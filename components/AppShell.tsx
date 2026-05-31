@@ -292,7 +292,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <nav className="mt-8 flex-1 space-y-1.5">
+              <nav className="mt-8 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
                 {visibleNav.map((item) => (
                   <NavLink
                     href={item.href}
@@ -314,7 +314,13 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
                   Install KingApp
                 </button>
               ) : null}
-              <UserPanel handleLogout={handleLogout} user={user} />
+              <UserPanel
+                handleLogout={() => {
+                  setMobileMenuOpen(false);
+                  handleLogout();
+                }}
+                user={user}
+              />
             </div>
           </div>
         ) : null}
@@ -322,7 +328,11 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
         <section className="mx-auto max-w-[1600px] px-4 pb-24 pt-5 sm:px-6 lg:px-8 lg:py-8">
           {children(user)}
         </section>
-        <MobileBottomNav pathname={pathname} visibleNav={visibleNav} />
+        <MobileBottomNav
+          onOpenMenu={() => setMobileMenuOpen(true)}
+          pathname={pathname}
+          visibleNav={visibleNav}
+        />
       </div>
     </main>
   );
@@ -397,7 +407,7 @@ function UserPanel({
   user: SessionUser;
 }) {
   return (
-    <div className="mt-6 rounded-lg border border-white/10 bg-white/10 p-3">
+    <div className="mt-4 shrink-0 rounded-lg border border-white/10 bg-white/10 p-3">
       <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-300 text-sm font-black text-brand-950">
           {user.displayName
@@ -432,9 +442,11 @@ function currentPageTitle(pathname: string) {
 }
 
 function MobileBottomNav({
+  onOpenMenu,
   pathname,
   visibleNav
 }: {
+  onOpenMenu: () => void;
   pathname: string;
   visibleNav: NavItem[];
 }) {
@@ -462,6 +474,14 @@ function MobileBottomNav({
             </Link>
           );
         })}
+        <button
+          className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-black text-slate-500 transition hover:bg-brand-50 hover:text-brand-800"
+          onClick={onOpenMenu}
+          type="button"
+        >
+          <Menu className="h-5 w-5" />
+          <span>More</span>
+        </button>
       </div>
     </nav>
   );
@@ -490,7 +510,7 @@ function getMobileNavItems(visibleNav: NavItem[]) {
         allItems.findIndex((candidate) => candidate.href === item.href) === index
     );
 
-  return items.slice(0, 5);
+  return items.slice(0, 4);
 }
 
 function shortMobileLabel(label: string) {
