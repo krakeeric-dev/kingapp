@@ -77,6 +77,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
     InventoryMovement[]
   >([]);
   const [minimumStocks, setMinimumStocks] = useState<MinimumStock[]>([]);
+  const [permissionMessage, setPermissionMessage] = useState("");
 
   useEffect(() => {
     setRecords(getLoadingRecords());
@@ -86,6 +87,14 @@ function DashboardContent({ user }: { user: SessionUser }) {
     setExpenseRecords(getExpenseRecords());
     setInventoryMovements(getInventoryMovements());
     setMinimumStocks(getMinimumStocks());
+    const blockedMessage = window.sessionStorage.getItem(
+      "kingapp.permissionMessage"
+    );
+
+    if (blockedMessage) {
+      setPermissionMessage(blockedMessage);
+      window.sessionStorage.removeItem("kingapp.permissionMessage");
+    }
   }, []);
 
   const dashboard = useMemo(() => {
@@ -364,6 +373,12 @@ function DashboardContent({ user }: { user: SessionUser }) {
           </div>
         </div>
       </div>
+
+      {permissionMessage ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+          {permissionMessage}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         {dashboard.stats.map((stat) => {

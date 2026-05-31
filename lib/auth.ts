@@ -1,3 +1,5 @@
+import { defaultUsers, getUsers, type PlatformUser } from "@/lib/users-data";
+
 export type UserRole =
   | "admin"
   | "supervisor"
@@ -6,53 +8,11 @@ export type UserRole =
   | "manager"
   | "marketer";
 
-export type MockUser = {
-  username: string;
-  password: string;
-  displayName: string;
-  role: UserRole;
-};
+export type MockUser = PlatformUser;
 
 export type SessionUser = Omit<MockUser, "password">;
 
-export const mockUsers: MockUser[] = [
-  {
-    username: "admin",
-    password: "admin123",
-    displayName: "System Admin",
-    role: "admin"
-  },
-  {
-    username: "supervisor",
-    password: "supervisor123",
-    displayName: "Supervisor",
-    role: "supervisor"
-  },
-  {
-    username: "storekeeper",
-    password: "store123",
-    displayName: "Storekeeper",
-    role: "storekeeper"
-  },
-  {
-    username: "accountant",
-    password: "cashier123",
-    displayName: "Accountant",
-    role: "accountant"
-  },
-  {
-    username: "manager",
-    password: "manager123",
-    displayName: "Manager",
-    role: "manager"
-  },
-  {
-    username: "marketer1",
-    password: "marketer123",
-    displayName: "Marketer 1",
-    role: "marketer"
-  }
-];
+export const mockUsers: MockUser[] = defaultUsers;
 
 export const roleLabels: Record<UserRole, string> = {
   admin: "Admin",
@@ -68,18 +28,7 @@ function getAvailableUsers() {
     return mockUsers;
   }
 
-  const rawUsers = window.localStorage.getItem("kingapp.users");
-
-  if (!rawUsers) {
-    return mockUsers;
-  }
-
-  try {
-    return JSON.parse(rawUsers) as MockUser[];
-  } catch {
-    window.localStorage.removeItem("kingapp.users");
-    return mockUsers;
-  }
+  return getUsers();
 }
 
 export function authenticateUser(
@@ -89,7 +38,8 @@ export function authenticateUser(
   const user = getAvailableUsers().find(
     (mockUser) =>
       mockUser.username.toLowerCase() === username.trim().toLowerCase() &&
-      mockUser.password === password
+      mockUser.password === password &&
+      mockUser.status !== "inactive"
   );
 
   if (!user) {

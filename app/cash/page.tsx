@@ -21,7 +21,7 @@ type DraftCash = Record<string, string>;
 
 export default function CashPage() {
   return (
-    <AppShell allowedRoles={["admin", "accountant"]}>
+    <AppShell allowedRoles={["admin", "supervisor", "accountant"]}>
       {(user) => <CashContent user={user} />}
     </AppShell>
   );
@@ -358,7 +358,7 @@ function CashRow(props: CashDisplayProps) {
       <td className="px-4 py-3">
         <input
           className="form-input ml-auto max-w-32 text-right"
-          disabled={user.role === "admin" || isLocked}
+          disabled={user.role !== "accountant" || isLocked}
           min="0"
           onChange={(event) =>
             setDraftCash((current) => ({
@@ -432,7 +432,7 @@ function CashCard(props: CashDisplayProps) {
         </span>
         <input
           className="form-input"
-          disabled={user.role === "admin" || isLocked}
+          disabled={user.role !== "accountant" || isLocked}
           min="0"
           onChange={(event) =>
             setDraftCash((current) => ({
@@ -478,7 +478,7 @@ function CashAction({
   setUnlockRecordId: (recordId: string) => void;
   user: SessionUser;
 }) {
-  if (user.role === "admin") {
+  if (user.role === "admin" || user.role === "supervisor") {
     if (cashRecord?.locked) {
       return (
         <button
@@ -494,7 +494,7 @@ function CashAction({
 
     return (
       <span className="text-xs font-semibold text-slate-500">
-        {cashRecord ? "Unlocked" : "No cash yet"}
+        {cashRecord ? "View only" : "No cash yet"}
       </span>
     );
   }

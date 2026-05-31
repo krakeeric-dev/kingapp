@@ -1,5 +1,5 @@
-import { mockUsers } from "@/lib/auth";
 import { defaultProducts } from "@/lib/products-data";
+import { defaultUsers } from "@/lib/users-data";
 import {
   fetchSupabaseTable,
   isSupabaseConfigured,
@@ -20,7 +20,7 @@ const configs: LocalTableConfig<unknown>[] = [
     localKey: "kingapp.users",
     table: "users",
     getId: (record) => (record as { username: string }).username,
-    seed: mockUsers
+    seed: defaultUsers
   },
   {
     localKey: "kingapp.productMaster",

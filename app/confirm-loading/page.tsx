@@ -15,7 +15,7 @@ import {
 
 export default function ConfirmLoadingPage() {
   return (
-    <AppShell allowedRoles={["admin", "marketer"]}>
+    <AppShell allowedRoles={["admin", "supervisor", "marketer"]}>
       {(user) => <ConfirmLoadingContent user={user} />}
     </AppShell>
   );
@@ -32,7 +32,7 @@ function ConfirmLoadingContent({ user }: { user: SessionUser }) {
   }, []);
 
   const visibleRecords = useMemo(() => {
-    if (user.role === "admin") {
+    if (user.role === "admin" || user.role === "supervisor") {
       return records;
     }
 
@@ -267,10 +267,10 @@ function RecordActions({
   setActiveRejectId: (recordId: string) => void;
   user: SessionUser;
 }) {
-  if (user.role === "admin") {
+  if (user.role === "admin" || user.role === "supervisor") {
     return (
       <span className="text-xs font-semibold text-slate-500">
-        Admin view only
+        View only
       </span>
     );
   }

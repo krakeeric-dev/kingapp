@@ -135,12 +135,12 @@ create policy "KingApp demo update audit logs" on public.audit_logs for update u
 
 insert into public.users (id, payload)
 values
-  ('admin', '{"username":"admin","password":"admin123","displayName":"System Admin","role":"admin"}'),
-  ('supervisor', '{"username":"supervisor","password":"supervisor123","displayName":"Supervisor","role":"supervisor"}'),
-  ('storekeeper', '{"username":"storekeeper","password":"store123","displayName":"Storekeeper","role":"storekeeper"}'),
-  ('accountant', '{"username":"accountant","password":"cashier123","displayName":"Accountant","role":"accountant"}'),
-  ('manager', '{"username":"manager","password":"manager123","displayName":"Manager","role":"manager"}'),
-  ('marketer1', '{"username":"marketer1","password":"marketer123","displayName":"Marketer 1","role":"marketer"}')
+  ('admin', '{"username":"admin","password":"admin123","displayName":"System Admin","role":"admin","phone":"","email":"","status":"active","createdAt":"2026-05-30T00:00:00.000Z","updatedAt":"2026-05-30T00:00:00.000Z"}'),
+  ('supervisor', '{"username":"supervisor","password":"supervisor123","displayName":"Supervisor","role":"supervisor","phone":"","email":"","status":"active","createdAt":"2026-05-30T00:00:00.000Z","updatedAt":"2026-05-30T00:00:00.000Z"}'),
+  ('storekeeper', '{"username":"storekeeper","password":"store123","displayName":"Storekeeper","role":"storekeeper","phone":"","email":"","status":"active","createdAt":"2026-05-30T00:00:00.000Z","updatedAt":"2026-05-30T00:00:00.000Z"}'),
+  ('accountant', '{"username":"accountant","password":"cashier123","displayName":"Accountant","role":"accountant","phone":"","email":"","status":"active","createdAt":"2026-05-30T00:00:00.000Z","updatedAt":"2026-05-30T00:00:00.000Z"}'),
+  ('manager', '{"username":"manager","password":"manager123","displayName":"Manager","role":"manager","phone":"","email":"","status":"active","createdAt":"2026-05-30T00:00:00.000Z","updatedAt":"2026-05-30T00:00:00.000Z"}'),
+  ('marketer1', '{"username":"marketer1","password":"marketer123","displayName":"Marketer 1","role":"marketer","phone":"","email":"","status":"active","createdAt":"2026-05-30T00:00:00.000Z","updatedAt":"2026-05-30T00:00:00.000Z"}')
 on conflict (id) do update
 set payload = excluded.payload,
     updated_at = now();

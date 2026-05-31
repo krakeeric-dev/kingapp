@@ -48,7 +48,17 @@ function AuditLogContent() {
               <article className="p-5" key={entry.id}>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="font-bold text-slate-950">
-                    {entry.action === "price_change"
+                    {entry.action === "user_created"
+                      ? "User created"
+                      : entry.action === "user_edited"
+                        ? "User edited"
+                        : entry.action === "user_deactivated"
+                          ? "User deactivated"
+                          : entry.action === "user_password_reset"
+                            ? "Password reset"
+                            : entry.action === "user_removed"
+                              ? "User removed"
+                              : entry.action === "price_change"
                       ? "Price changed"
                       : entry.action === "inventory_adjustment"
                         ? "Inventory adjustment"

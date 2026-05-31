@@ -22,7 +22,7 @@ type DraftSold = Record<string, string>;
 
 export default function SalesPage() {
   return (
-    <AppShell allowedRoles={["admin", "marketer"]}>
+    <AppShell allowedRoles={["admin", "supervisor", "marketer"]}>
       {(user) => <SalesContent user={user} />}
     </AppShell>
   );
@@ -170,7 +170,7 @@ function SalesContent({ user }: { user: SessionUser }) {
         </div>
       </div>
 
-      {user.role === "admin" ? (
+      {user.role === "admin" || user.role === "supervisor" ? (
         <div className="rounded-lg border border-brand-100 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
             <Search className="h-4 w-4 text-brand-700" />
@@ -361,7 +361,7 @@ function SalesRow({
       <td className="px-4 py-3">
         <input
           className="form-input ml-auto max-w-28 text-right"
-          disabled={user.role === "admin" || isLocked}
+          disabled={user.role !== "marketer" || isLocked}
           min="0"
           onChange={(event) => handleSoldChange(load.id, event.target.value)}
           type="number"
@@ -430,7 +430,7 @@ function SalesCard(props: SalesDisplayProps) {
         </span>
         <input
           className="form-input"
-          disabled={user.role === "admin" || isLocked}
+          disabled={user.role !== "marketer" || isLocked}
           min="0"
           onChange={(event) => handleSoldChange(load.id, event.target.value)}
           type="number"
@@ -488,7 +488,7 @@ function SalesAction({
   setUnlockRecordId: (recordId: string) => void;
   user: SessionUser;
 }) {
-  if (user.role === "admin") {
+  if (user.role === "admin" || user.role === "supervisor") {
     if (salesRecord?.locked) {
       return (
         <button
@@ -504,7 +504,7 @@ function SalesAction({
 
     return (
       <span className="text-xs font-semibold text-slate-500">
-        {salesRecord ? "Unlocked" : "No sales yet"}
+        {salesRecord ? "View only" : "No sales yet"}
       </span>
     );
   }

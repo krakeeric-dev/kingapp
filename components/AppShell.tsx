@@ -16,12 +16,14 @@ import {
   ReceiptText,
   ScrollText,
   ShieldCheck,
+  UserRound,
   WalletCards,
   X
 } from "lucide-react";
 import type { SessionUser, UserRole } from "@/lib/auth";
 import { cleanupLegacyDemoProductData } from "@/lib/data-cleanup";
 import { syncSupabaseToLocalStorage } from "@/lib/live-data";
+import { canAccessPage, getAllowedRoles } from "@/lib/permissions";
 import { roleLabels } from "@/lib/auth";
 import { clearSession, getSession } from "@/lib/storage";
 
@@ -37,73 +39,79 @@ const navItems: NavItem[] = [
     href: "/dashboard",
     label: "Dashboard",
     icon: Home,
-    roles: ["admin", "supervisor", "storekeeper", "accountant", "manager", "marketer"]
+    roles: getAllowedRoles("/dashboard")
   },
   {
     href: "/loading",
     label: "Loading",
     icon: Boxes,
-    roles: ["admin", "storekeeper"]
+    roles: getAllowedRoles("/loading")
   },
   {
     href: "/inventory",
     label: "Inventory",
     icon: Boxes,
-    roles: ["admin", "storekeeper", "manager", "supervisor"]
+    roles: getAllowedRoles("/inventory")
   },
   {
     href: "/price-management",
     label: "Prices",
     icon: BadgeDollarSign,
-    roles: ["admin"]
+    roles: getAllowedRoles("/price-management")
   },
   {
     href: "/confirm-loading",
     label: "Confirm",
     icon: ClipboardCheck,
-    roles: ["admin", "marketer"]
+    roles: getAllowedRoles("/confirm-loading")
   },
   {
     href: "/sales",
     label: "Sales",
     icon: FileText,
-    roles: ["admin", "marketer"]
+    roles: getAllowedRoles("/sales")
   },
   {
     href: "/returns",
     label: "Returns",
     icon: PackageCheck,
-    roles: ["admin", "storekeeper"]
+    roles: getAllowedRoles("/returns")
   },
   {
     href: "/cash",
     label: "Cash",
     icon: WalletCards,
-    roles: ["admin", "accountant"]
+    roles: getAllowedRoles("/cash")
   },
   {
     href: "/expenses",
     label: "Expenses",
     icon: ReceiptText,
-    roles: ["admin", "accountant"]
+    roles: getAllowedRoles("/expenses")
   },
   {
     href: "/admin/audit-log",
     label: "Audit Log",
     icon: ShieldCheck,
-    roles: ["admin"]
+    roles: getAllowedRoles("/admin/audit-log")
+  },
+  {
+    href: "/admin/users",
+    label: "Users",
+    icon: UserRound,
+    roles: getAllowedRoles("/admin/users")
   },
   {
     href: "/daily-report",
     label: "Daily Report",
     icon: ScrollText,
-    roles: ["admin", "manager", "supervisor"]
+    roles: getAllowedRoles("/daily-report")
   },
   {
     href: "/reports",
     label: "Reports",
     icon: BarChart3,
-    roles: ["admin", "supervisor", "manager"]
+    roles: getAllowedRoles("/reports")
   }
 ];
 
@@ -133,7 +141,13 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
         return;
       }
 
-      if (allowedRoles && !allowedRoles.includes(session.role)) {
+      const pageAllowedRoles = allowedRoles ?? getAllowedRoles(pathname);
+
+      if (!pageAllowedRoles.includes(session.role) || !canAccessPage(pathname, session.role)) {
+        window.sessionStorage.setItem(
+          "kingapp.permissionMessage",
+          "You do not have permission to access this page."
+        );
         router.replace("/dashboard");
         return;
       }
@@ -149,7 +163,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
     return () => {
       isMounted = false;
     };
-  }, [allowedRoleKey, router]);
+  }, [allowedRoleKey, pathname, router]);
 
   function handleLogout() {
     clearSession();

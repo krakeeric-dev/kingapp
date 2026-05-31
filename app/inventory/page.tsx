@@ -280,7 +280,7 @@ function InventoryContent({ user }: { user: SessionUser }) {
         </div>
       </section>
 
-      {user.role === "storekeeper" || user.role === "admin" ? (
+      {user.role === "admin" ? (
         <div className="grid gap-4 xl:grid-cols-2">
           <StockMovementForm
             form={openingForm}

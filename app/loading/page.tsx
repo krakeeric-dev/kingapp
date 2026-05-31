@@ -47,7 +47,7 @@ const marketers = mockUsers.filter((user) => user.role === "marketer");
 
 export default function LoadingPage() {
   return (
-    <AppShell allowedRoles={["admin", "storekeeper"]}>
+    <AppShell allowedRoles={["admin", "supervisor", "storekeeper"]}>
       {(user) => <LoadingContent user={user} />}
     </AppShell>
   );
@@ -85,7 +85,7 @@ function LoadingContent({ user }: { user: SessionUser }) {
   }, []);
 
   const visibleRecords = useMemo(() => {
-    if (user.role === "admin") {
+    if (user.role === "admin" || user.role === "supervisor") {
       return records;
     }
 

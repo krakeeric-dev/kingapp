@@ -36,7 +36,12 @@ export type AuditLogEntry = {
     | "unlock_return"
     | "unlock_expenses"
     | "inventory_adjustment"
-    | "price_change";
+    | "price_change"
+    | "user_created"
+    | "user_edited"
+    | "user_deactivated"
+    | "user_password_reset"
+    | "user_removed";
   reason: string;
   performedBy: string;
   performedByRole: string;

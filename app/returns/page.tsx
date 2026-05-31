@@ -18,7 +18,7 @@ type DraftReturn = Record<string, string>;
 
 export default function ReturnsPage() {
   return (
-    <AppShell allowedRoles={["admin", "storekeeper"]}>
+    <AppShell allowedRoles={["admin", "supervisor", "storekeeper"]}>
       {(user) => <ReturnsContent user={user} />}
     </AppShell>
   );
@@ -353,7 +353,7 @@ function ReturnRow(props: ReturnDisplayProps) {
       <td className="px-4 py-3">
         <input
           className="form-input ml-auto max-w-32 text-right"
-          disabled={user.role === "admin" || isLocked}
+          disabled={user.role !== "storekeeper" || isLocked}
           min="0"
           onChange={(event) =>
             setDraftReturn((current) => ({
@@ -426,7 +426,7 @@ function ReturnCard(props: ReturnDisplayProps) {
         </span>
         <input
           className="form-input"
-          disabled={user.role === "admin" || isLocked}
+          disabled={user.role !== "storekeeper" || isLocked}
           min="0"
           onChange={(event) =>
             setDraftReturn((current) => ({
@@ -479,7 +479,7 @@ function ReturnAction({
   setUnlockRecordId: (recordId: string) => void;
   user: SessionUser;
 }) {
-  if (user.role === "admin") {
+  if (user.role === "admin" || user.role === "supervisor") {
     if (returnRecord?.locked) {
       return (
         <button
@@ -495,7 +495,7 @@ function ReturnAction({
 
     return (
       <span className="text-xs font-semibold text-slate-500">
-        {returnRecord ? "Unlocked" : "No return yet"}
+        {returnRecord ? "View only" : "No return yet"}
       </span>
     );
   }

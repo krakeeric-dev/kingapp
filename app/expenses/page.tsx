@@ -42,7 +42,7 @@ const emptyDraft: ExpenseDraft = {
 
 export default function ExpensesPage() {
   return (
-    <AppShell allowedRoles={["admin", "accountant"]}>
+    <AppShell allowedRoles={["admin", "supervisor", "accountant"]}>
       {(user) => <ExpensesContent user={user} />}
     </AppShell>
   );
@@ -384,7 +384,7 @@ function ExpenseCard({
   const totalExpenses = calculateTotalExpenses(input);
   const closingBalance = cashRecord.cashReceived - totalExpenses;
   const isLocked = Boolean(expenseRecord?.locked);
-  const isAdmin = user.role === "admin";
+  const isReadOnly = user.role !== "accountant";
 
   return (
     <article className="rounded-lg border border-brand-100 bg-white p-4 shadow-sm sm:p-5">
@@ -413,43 +413,43 @@ function ExpenseCard({
 
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <ExpenseInputField
-          disabled={isAdmin || isLocked}
+          disabled={isReadOnly || isLocked}
           label="Fuel"
           onChange={(value) => updateDraft(cashRecord.id, "fuel", value)}
           value={draft.fuel}
         />
         <ExpenseInputField
-          disabled={isAdmin || isLocked}
+          disabled={isReadOnly || isLocked}
           label="Transport"
           onChange={(value) => updateDraft(cashRecord.id, "transport", value)}
           value={draft.transport}
         />
         <ExpenseInputField
-          disabled={isAdmin || isLocked}
+          disabled={isReadOnly || isLocked}
           label="Loader Payment"
           onChange={(value) => updateDraft(cashRecord.id, "loaderPayment", value)}
           value={draft.loaderPayment}
         />
         <ExpenseInputField
-          disabled={isAdmin || isLocked}
+          disabled={isReadOnly || isLocked}
           label="Commission"
           onChange={(value) => updateDraft(cashRecord.id, "commission", value)}
           value={draft.commission}
         />
         <ExpenseInputField
-          disabled={isAdmin || isLocked}
+          disabled={isReadOnly || isLocked}
           label="Airtime"
           onChange={(value) => updateDraft(cashRecord.id, "airtime", value)}
           value={draft.airtime}
         />
         <ExpenseInputField
-          disabled={isAdmin || isLocked}
+          disabled={isReadOnly || isLocked}
           label="Food"
           onChange={(value) => updateDraft(cashRecord.id, "food", value)}
           value={draft.food}
         />
         <ExpenseInputField
-          disabled={isAdmin || isLocked}
+          disabled={isReadOnly || isLocked}
           label="Miscellaneous"
           onChange={(value) => updateDraft(cashRecord.id, "miscellaneous", value)}
           value={draft.miscellaneous}
@@ -460,7 +460,7 @@ function ExpenseCard({
           </span>
           <input
             className="form-input"
-            disabled={isAdmin || isLocked}
+            disabled={isReadOnly || isLocked}
             onChange={(event) =>
               updateDraft(cashRecord.id, "notes", event.target.value)
             }
@@ -505,7 +505,7 @@ function ExpenseAction({
   setUnlockRecordId: (recordId: string) => void;
   user: SessionUser;
 }) {
-  if (user.role === "admin") {
+  if (user.role === "admin" || user.role === "supervisor") {
     if (expenseRecord?.locked) {
       return (
         <button
@@ -521,7 +521,7 @@ function ExpenseAction({
 
     return (
       <span className="inline-flex h-11 items-center text-sm font-semibold text-slate-500">
-        {expenseRecord ? "Unlocked" : "No expenses yet"}
+        {expenseRecord ? "View only" : "No expenses yet"}
       </span>
     );
   }

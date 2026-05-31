@@ -33,7 +33,7 @@ type Filters = {
 
 export default function DailyReportPage() {
   return (
-    <AppShell allowedRoles={["admin", "manager", "supervisor"]}>
+    <AppShell allowedRoles={["admin", "manager", "supervisor", "accountant"]}>
       {() => <DailyReportContent />}
     </AppShell>
   );
