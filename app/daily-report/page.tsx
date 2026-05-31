@@ -194,14 +194,14 @@ function DailyReportContent() {
 
   return (
     <div className="space-y-6">
-      <div className="no-print rounded-lg border border-brand-100 bg-white p-5 shadow-sm sm:p-6">
+      <div className="no-print app-card-soft p-5 sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
               <ScrollText className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-slate-950">
+              <h2 className="text-2xl font-black text-slate-950">
                 Daily Closing Report
               </h2>
               <p className="mt-1 text-sm text-slate-600">
@@ -211,7 +211,7 @@ function DailyReportContent() {
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-200 px-4 py-2.5 text-sm font-bold text-brand-800 transition hover:bg-brand-50"
+              className="secondary-button"
               onClick={printReport}
               type="button"
             >
@@ -219,7 +219,7 @@ function DailyReportContent() {
               Print Report
             </button>
             <button
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-brand-800"
+              className="primary-button"
               onClick={printReport}
               type="button"
             >
@@ -230,7 +230,7 @@ function DailyReportContent() {
         </div>
       </div>
 
-      <div className="no-print rounded-lg border border-brand-100 bg-white p-4 shadow-sm">
+      <div className="no-print app-card p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
           <Search className="h-4 w-4 text-brand-700" />
           Report filters
@@ -263,25 +263,25 @@ function DailyReportContent() {
         </div>
       </div>
 
-      <article className="print-page rounded-lg border border-brand-100 bg-white p-5 shadow-sm sm:p-8">
-        <header className="border-b border-brand-100 pb-5">
+      <article className="print-page rounded-lg border border-slate-200 bg-white p-5 shadow-executive sm:p-8">
+        <header className="rounded-lg bg-gradient-to-r from-brand-950 to-brand-700 p-5 text-white">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-700 text-xl font-bold text-white">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white/15 text-xl font-black text-white">
                 K
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-brand-900">KingApp</h1>
-                <p className="text-sm font-semibold text-brand-700">
+                <h1 className="text-2xl font-black text-white">KingApp</h1>
+                <p className="text-sm font-semibold text-emerald-100">
                   Sales & Stock Management
                 </p>
               </div>
             </div>
             <div className="text-left sm:text-right">
-              <p className="text-sm font-semibold uppercase tracking-normal text-slate-500">
+              <p className="text-sm font-semibold uppercase tracking-normal text-emerald-100">
                 Daily Closing Report
               </p>
-              <p className="mt-1 text-xl font-bold text-slate-950">
+              <p className="mt-1 text-xl font-black text-white">
                 {formatDate(filters.date)}
               </p>
             </div>
@@ -390,7 +390,7 @@ function DailyReportContent() {
           </ReportSection>
         </section>
 
-        <section className="mt-4 rounded-lg border border-brand-200 bg-brand-50 p-5">
+        <section className="mt-4 rounded-lg border border-brand-200 bg-gradient-to-r from-brand-50 to-white p-5">
           <p className="text-sm font-semibold uppercase tracking-normal text-brand-700">
             Final Closing Summary
           </p>
@@ -398,7 +398,7 @@ function DailyReportContent() {
             <h2 className="text-xl font-bold text-brand-950">
               Closing Cash Balance
             </h2>
-            <p className="text-3xl font-bold text-brand-800">
+            <p className="text-3xl font-black text-brand-800">
               {formatMoney(report.closingBalance)} RWF
             </p>
           </div>
@@ -433,8 +433,8 @@ function ReportSection({
   title: string;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 p-4">
-      <h2 className="border-b border-slate-100 pb-3 text-base font-bold text-slate-950">
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="border-b border-slate-100 pb-3 text-base font-black text-slate-950">
         {title}
       </h2>
       <div className="mt-3 space-y-2">{children}</div>

@@ -12,6 +12,8 @@ import {
   ReceiptText,
   ScrollText,
   ShieldCheck,
+  TrendingDown,
+  TrendingUp,
   WalletCards
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -51,6 +53,13 @@ type DashboardModule = {
   href: string;
   icon: typeof BarChart3;
   roles: UserRole[];
+};
+
+type DashboardStat = {
+  label: string;
+  value: string;
+  icon: typeof BarChart3;
+  tone?: "success" | "danger" | "warning" | "neutral";
 };
 
 const modules: DashboardModule[] = [
@@ -198,9 +207,23 @@ function DashboardContent({ user }: { user: SessionUser }) {
       })
     );
 
+    const cashVarianceTone =
+      cashTotals.cashVarianceToday < 0
+        ? "danger"
+        : cashTotals.cashVarianceToday > 0
+          ? "warning"
+          : "success";
+    const stockVarianceTone =
+      returnTotals.stockVarianceToday > 0
+        ? "danger"
+        : returnTotals.stockVarianceToday < 0
+          ? "warning"
+          : "success";
+
     return [
       {
         label: "Total Loaded Today",
+        icon: Boxes,
         value: roleRecords
           .filter((record) => record.date === today && record.status !== "draft")
           .reduce((total, record) => total + record.loadedCartons, 0)
@@ -208,71 +231,96 @@ function DashboardContent({ user }: { user: SessionUser }) {
       },
       {
         label: "Pending Confirmations",
+        icon: ClipboardCheck,
+        tone: "warning" as const,
         value: roleRecords
           .filter((record) => record.status === "pending")
           .length.toLocaleString()
       },
       {
         label: "Confirmed Loads",
+        icon: ShieldCheck,
+        tone: "success" as const,
         value: roleRecords
           .filter((record) => record.status === "confirmed")
           .length.toLocaleString()
       },
       {
         label: "Rejected Loads",
+        icon: TrendingDown,
+        tone: "danger" as const,
         value: roleRecords
           .filter((record) => record.status === "rejected")
           .length.toLocaleString()
       },
       {
         label: "Total Sold Today",
+        icon: FileText,
         value: salesTotals.totalSoldToday.toLocaleString()
       },
       {
         label: "Expected Returns Today",
+        icon: PackageCheck,
         value: salesTotals.expectedReturnsToday.toLocaleString()
       },
       {
         label: "Total Sales Value",
+        icon: TrendingUp,
+        tone: "success" as const,
         value: formatMoney(salesTotals.totalSalesValue)
       },
       {
         label: "Cash Received Today",
+        icon: WalletCards,
+        tone: "success" as const,
         value: formatMoney(cashTotals.cashReceivedToday)
       },
       {
         label: "Cash Variance Today",
+        icon: cashVarianceTone === "danger" ? TrendingDown : TrendingUp,
+        tone: cashVarianceTone,
         value: formatMoney(cashTotals.cashVarianceToday)
       },
       {
         label: "Returns Received Today",
+        icon: PackageCheck,
         value: returnTotals.returnsReceivedToday.toLocaleString()
       },
       {
         label: "Stock Variance Today",
+        icon: stockVarianceTone === "danger" ? TrendingDown : TrendingUp,
+        tone: stockVarianceTone,
         value: returnTotals.stockVarianceToday.toLocaleString()
       },
       {
         label: "Total Expenses Today",
+        icon: ReceiptText,
         value: formatMoney(expenseTotals.totalExpensesToday)
       },
       {
         label: "Closing Cash Balance Today",
+        icon: WalletCards,
+        tone: "success" as const,
         value: formatMoney(expenseTotals.closingCashBalanceToday)
       },
       {
         label: "Total Warehouse Stock",
+        icon: Boxes,
         value: inventoryTotals.totalWarehouseStock.toLocaleString()
       },
       {
         label: "Low Stock Items",
+        icon: TrendingDown,
+        tone: inventoryTotals.lowStockItems > 0 ? ("warning" as const) : ("success" as const),
         value: inventoryTotals.lowStockItems.toLocaleString()
       },
       {
         label: "Out of Stock Items",
+        icon: TrendingDown,
+        tone: inventoryTotals.outOfStockItems > 0 ? ("danger" as const) : ("success" as const),
         value: inventoryTotals.outOfStockItems.toLocaleString()
       }
-    ];
+    ] satisfies DashboardStat[];
   }, [
     cashRecords,
     expenseRecords,
@@ -287,35 +335,51 @@ function DashboardContent({ user }: { user: SessionUser }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm sm:p-6">
+      <div className="app-card-soft overflow-hidden p-5 sm:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-normal text-brand-700">
               {roleLabels[user.role]} Dashboard
             </p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-950 sm:text-3xl">
+            <h2 className="mt-2 text-2xl font-black text-slate-950 sm:text-4xl">
               Welcome, {user.displayName}
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               {roleSummaries[user.role]}
             </p>
           </div>
-          <div className="rounded-lg bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-900">
+          <div className="rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-bold text-brand-900">
             Signed in as {user.username}
           </div>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => (
+        {stats.map((stat) => {
+          const Icon = stat.icon;
+          const toneClass = getStatToneClass(stat.tone);
+
+          return (
           <article
-            className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm"
+            className="app-card group p-5 transition hover:-translate-y-0.5 hover:shadow-soft"
             key={stat.label}
           >
-            <p className="text-sm font-semibold text-slate-500">{stat.label}</p>
-            <p className="mt-3 text-3xl font-bold text-brand-800">{stat.value}</p>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-bold text-slate-500">{stat.label}</p>
+                <p className={`mt-3 text-3xl font-black ${toneClass.text}`}>
+                  {stat.value}
+                </p>
+              </div>
+              <div
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${toneClass.icon}`}
+              >
+                <Icon className="h-6 w-6" />
+              </div>
+            </div>
           </article>
-        ))}
+          );
+        })}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -324,7 +388,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
 
           return (
             <Link
-              className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft"
+              className="app-card p-5 transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-soft"
               href={module.href}
               key={module.title}
             >
@@ -343,4 +407,32 @@ function DashboardContent({ user }: { user: SessionUser }) {
       </div>
     </div>
   );
+}
+
+function getStatToneClass(tone: DashboardStat["tone"] = "neutral") {
+  if (tone === "danger") {
+    return {
+      icon: "bg-red-50 text-red-700",
+      text: "text-red-700"
+    };
+  }
+
+  if (tone === "warning") {
+    return {
+      icon: "bg-amber-50 text-amber-700",
+      text: "text-amber-700"
+    };
+  }
+
+  if (tone === "success") {
+    return {
+      icon: "bg-emerald-50 text-emerald-700",
+      text: "text-emerald-700"
+    };
+  }
+
+  return {
+    icon: "bg-brand-50 text-brand-700",
+    text: "text-brand-800"
+  };
 }

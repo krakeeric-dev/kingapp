@@ -74,7 +74,7 @@ export function LoadingRecordsView({
   return (
     <div className="space-y-4">
       {showAdminFilters ? (
-        <div className="rounded-lg border border-brand-100 bg-white p-4 shadow-sm">
+        <div className="app-card p-4">
           <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
             <Search className="h-4 w-4 text-brand-700" />
             Filter loading records
@@ -85,7 +85,7 @@ export function LoadingRecordsView({
                 Date
               </span>
               <input
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-brand-600 focus:ring-4 focus:ring-brand-100"
+                className="form-input"
                 onChange={(event) =>
                   setFilters((current) => ({ ...current, date: event.target.value }))
                 }
@@ -98,7 +98,7 @@ export function LoadingRecordsView({
                 Marketer
               </span>
               <input
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-brand-600 focus:ring-4 focus:ring-brand-100"
+                className="form-input"
                 onChange={(event) =>
                   setFilters((current) => ({
                     ...current,
@@ -114,7 +114,7 @@ export function LoadingRecordsView({
                 Product
               </span>
               <input
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-brand-600 focus:ring-4 focus:ring-brand-100"
+                className="form-input"
                 onChange={(event) =>
                   setFilters((current) => ({
                     ...current,
@@ -129,9 +129,9 @@ export function LoadingRecordsView({
         </div>
       ) : null}
 
-      <div className="hidden overflow-hidden rounded-lg border border-brand-100 bg-white shadow-sm lg:block">
-        <table className="w-full border-collapse text-left text-sm">
-          <thead className="bg-brand-50 text-xs font-bold uppercase tracking-normal text-brand-900">
+      <div className="hidden max-h-[620px] overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm lg:block">
+        <table className="data-table">
+          <thead>
             <tr>
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Product</th>
@@ -143,7 +143,7 @@ export function LoadingRecordsView({
               {user.role === "admin" ? <th className="px-4 py-3">Admin</th> : null}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody>
             {filteredRecords.map((record) => (
               <tr key={record.id}>
                 <td className="px-4 py-3 text-slate-700">{formatDate(record.date)}</td>
@@ -158,7 +158,7 @@ export function LoadingRecordsView({
                 </td>
                 <td className="px-4 py-3">
                   <span
-                    className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${statusChipClass(
+                    className={`status-badge ${statusChipClass(
                       record.status
                     )}`}
                   >
@@ -169,7 +169,7 @@ export function LoadingRecordsView({
                   <td className="px-4 py-3">
                     {record.locked ? (
                       <button
-                        className="inline-flex items-center gap-2 rounded-lg border border-brand-200 px-3 py-2 text-xs font-bold text-brand-800 transition hover:bg-brand-50"
+                        className="secondary-button !px-3 !py-2 !text-xs"
                         onClick={() => setUnlockRecordId(record.id)}
                         type="button"
                       >
@@ -192,18 +192,18 @@ export function LoadingRecordsView({
       <div className="grid gap-3 lg:hidden">
         {filteredRecords.map((record) => (
           <article
-            className="rounded-lg border border-brand-100 bg-white p-4 shadow-sm"
+            className="app-card p-4"
             key={record.id}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-bold text-slate-950">{record.productName}</h3>
                 <p className="mt-1 text-sm text-slate-600">
-                  {record.itemCode} · {formatDate(record.date)}
+                  {record.itemCode} - {formatDate(record.date)}
                 </p>
               </div>
               <span
-                className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${statusChipClass(
+                className={`status-badge ${statusChipClass(
                   record.status
                 )}`}
               >
@@ -249,7 +249,7 @@ export function LoadingRecordsView({
             ) : null}
             {user.role === "admin" && record.locked ? (
               <button
-                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 px-3 py-2 text-sm font-bold text-brand-800 transition hover:bg-brand-50"
+                className="secondary-button mt-4 w-full"
                 onClick={() => setUnlockRecordId(record.id)}
                 type="button"
               >
@@ -268,7 +268,7 @@ export function LoadingRecordsView({
       ) : null}
 
       {unlockRecordId ? (
-        <div className="rounded-lg border border-brand-100 bg-white p-4 shadow-sm">
+        <div className="app-card p-4">
           <form className="space-y-3" onSubmit={handleUnlock}>
             <div>
               <h3 className="font-bold text-slate-950">Unlock confirmed record</h3>
@@ -277,7 +277,7 @@ export function LoadingRecordsView({
               </p>
             </div>
             <textarea
-              className="min-h-24 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-brand-600 focus:ring-4 focus:ring-brand-100"
+              className="form-input min-h-24"
               onChange={(event) => setUnlockReason(event.target.value)}
               placeholder="Reason for unlock"
               value={unlockReason}
@@ -287,13 +287,13 @@ export function LoadingRecordsView({
             ) : null}
             <div className="flex flex-col gap-2 sm:flex-row">
               <button
-                className="inline-flex items-center justify-center rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-800"
+                className="primary-button"
                 type="submit"
               >
                 Save unlock
               </button>
               <button
-                className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                className="secondary-button"
                 onClick={() => {
                   setUnlockRecordId("");
                   setUnlockReason("");

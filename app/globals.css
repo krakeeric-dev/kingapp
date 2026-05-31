@@ -12,12 +12,17 @@
 
 body {
   margin: 0;
-  background: #f6faf7;
+  background:
+    radial-gradient(circle at top left, rgba(217, 251, 230, 0.7), transparent 34rem),
+    linear-gradient(180deg, #f8fbf9 0%, #eef6f1 100%);
   color: #102116;
+  min-height: 100vh;
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -28,7 +33,47 @@ a {
 
 @layer components {
   .form-input {
-    @apply w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-4 focus:ring-brand-100;
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3.5 py-3 text-sm font-medium text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-100;
+  }
+
+  .app-card {
+    @apply rounded-lg border border-slate-200/80 bg-white shadow-sm;
+  }
+
+  .app-card-soft {
+    @apply rounded-lg border border-slate-200/80 bg-white/95 shadow-executive;
+  }
+
+  .primary-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-brand-800 focus:outline-none focus:ring-4 focus:ring-brand-100 disabled:cursor-not-allowed disabled:opacity-70;
+  }
+
+  .secondary-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-800 focus:outline-none focus:ring-4 focus:ring-brand-100;
+  }
+
+  .status-badge {
+    @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold;
+  }
+
+  .data-table {
+    @apply w-full border-separate border-spacing-0 text-left text-sm;
+  }
+
+  .data-table thead {
+    @apply sticky top-0 z-10 bg-slate-50 text-xs font-bold uppercase tracking-normal text-slate-500;
+  }
+
+  .data-table th {
+    @apply border-b border-slate-200 px-4 py-3;
+  }
+
+  .data-table td {
+    @apply border-b border-slate-100 px-4 py-3.5 align-middle;
+  }
+
+  .data-table tbody tr {
+    @apply transition hover:bg-brand-50/50;
   }
 }
 
@@ -57,7 +102,12 @@ a {
     border: 0 !important;
     box-shadow: none !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 16mm !important;
     width: 100% !important;
+  }
+
+  .print-page * {
+    color-adjust: exact;
+    print-color-adjust: exact;
   }
 }

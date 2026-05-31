@@ -2,8 +2,8 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LockKeyhole, LogIn, UserRound } from "lucide-react";
-import { authenticateUser } from "@/lib/auth";
+import { LockKeyhole, LogIn, ShieldCheck, UserRound } from "lucide-react";
+import { authenticateUser, mockUsers, roleLabels } from "@/lib/auth";
 import { syncSupabaseToLocalStorage } from "@/lib/live-data";
 import { getSession, saveSession } from "@/lib/storage";
 
@@ -40,28 +40,33 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#dcfce7,transparent_36%),linear-gradient(135deg,#f6faf7_0%,#ffffff_46%,#eaf7ef_100%)] px-4 py-8">
-      <section className="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="space-y-7">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(217,251,230,0.95),transparent_34rem),linear-gradient(135deg,#f8fbf9_0%,#ffffff_45%,#edf7f1_100%)] px-4 py-8">
+      <section className="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="order-2 space-y-6 lg:order-1">
+          <div className="inline-flex items-center gap-3 rounded-lg border border-brand-100 bg-white/80 px-3 py-2 text-sm font-bold text-brand-800 shadow-sm">
+            <ShieldCheck className="h-4 w-4" />
+            Live-ready sales operations
+          </div>
           <div>
-            <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-lg bg-brand-700 text-xl font-bold text-white shadow-soft">
+            <div className="mb-5 inline-flex h-16 w-16 items-center justify-center rounded-lg bg-gradient-to-br from-brand-700 to-brand-950 text-2xl font-black text-white shadow-soft">
               K
             </div>
-            <h1 className="text-4xl font-bold tracking-normal text-brand-900 sm:text-5xl">
+            <h1 className="text-4xl font-black tracking-normal text-brand-950 sm:text-6xl">
               KingApp
             </h1>
-            <p className="mt-3 text-xl font-medium text-brand-700">
+            <p className="mt-3 text-xl font-bold text-brand-700">
               Sales & Stock Management
             </p>
           </div>
-          <p className="max-w-xl text-base leading-7 text-slate-700">
+          <p className="max-w-xl text-base leading-7 text-slate-600">
             Manage beverage loading, marketer confirmations, sales, returns,
-            cash collection, and reporting from one clean business dashboard.
+            cash collection, inventory, expenses, and closing reports from one
+            premium business workspace.
           </p>
           <div className="grid max-w-xl gap-3 sm:grid-cols-3">
             {["Stock Control", "Cash Tracking", "Role Access"].map((item) => (
               <div
-                className="rounded-lg border border-brand-100 bg-white/80 px-4 py-3 text-sm font-semibold text-brand-800 shadow-sm"
+                className="rounded-lg border border-brand-100 bg-white/90 px-4 py-4 text-sm font-bold text-brand-900 shadow-sm"
                 key={item}
               >
                 {item}
@@ -70,9 +75,12 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-brand-100 bg-white p-6 shadow-soft sm:p-8">
-          <div className="mb-7">
-            <h2 className="text-2xl font-bold text-slate-950">Sign in</h2>
+        <div className="order-1 rounded-lg border border-slate-200 bg-white/95 p-6 shadow-executive backdrop-blur sm:p-8 lg:order-2">
+          <div className="mb-7 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-brand-50 text-brand-800">
+              <UserRound className="h-7 w-7" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-950">Sign in</h2>
             <p className="mt-2 text-sm text-slate-600">
               Use your assigned KingApp account to continue.
             </p>
@@ -83,7 +91,7 @@ export default function LoginPage() {
               <span className="mb-2 block text-sm font-semibold text-slate-700">
                 Username
               </span>
-              <span className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 focus-within:border-brand-600 focus-within:ring-4 focus-within:ring-brand-100">
+              <span className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 shadow-sm focus-within:border-brand-600 focus-within:ring-4 focus-within:ring-brand-100">
                 <UserRound className="h-5 w-5 text-brand-700" />
                 <input
                   className="w-full border-0 bg-transparent text-slate-950 outline-none"
@@ -99,7 +107,7 @@ export default function LoginPage() {
               <span className="mb-2 block text-sm font-semibold text-slate-700">
                 Password
               </span>
-              <span className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 focus-within:border-brand-600 focus-within:ring-4 focus-within:ring-brand-100">
+              <span className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 shadow-sm focus-within:border-brand-600 focus-within:ring-4 focus-within:ring-brand-100">
                 <LockKeyhole className="h-5 w-5 text-brand-700" />
                 <input
                   className="w-full border-0 bg-transparent text-slate-950 outline-none"
@@ -113,13 +121,13 @@ export default function LoginPage() {
             </label>
 
             {error ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
                 {error}
               </div>
             ) : null}
 
             <button
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand-700 px-5 py-3 font-semibold text-white transition hover:bg-brand-800 focus:outline-none focus:ring-4 focus:ring-brand-100 disabled:cursor-not-allowed disabled:opacity-70"
+              className="primary-button w-full !py-3"
               disabled={isSubmitting}
               type="submit"
             >
@@ -128,9 +136,23 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-900">
-            Phase 1 test account: <strong>admin</strong> /{" "}
-            <strong>admin123</strong>
+          <div className="mt-7 rounded-lg border border-brand-100 bg-brand-50/80 p-4">
+            <p className="text-sm font-black text-brand-950">Test users</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {mockUsers.map((user) => (
+                <div
+                  className="rounded-lg border border-white bg-white px-3 py-2 text-xs shadow-sm"
+                  key={user.username}
+                >
+                  <div className="font-bold text-slate-950">
+                    {user.username} / {user.password}
+                  </div>
+                  <div className="mt-0.5 font-semibold text-brand-700">
+                    {roleLabels[user.role]}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
