@@ -8,6 +8,7 @@ import {
   BadgeDollarSign,
   Boxes,
   ClipboardCheck,
+  Download,
   FileText,
   Home,
   LogOut,
@@ -32,6 +33,11 @@ type NavItem = {
   label: string;
   icon: typeof Home;
   roles: UserRole[];
+};
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
 const navItems: NavItem[] = [
@@ -126,6 +132,8 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
   const allowedRoleKey = allowedRoles?.join(",");
 
   useEffect(() => {
@@ -165,9 +173,32 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
     };
   }, [allowedRoleKey, pathname, router]);
 
+  useEffect(() => {
+    function handleBeforeInstallPrompt(event: Event) {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
+  }, []);
+
   function handleLogout() {
     clearSession();
     router.replace("/login");
+  }
+
+  async function handleInstall() {
+    if (!installPrompt) {
+      return;
+    }
+
+    await installPrompt.prompt();
+    await installPrompt.userChoice;
+    setInstallPrompt(null);
   }
 
   if (!isReady || !user) {
@@ -234,6 +265,16 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
                 <LogOut className="h-4 w-4" />
                 Logout
               </button>
+              {installPrompt ? (
+                <button
+                  className="primary-button hidden sm:inline-flex"
+                  onClick={handleInstall}
+                  type="button"
+                >
+                  <Download className="h-4 w-4" />
+                  Install
+                </button>
+              ) : null}
             </div>
           </div>
         </header>
@@ -263,14 +304,25 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
                   />
                 ))}
               </nav>
+              {installPrompt ? (
+                <button
+                  className="mb-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-black text-brand-900"
+                  onClick={handleInstall}
+                  type="button"
+                >
+                  <Download className="h-4 w-4" />
+                  Install KingApp
+                </button>
+              ) : null}
               <UserPanel handleLogout={handleLogout} user={user} />
             </div>
           </div>
         ) : null}
 
-        <section className="mx-auto max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+        <section className="mx-auto max-w-[1600px] px-4 pb-24 pt-5 sm:px-6 lg:px-8 lg:py-8">
           {children(user)}
         </section>
+        <MobileBottomNav pathname={pathname} visibleNav={visibleNav} />
       </div>
     </main>
   );
@@ -377,4 +429,78 @@ function currentPageTitle(pathname: string) {
   return (
     navItems.find((item) => item.href === pathname)?.label ?? "Dashboard"
   );
+}
+
+function MobileBottomNav({
+  pathname,
+  visibleNav
+}: {
+  pathname: string;
+  visibleNav: NavItem[];
+}) {
+  const mobileItems = getMobileNavItems(visibleNav);
+
+  return (
+    <nav className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-18px_40px_rgba(15,35,24,0.12)] backdrop-blur-xl lg:hidden">
+      <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
+        {mobileItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href;
+
+          return (
+            <Link
+              className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-black transition ${
+                isActive
+                  ? "bg-brand-700 text-white"
+                  : "text-slate-500 hover:bg-brand-50 hover:text-brand-800"
+              }`}
+              href={item.href}
+              key={item.href}
+            >
+              <Icon className="h-5 w-5" />
+              <span className="max-w-full truncate">{shortMobileLabel(item.label)}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+function getMobileNavItems(visibleNav: NavItem[]) {
+  const dashboard = visibleNav.find((item) => item.href === "/dashboard");
+  const priority = [
+    "/loading",
+    "/confirm-loading",
+    "/sales",
+    "/cash",
+    "/returns",
+    "/inventory",
+    "/expenses",
+    "/daily-report",
+    "/reports"
+  ];
+  const prioritized = priority
+    .map((href) => visibleNav.find((item) => item.href === href))
+    .filter((item): item is NavItem => Boolean(item));
+  const items = [dashboard, ...prioritized]
+    .filter((item): item is NavItem => Boolean(item))
+    .filter(
+      (item, index, allItems) =>
+        allItems.findIndex((candidate) => candidate.href === item.href) === index
+    );
+
+  return items.slice(0, 5);
+}
+
+function shortMobileLabel(label: string) {
+  if (label === "Confirm Loading") {
+    return "Confirm";
+  }
+
+  if (label === "Daily Report") {
+    return "Daily";
+  }
+
+  return label;
 }
