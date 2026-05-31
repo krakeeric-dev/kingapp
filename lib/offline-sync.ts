@@ -93,6 +93,11 @@ export async function enqueueOfflineAction({
   };
 
   await withStore("readwrite", (store) => store.put(item));
+  console.log("[KingApp PWA] Pending sync saved", {
+    actionType: item.actionType,
+    id: item.id,
+    table: item.table
+  });
 }
 
 export async function getSyncQueue() {
