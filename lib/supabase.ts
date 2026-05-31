@@ -1,3 +1,10 @@
+import {
+  enqueueOfflineAction,
+  getSyncQueue,
+  saveLastSyncTime,
+  updateSyncItem
+} from "@/lib/offline-sync";
+
 export type SupabaseTable =
   | "users"
   | "products"
@@ -82,19 +89,105 @@ export async function upsertSupabaseRows<T>(
     return;
   }
 
-  try {
-    const response = await fetch(getRestUrl(table, "?on_conflict=id"), {
-      method: "POST",
-      headers: getHeaders({
-        Prefer: "resolution=merge-duplicates"
-      }),
-      body: JSON.stringify(rows)
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    await enqueueOfflineAction({
+      actionType: `upsert:${table}`,
+      payload: rows,
+      table
     });
+    return;
+  }
 
-    if (!response.ok) {
-      throw new Error(`Unable to write ${table}`);
-    }
+  try {
+    await writeRows(table, rows);
   } catch (error) {
     console.warn(error);
+    await enqueueOfflineAction({
+      actionType: `upsert:${table}`,
+      payload: rows,
+      table
+    });
   }
+}
+
+async function writeRows<T>(table: SupabaseTable, rows: SupabasePayloadRow<T>[]) {
+  const response = await fetch(getRestUrl(table, "?on_conflict=id"), {
+    method: "POST",
+    headers: getHeaders({
+      Prefer: "resolution=merge-duplicates"
+    }),
+    body: JSON.stringify(rows)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Unable to write ${table}`);
+  }
+}
+
+async function hasConflict<T>(table: SupabaseTable, rows: SupabasePayloadRow<T>[], queuedAt: string) {
+  const ids = rows.map((row) => row.id);
+
+  if (ids.length === 0) {
+    return false;
+  }
+
+  const query = `?select=id,updated_at&id=in.(${ids.map(encodeURIComponent).join(",")})`;
+  const response = await fetch(getRestUrl(table, query), {
+    headers: getHeaders(),
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    return false;
+  }
+
+  const remoteRows = (await response.json()) as { id: string; updated_at: string }[];
+
+  return remoteRows.some((row) => row.updated_at > queuedAt);
+}
+
+export async function syncPendingQueue() {
+  if (!isSupabaseConfigured()) {
+    return;
+  }
+
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return;
+  }
+
+  const items = await getSyncQueue();
+  const pendingItems = items.filter(
+    (item) => item.syncStatus === "pending" || item.syncStatus === "failed"
+  );
+
+  for (const item of pendingItems) {
+    try {
+      const rows = item.payload as SupabasePayloadRow<unknown>[];
+      const conflict = await hasConflict(item.table, rows, item.timestamp);
+
+      if (conflict) {
+        await updateSyncItem({
+          ...item,
+          syncStatus: "conflict",
+          error: "Needs Admin Review"
+        });
+        continue;
+      }
+
+      await writeRows(item.table, rows);
+      await updateSyncItem({
+        ...item,
+        syncStatus: "synced",
+        error: ""
+      });
+    } catch (error) {
+      await updateSyncItem({
+        ...item,
+        syncStatus: "failed",
+        error: error instanceof Error ? error.message : "Sync failed"
+      });
+    }
+  }
+
+  saveLastSyncTime();
 }

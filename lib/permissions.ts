@@ -12,6 +12,7 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/expenses": ["admin", "supervisor", "accountant"],
   "/daily-report": ["admin", "manager", "supervisor", "accountant"],
   "/reports": ["admin", "manager", "supervisor"],
+  "/sync-status": ["admin", "manager", "supervisor", "storekeeper", "marketer", "accountant"],
   "/admin/audit-log": ["admin"],
   "/admin/users": ["admin"]
 };

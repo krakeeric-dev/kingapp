@@ -1,9 +1,20 @@
 import type { SessionUser } from "@/lib/auth";
 
 const SESSION_KEY = "kingapp.session";
+const OFFLINE_USERS_KEY = "kingapp.offlineAllowedUsers";
 
 export function saveSession(user: SessionUser) {
   window.localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  const rawUsers = window.localStorage.getItem(OFFLINE_USERS_KEY);
+  const users = rawUsers ? (JSON.parse(rawUsers) as string[]) : [];
+  const updatedUsers = Array.from(new Set([...users, user.username]));
+  window.localStorage.setItem(OFFLINE_USERS_KEY, JSON.stringify(updatedUsers));
+}
+
+export function canLoginOffline(username: string) {
+  const rawUsers = window.localStorage.getItem(OFFLINE_USERS_KEY);
+  const users = rawUsers ? (JSON.parse(rawUsers) as string[]) : [];
+  return users.includes(username);
 }
 
 export function getSession(): SessionUser | null {

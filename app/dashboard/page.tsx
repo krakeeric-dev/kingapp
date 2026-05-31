@@ -9,6 +9,7 @@ import {
   FileText,
   PackageCheck,
   ReceiptText,
+  RefreshCw,
   ShieldCheck,
   TrendingDown,
   TrendingUp,
@@ -38,6 +39,7 @@ import {
   getMinimumStocks
 } from "@/lib/inventory-data";
 import type { InventoryMovement, MinimumStock } from "@/lib/inventory-data";
+import { getSyncSummary } from "@/lib/offline-sync";
 
 type DashboardStat = {
   label: string;
@@ -77,6 +79,11 @@ function DashboardContent({ user }: { user: SessionUser }) {
     InventoryMovement[]
   >([]);
   const [minimumStocks, setMinimumStocks] = useState<MinimumStock[]>([]);
+  const [syncSummary, setSyncSummary] = useState({
+    conflicts: 0,
+    failed: 0,
+    pending: 0
+  });
   const [permissionMessage, setPermissionMessage] = useState("");
 
   useEffect(() => {
@@ -87,6 +94,13 @@ function DashboardContent({ user }: { user: SessionUser }) {
     setExpenseRecords(getExpenseRecords());
     setInventoryMovements(getInventoryMovements());
     setMinimumStocks(getMinimumStocks());
+    void getSyncSummary().then((summary) =>
+      setSyncSummary({
+        conflicts: summary.conflicts,
+        failed: summary.failed,
+        pending: summary.pending
+      })
+    );
     const blockedMessage = window.sessionStorage.getItem(
       "kingapp.permissionMessage"
     );
@@ -172,6 +186,29 @@ function DashboardContent({ user }: { user: SessionUser }) {
       .length;
     const confirmed = roleRecords.filter((record) => record.status === "confirmed")
       .length;
+    const syncStats: DashboardStat[] =
+      user.role === "admin"
+        ? [
+            {
+              label: "Pending Offline Sync",
+              icon: RefreshCw,
+              tone: syncSummary.pending > 0 ? "warning" : "success",
+              value: syncSummary.pending.toLocaleString()
+            },
+            {
+              label: "Failed Syncs",
+              icon: AlertTriangle,
+              tone: syncSummary.failed > 0 ? "danger" : "success",
+              value: syncSummary.failed.toLocaleString()
+            },
+            {
+              label: "Conflicts Needing Review",
+              icon: ShieldCheck,
+              tone: syncSummary.conflicts > 0 ? "danger" : "success",
+              value: syncSummary.conflicts.toLocaleString()
+            }
+          ]
+        : [];
 
     const stats: DashboardStat[] = [
       {
@@ -206,7 +243,8 @@ function DashboardContent({ user }: { user: SessionUser }) {
         label: "Warehouse Stock",
         icon: Boxes,
         value: inventoryTotals.totalWarehouseStock.toLocaleString()
-      }
+      },
+      ...syncStats
     ];
 
     const overviewDays = getLastSevenDays(today).map((date) => {
@@ -349,6 +387,9 @@ function DashboardContent({ user }: { user: SessionUser }) {
     records,
     returnRecords,
     salesRecords,
+    syncSummary.conflicts,
+    syncSummary.failed,
+    syncSummary.pending,
     user.role,
     user.username
   ]);

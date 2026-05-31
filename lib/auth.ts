@@ -1,4 +1,5 @@
 import { defaultUsers, getUsers, type PlatformUser } from "@/lib/users-data";
+import { canLoginOffline } from "@/lib/storage";
 
 export type UserRole =
   | "admin"
@@ -35,9 +36,19 @@ export function authenticateUser(
   username: string,
   password: string
 ): SessionUser | null {
+  const normalizedUsername = username.trim().toLowerCase();
+
+  if (
+    typeof navigator !== "undefined" &&
+    !navigator.onLine &&
+    !canLoginOffline(username.trim())
+  ) {
+    return null;
+  }
+
   const user = getAvailableUsers().find(
     (mockUser) =>
-      mockUser.username.toLowerCase() === username.trim().toLowerCase() &&
+      mockUser.username.toLowerCase() === normalizedUsername &&
       mockUser.password === password &&
       mockUser.status !== "inactive"
   );

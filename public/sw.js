@@ -4,7 +4,19 @@ const PRECACHE_URLS = [
   OFFLINE_URL,
   "/manifest.json",
   "/icons/icon-192.svg",
-  "/icons/icon-512.svg"
+  "/icons/icon-512.svg",
+  "/login",
+  "/dashboard",
+  "/loading",
+  "/confirm-loading",
+  "/sales",
+  "/returns",
+  "/cash",
+  "/expenses",
+  "/inventory",
+  "/daily-report",
+  "/reports",
+  "/sync-status"
 ];
 
 self.addEventListener("install", (event) => {
@@ -38,7 +50,13 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request).catch(() => caches.match(OFFLINE_URL))
+      fetch(request)
+        .then((response) => {
+          const responseCopy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, responseCopy));
+          return response;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || caches.match(OFFLINE_URL)))
     );
     return;
   }
@@ -49,7 +67,7 @@ self.addEventListener("fetch", (event) => {
         return cachedResponse;
       }
 
-      return fetch(request).catch(() => caches.match(OFFLINE_URL));
+      return fetch(request);
     })
   );
 });

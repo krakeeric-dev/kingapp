@@ -15,6 +15,7 @@ import {
   Menu,
   PackageCheck,
   ReceiptText,
+  RefreshCw,
   ScrollText,
   ShieldCheck,
   UserRound,
@@ -27,6 +28,7 @@ import { syncSupabaseToLocalStorage } from "@/lib/live-data";
 import { canAccessPage, getAllowedRoles } from "@/lib/permissions";
 import { roleLabels } from "@/lib/auth";
 import { clearSession, getSession } from "@/lib/storage";
+import { syncPendingQueue } from "@/lib/supabase";
 
 type NavItem = {
   href: string;
@@ -118,6 +120,12 @@ const navItems: NavItem[] = [
     label: "Reports",
     icon: BarChart3,
     roles: getAllowedRoles("/reports")
+  },
+  {
+    href: "/sync-status",
+    label: "Sync",
+    icon: RefreshCw,
+    roles: getAllowedRoles("/sync-status")
   }
 ];
 
@@ -132,6 +140,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const allowedRoleKey = allowedRoles?.join(",");
@@ -183,6 +192,26 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  useEffect(() => {
+    function updateOnlineStatus() {
+      const online = navigator.onLine;
+      setIsOnline(online);
+
+      if (online) {
+        void syncPendingQueue();
+      }
+    }
+
+    updateOnlineStatus();
+    window.addEventListener("online", updateOnlineStatus);
+    window.addEventListener("offline", updateOnlineStatus);
+
+    return () => {
+      window.removeEventListener("online", updateOnlineStatus);
+      window.removeEventListener("offline", updateOnlineStatus);
     };
   }, []);
 
@@ -278,6 +307,11 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
             </div>
           </div>
         </header>
+        {!isOnline ? (
+          <div className="no-print border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-black text-amber-800">
+            Offline Mode — data will sync when internet returns
+          </div>
+        ) : null}
 
         {mobileMenuOpen ? (
           <div className="no-print fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm lg:hidden">
