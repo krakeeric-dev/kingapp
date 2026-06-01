@@ -55,6 +55,8 @@ function QueueContent({ user }: { user: SessionUser }) {
   const [calls, setCalls] = useState<QueueCall[]>([]);
   const [agents, setAgents] = useState<CallCenterAgent[]>([]);
   const [clients, setClients] = useState<CallCenterClient[]>([]);
+  const [missedCalls, setMissedCalls] = useState(getSafeEmptyArray<ReturnType<typeof getMissedCalls>[number]>());
+  const [callbacks, setCallbacks] = useState(getSafeEmptyArray<ReturnType<typeof getCallbacks>[number]>());
   const [products, setProducts] = useState<ProductMaster[]>([]);
   const [selectedCallId, setSelectedCallId] = useState("");
   const [message, setMessage] = useState("");
@@ -68,6 +70,8 @@ function QueueContent({ user }: { user: SessionUser }) {
     setCalls(loadedCalls);
     setAgents(getAgents());
     setClients(getCallCenterClients());
+    setMissedCalls(getMissedCalls());
+    setCallbacks(getCallbacks());
     setProducts(getProducts());
     setSelectedCallId((current) => current || loadedCalls.find((call) => call.status === "Active")?.id || "");
   }
@@ -75,8 +79,7 @@ function QueueContent({ user }: { user: SessionUser }) {
   const incoming = calls.filter((call) => call.status === "Incoming");
   const waiting = calls.filter((call) => call.status === "Waiting");
   const active = calls.filter((call) => call.status === "Active" || call.status === "Transferred");
-  const missed = getMissedCalls();
-  const callbacks = getCallbacks();
+  const missed = missedCalls;
   const availableAgents = agents.filter((agent) => agent.status === "Available");
   const selectedCall = calls.find((call) => call.id === selectedCallId) ?? active[0];
   const selectedClient = clients.find((client) => client.id === selectedCall?.clientId);
@@ -113,6 +116,7 @@ function QueueContent({ user }: { user: SessionUser }) {
 
   function missCall(call: QueueCall) {
     setCalls(markCallMissed(call.id, "Rejected or missed by call center"));
+    setMissedCalls(getMissedCalls());
     setMessage("Call moved to missed calls.");
   }
 
@@ -176,7 +180,7 @@ function QueueContent({ user }: { user: SessionUser }) {
           <QueueSection title="Waiting Queue" calls={waiting} empty="No callers waiting." onAccept={acceptCall} onMissed={missCall} />
           <QueueSection title="Active Calls" calls={active} empty="No active calls." onSelect={(call) => setSelectedCallId(call.id)} />
           <QueueSection title="Missed Calls" calls={calls.filter((call) => call.status === "Missed")} empty="No missed queue calls." />
-          <CallbackPreview />
+          <CallbackPreview callbacks={callbacks} />
         </div>
 
         {selectedCall && selectedClient ? (
@@ -453,12 +457,12 @@ function QueueSection({
   );
 }
 
-function CallbackPreview() {
-  const callbacks = getCallbacks().filter((callback) => callback.status === "Pending");
+function CallbackPreview({ callbacks }: { callbacks: ReturnType<typeof getCallbacks> }) {
+  const pendingCallbacks = callbacks.filter((callback) => callback.status === "Pending");
   return (
     <Panel title="Callback List">
       <div className="grid gap-2">
-        {callbacks.slice(0, 5).map((callback) => (
+        {pendingCallbacks.slice(0, 5).map((callback) => (
           <div className="rounded-lg border border-slate-100 px-3 py-2 text-sm" key={callback.id}>
             <span className="font-black">{callback.callbackDate} {callback.callbackTime}</span> - {callback.clientName}: {callback.reason}
           </div>
@@ -466,6 +470,10 @@ function CallbackPreview() {
       </div>
     </Panel>
   );
+}
+
+function getSafeEmptyArray<T>() {
+  return [] as T[];
 }
 
 function Kpi({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: number | string }) {

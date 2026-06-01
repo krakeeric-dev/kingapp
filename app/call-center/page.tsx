@@ -52,6 +52,7 @@ import {
   getQueueCalls,
   saveClientNotes,
   type CallbackItem,
+  type CallCenterAgent,
   type CallCenterClient,
   type CallLog,
   type CallType,
@@ -120,10 +121,11 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
   const [clients, setClients] = useState<CallCenterClient[]>([]);
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [orders, setOrders] = useState<PendingOrder[]>([]);
-  const [payments, setPayments] = useState(getPaymentFollowUps());
-  const [complaints, setComplaints] = useState(getComplaints());
+  const [payments, setPayments] = useState<ReturnType<typeof getPaymentFollowUps>>([]);
+  const [complaints, setComplaints] = useState<ReturnType<typeof getComplaints>>([]);
   const [callbacks, setCallbacks] = useState<CallbackItem[]>([]);
   const [queueCalls, setQueueCalls] = useState<QueueCall[]>([]);
+  const [agents, setAgents] = useState<CallCenterAgent[]>([]);
   const [products, setProducts] = useState<ProductMaster[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [query, setQuery] = useState("");
@@ -168,12 +170,13 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
     setComplaints(getComplaints());
     setCallbacks(getCallbacks());
     setQueueCalls(getQueueCalls());
+    setAgents(getAgents());
     setProducts(getProducts());
   }, []);
 
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
   const currentCall = queueCalls.find((call) => call.status === "Active") ?? queueCalls.find((call) => call.status === "Incoming");
-  const agentsOnline = getAgents().filter((agent) => agent.status !== "Offline").length;
+  const agentsOnline = agents.filter((agent) => agent.status !== "Offline").length;
   const callsInQueue = queueCalls.filter((call) => call.status === "Waiting" || call.status === "Incoming").length;
   const todaysLogs = callLogs.filter((record) => record.date === today());
   const pendingOrders = orders.filter((order) => order.status === "Pending Storekeeper");

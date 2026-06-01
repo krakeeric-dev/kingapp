@@ -403,6 +403,10 @@ const defaultCallbacks: CallbackItem[] = [
 ];
 
 function readJson<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
   const rawValue = window.localStorage.getItem(key);
 
   if (!rawValue) {
@@ -418,6 +422,10 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 function writeJson<T>(key: string, value: T) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
