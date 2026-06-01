@@ -162,3 +162,103 @@ values
 on conflict (id) do update
 set payload = excluded.payload,
     updated_at = now();
+
+create table if not exists public.suppliers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  username text unique not null,
+  phone text,
+  location text,
+  status text not null default 'active',
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.clients (
+  id uuid primary key default gen_random_uuid(),
+  client_name text not null,
+  owner_name text,
+  username text unique not null,
+  phone text,
+  location text,
+  status text not null default 'active',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.supplier_clients (
+  id uuid primary key default gen_random_uuid(),
+  supplier_id uuid not null references public.suppliers(id) on delete cascade,
+  client_id uuid not null references public.clients(id) on delete cascade,
+  assigned_marketer text,
+  active boolean not null default true,
+  custom_prices jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  unique (supplier_id, client_id)
+);
+
+create table if not exists public.orders (
+  id uuid primary key default gen_random_uuid(),
+  supplier_id uuid not null references public.suppliers(id) on delete restrict,
+  client_id uuid not null references public.clients(id) on delete restrict,
+  status text not null default 'Pending',
+  payment_status text not null default 'Unpaid',
+  assigned_marketer text,
+  delivery_person text,
+  total_quantity numeric not null default 0,
+  total_amount numeric not null default 0,
+  rejection_reason text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.order_items (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  product_id text not null,
+  product_name text not null,
+  item_code text not null,
+  quantity numeric not null default 0,
+  price_per_carton numeric not null default 0,
+  amount numeric not null default 0
+);
+
+create table if not exists public.payments (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  supplier_id uuid not null references public.suppliers(id) on delete restrict,
+  client_id uuid not null references public.clients(id) on delete restrict,
+  amount numeric not null default 0,
+  status text not null default 'Pending',
+  received_by text,
+  notes text,
+  paid_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists supplier_clients_supplier_idx on public.supplier_clients (supplier_id);
+create index if not exists supplier_clients_client_idx on public.supplier_clients (client_id);
+create index if not exists orders_supplier_idx on public.orders (supplier_id);
+create index if not exists orders_client_idx on public.orders (client_id);
+create index if not exists payments_supplier_client_idx on public.payments (supplier_id, client_id);
+
+alter table public.suppliers enable row level security;
+alter table public.clients enable row level security;
+alter table public.supplier_clients enable row level security;
+alter table public.orders enable row level security;
+alter table public.order_items enable row level security;
+alter table public.payments enable row level security;
+
+create policy "Admin can manage suppliers" on public.suppliers for all using (true) with check (true);
+create policy "Admin can manage clients" on public.clients for all using (true) with check (true);
+create policy "Admin can manage supplier links" on public.supplier_clients for all using (true) with check (true);
+create policy "Admin can manage portal orders" on public.orders for all using (true) with check (true);
+create policy "Admin can manage portal order items" on public.order_items for all using (true) with check (true);
+create policy "Admin can manage portal payments" on public.payments for all using (true) with check (true);
+
+-- Live RLS note:
+-- Replace the permissive admin/demo policies above with auth.jwt() role checks.
+-- Client policies should filter by orders.client_id and supplier_clients.client_id.
+-- Supplier policies should filter by orders.supplier_id and supplier_clients.supplier_id.
+-- This prevents URL changes from exposing another supplier or client's data.

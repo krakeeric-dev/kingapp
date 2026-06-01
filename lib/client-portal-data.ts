@@ -3,10 +3,23 @@ import { getActivePrice, getProducts } from "@/lib/products-data";
 export type ClientOrderStatus =
   | "Pending"
   | "Approved"
+  | "Rejected"
   | "Loaded"
   | "Out for Delivery"
   | "Delivered"
   | "Paid";
+
+export type PortalSupplier = {
+  id: string;
+  username: string;
+  password: string;
+  name: string;
+  phone: string;
+  location: string;
+  status: "active" | "inactive";
+  notes: string;
+  createdAt: string;
+};
 
 export type PortalClient = {
   id: string;
@@ -19,6 +32,18 @@ export type PortalClient = {
   supplier: string;
   assignedMarketer: string;
   productPrices: Record<string, number>;
+  status?: "active" | "inactive";
+  createdAt?: string;
+};
+
+export type SupplierClientLink = {
+  id: string;
+  supplierId: string;
+  clientId: string;
+  active: boolean;
+  assignedMarketer: string;
+  productPrices: Record<string, number>;
+  createdAt: string;
 };
 
 export type ClientOrderLine = {
@@ -36,6 +61,7 @@ export type ClientPortalOrder = {
   phone: string;
   location: string;
   supplier: string;
+  supplierId?: string;
   assignedMarketer: string;
   lines: ClientOrderLine[];
   totalQuantity: number;
@@ -45,11 +71,49 @@ export type ClientPortalOrder = {
   createdAt: string;
   deliveryPerson?: string;
   deliveredAt?: string;
+  rejectionReason?: string;
 };
 
 const CLIENTS_KEY = "kingapp.clientPortal.clients";
+const SUPPLIERS_KEY = "kingapp.clientPortal.suppliers";
+const LINKS_KEY = "kingapp.clientPortal.supplierClients";
 const ORDERS_KEY = "kingapp.clientPortal.orders";
 const SESSION_KEY = "kingapp.clientPortal.session";
+const SUPPLIER_SESSION_KEY = "kingapp.clientPortal.supplierSession";
+
+const mainSupplierId = "SUP-001";
+
+const defaultSuppliers: PortalSupplier[] = [
+  {
+    id: mainSupplierId,
+    username: "supplier1",
+    password: "supplier123",
+    name: "KingApp Beverage Pro",
+    phone: "0788999000",
+    location: "Kigali",
+    status: "active",
+    notes: "Main beverage supplier",
+    createdAt: "2026-05-30T00:00:00.000Z"
+  },
+  {
+    id: "SUP-002",
+    username: "supplier2",
+    password: "supplier123",
+    name: "Premium Water Depot",
+    phone: "0788999001",
+    location: "Gasabo",
+    status: "active",
+    notes: "Secondary supplier for private client relationships",
+    createdAt: "2026-05-30T00:00:00.000Z"
+  }
+];
+
+const defaultPrices = {
+  "WT-500": 1999,
+  "WT-1000": 2500,
+  "WT-1500": 3000,
+  "WT-5000": 5000
+};
 
 const defaultClients: PortalClient[] = [
   {
@@ -62,12 +126,9 @@ const defaultClients: PortalClient[] = [
     location: "Nyamirambo",
     supplier: "KingApp Beverage Pro",
     assignedMarketer: "Marketer 1",
-    productPrices: {
-      "WT-500": 1999,
-      "WT-1000": 2500,
-      "WT-1500": 3000,
-      "WT-5000": 5000
-    }
+    productPrices: defaultPrices,
+    status: "active",
+    createdAt: "2026-05-30T00:00:00.000Z"
   },
   {
     id: "PORTAL-CL-002",
@@ -80,11 +141,35 @@ const defaultClients: PortalClient[] = [
     supplier: "KingApp Beverage Pro",
     assignedMarketer: "Marketer 1",
     productPrices: {
-      "WT-500": 1950,
-      "WT-1000": 2500,
-      "WT-1500": 3000,
-      "WT-5000": 5000
-    }
+      ...defaultPrices,
+      "WT-500": 1950
+    },
+    status: "active",
+    createdAt: "2026-05-30T00:00:00.000Z"
+  }
+];
+
+const defaultLinks: SupplierClientLink[] = [
+  {
+    id: "LINK-001",
+    supplierId: mainSupplierId,
+    clientId: "PORTAL-CL-001",
+    active: true,
+    assignedMarketer: "Marketer 1",
+    productPrices: defaultPrices,
+    createdAt: "2026-05-30T00:00:00.000Z"
+  },
+  {
+    id: "LINK-002",
+    supplierId: mainSupplierId,
+    clientId: "PORTAL-CL-002",
+    active: true,
+    assignedMarketer: "Marketer 1",
+    productPrices: {
+      ...defaultPrices,
+      "WT-500": 1950
+    },
+    createdAt: "2026-05-30T00:00:00.000Z"
   }
 ];
 
@@ -107,6 +192,25 @@ function writeJson<T>(key: string, value: T) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
+function makeId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase();
+}
+
+function activeClient(client: PortalClient) {
+  return client.status !== "inactive";
+}
+
+export function getSuppliers() {
+  const suppliers = readJson<PortalSupplier[]>(SUPPLIERS_KEY, defaultSuppliers);
+  writeJson(SUPPLIERS_KEY, suppliers);
+  return suppliers;
+}
+
+export function saveSuppliers(suppliers: PortalSupplier[]) {
+  writeJson(SUPPLIERS_KEY, suppliers);
+  return suppliers;
+}
+
 export function getPortalClients() {
   const clients = readJson<PortalClient[]>(CLIENTS_KEY, defaultClients);
   writeJson(CLIENTS_KEY, clients);
@@ -116,6 +220,17 @@ export function getPortalClients() {
 export function savePortalClients(clients: PortalClient[]) {
   writeJson(CLIENTS_KEY, clients);
   return clients;
+}
+
+export function getSupplierClientLinks() {
+  const links = readJson<SupplierClientLink[]>(LINKS_KEY, defaultLinks);
+  writeJson(LINKS_KEY, links);
+  return links;
+}
+
+export function saveSupplierClientLinks(links: SupplierClientLink[]) {
+  writeJson(LINKS_KEY, links);
+  return links;
 }
 
 export function getClientOrders() {
@@ -131,8 +246,20 @@ export function authenticatePortalClient(username: string, password: string) {
   return (
     getPortalClients().find(
       (client) =>
+        activeClient(client) &&
         client.username.toLowerCase() === username.trim().toLowerCase() &&
         client.password === password
+    ) ?? null
+  );
+}
+
+export function authenticateSupplier(username: string, password: string) {
+  return (
+    getSuppliers().find(
+      (supplier) =>
+        supplier.status === "active" &&
+        supplier.username.toLowerCase() === username.trim().toLowerCase() &&
+        supplier.password === password
     ) ?? null
   );
 }
@@ -149,20 +276,88 @@ export function clearPortalSession() {
   window.localStorage.removeItem(SESSION_KEY);
 }
 
-export function getCatalogForClient(client: PortalClient) {
+export function saveSupplierSession(supplier: PortalSupplier) {
+  window.localStorage.setItem(SUPPLIER_SESSION_KEY, JSON.stringify(supplier));
+}
+
+export function getSupplierSession() {
+  return readJson<PortalSupplier | null>(SUPPLIER_SESSION_KEY, null);
+}
+
+export function clearSupplierSession() {
+  window.localStorage.removeItem(SUPPLIER_SESSION_KEY);
+}
+
+export function getSuppliersForClient(clientId: string) {
+  const suppliers = getSuppliers();
+  const links = getSupplierClientLinks();
+
+  return links
+    .filter((link) => link.clientId === clientId && link.active)
+    .map((link) => suppliers.find((supplier) => supplier.id === link.supplierId))
+    .filter((supplier): supplier is PortalSupplier => !!supplier && supplier.status === "active");
+}
+
+export function getClientsForSupplier(supplierId: string) {
+  const clients = getPortalClients();
+  const links = getSupplierClientLinks();
+
+  return links
+    .filter((link) => link.supplierId === supplierId && link.active)
+    .map((link) => clients.find((client) => client.id === link.clientId))
+    .filter((client): client is PortalClient => !!client && activeClient(client));
+}
+
+export function getLinkForClientSupplier(clientId: string, supplierId: string) {
+  return (
+    getSupplierClientLinks().find(
+      (link) => link.clientId === clientId && link.supplierId === supplierId && link.active
+    ) ?? null
+  );
+}
+
+export function getCatalogForClientSupplier(client: PortalClient, supplier: PortalSupplier) {
+  const link = getLinkForClientSupplier(client.id, supplier.id);
+
+  if (!link || supplier.status !== "active" || !activeClient(client)) {
+    return [];
+  }
+
   return getProducts().map((product) => ({
     ...product,
     clientPrice:
+      link.productPrices[product.itemCode] ??
       client.productPrices[product.itemCode] ??
       getActivePrice(product.name, product.itemCode)
   }));
 }
 
+export function getCatalogForClient(client: PortalClient) {
+  const supplier = getSuppliersForClient(client.id)[0];
+
+  if (!supplier) {
+    return [];
+  }
+
+  return getCatalogForClientSupplier(client, supplier);
+}
+
 export function createClientOrder(
   client: PortalClient,
-  quantities: Record<string, number>
+  quantities: Record<string, number>,
+  supplierId?: string
 ) {
-  const lines = getCatalogForClient(client)
+  const supplier = supplierId
+    ? getSuppliersForClient(client.id).find((item) => item.id === supplierId)
+    : getSuppliersForClient(client.id)[0];
+
+  if (!supplier) {
+    throw new Error("This client is not linked to that supplier.");
+  }
+
+  const link = getLinkForClientSupplier(client.id, supplier.id);
+  const catalog = getCatalogForClientSupplier(client, supplier);
+  const lines = catalog
     .map((product) => {
       const quantity = quantities[product.itemCode] ?? 0;
 
@@ -177,13 +372,14 @@ export function createClientOrder(
     .filter((line) => line.quantity > 0);
 
   const order: ClientPortalOrder = {
-    id: `CPO-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase(),
+    id: makeId("CPO"),
     clientId: client.id,
     clientName: client.clientName,
     phone: client.phone,
     location: client.location,
-    supplier: client.supplier,
-    assignedMarketer: client.assignedMarketer,
+    supplier: supplier.name,
+    supplierId: supplier.id,
+    assignedMarketer: link?.assignedMarketer ?? client.assignedMarketer,
     lines,
     totalQuantity: lines.reduce((total, line) => total + line.quantity, 0),
     totalAmount: lines.reduce((total, line) => total + line.amount, 0),
@@ -208,6 +404,92 @@ export function updateClientOrderStatus(
   return orders;
 }
 
+export function createSupplier(input: Omit<PortalSupplier, "id" | "createdAt">) {
+  const supplier: PortalSupplier = {
+    ...input,
+    id: makeId("SUP"),
+    createdAt: new Date().toISOString()
+  };
+  return saveSuppliers([supplier, ...getSuppliers()]);
+}
+
+export function updateSupplier(supplierId: string, updates: Partial<PortalSupplier>) {
+  const suppliers = getSuppliers().map((supplier) =>
+    supplier.id === supplierId ? { ...supplier, ...updates } : supplier
+  );
+  return saveSuppliers(suppliers);
+}
+
+export function createPortalClient(input: Omit<PortalClient, "id" | "createdAt" | "supplier" | "assignedMarketer" | "productPrices">) {
+  const client: PortalClient = {
+    ...input,
+    id: makeId("PORTAL-CL"),
+    supplier: "",
+    assignedMarketer: "",
+    productPrices: {},
+    createdAt: new Date().toISOString()
+  };
+  return savePortalClients([client, ...getPortalClients()]);
+}
+
+export function linkClientToSupplier(
+  supplierId: string,
+  clientId: string,
+  assignedMarketer = "Marketer 1",
+  productPrices: Record<string, number> = {}
+) {
+  const links = getSupplierClientLinks();
+  const existing = links.find((link) => link.supplierId === supplierId && link.clientId === clientId);
+
+  if (existing) {
+    return saveSupplierClientLinks(
+      links.map((link) =>
+        link.id === existing.id
+          ? { ...link, active: true, assignedMarketer, productPrices: { ...link.productPrices, ...productPrices } }
+          : link
+      )
+    );
+  }
+
+  const link: SupplierClientLink = {
+    id: makeId("LINK"),
+    supplierId,
+    clientId,
+    active: true,
+    assignedMarketer,
+    productPrices,
+    createdAt: new Date().toISOString()
+  };
+
+  return saveSupplierClientLinks([link, ...links]);
+}
+
+export function removeClientFromSupplier(supplierId: string, clientId: string) {
+  return saveSupplierClientLinks(
+    getSupplierClientLinks().map((link) =>
+      link.supplierId === supplierId && link.clientId === clientId ? { ...link, active: false } : link
+    )
+  );
+}
+
+export function updateLinkPrices(
+  supplierId: string,
+  clientId: string,
+  productPrices: Record<string, number>,
+  assignedMarketer?: string
+) {
+  const links = getSupplierClientLinks().map((link) =>
+    link.supplierId === supplierId && link.clientId === clientId
+      ? {
+          ...link,
+          assignedMarketer: assignedMarketer ?? link.assignedMarketer,
+          productPrices: { ...link.productPrices, ...productPrices }
+        }
+      : link
+  );
+  return saveSupplierClientLinks(links);
+}
+
 export function updateClientAssignment(
   clientId: string,
   updates: Pick<PortalClient, "supplier" | "assignedMarketer" | "productPrices">
@@ -216,5 +498,11 @@ export function updateClientAssignment(
     client.id === clientId ? { ...client, ...updates } : client
   );
   savePortalClients(clients);
+  const supplier = getSuppliers().find((item) => item.name === updates.supplier);
+
+  if (supplier) {
+    linkClientToSupplier(supplier.id, clientId, updates.assignedMarketer, updates.productPrices);
+  }
+
   return clients;
 }

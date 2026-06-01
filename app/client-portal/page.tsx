@@ -1,16 +1,18 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { LogOut, PackageCheck, ShoppingCart, UserRound } from "lucide-react";
+import { Building2, LogOut, PackageCheck, ShoppingCart, UserRound } from "lucide-react";
 import {
   authenticatePortalClient,
   clearPortalSession,
   createClientOrder,
-  getCatalogForClient,
+  getCatalogForClientSupplier,
   getClientOrders,
   getPortalSession,
+  getSuppliersForClient,
   savePortalSession,
-  type PortalClient
+  type PortalClient,
+  type PortalSupplier
 } from "@/lib/client-portal-data";
 import { formatMoney } from "@/lib/sales-data";
 
@@ -22,14 +24,27 @@ export default function ClientPortalPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [ordersVersion, setOrdersVersion] = useState(0);
+  const [selectedSupplierId, setSelectedSupplierId] = useState("");
 
   useEffect(() => {
-    setClient(getPortalSession());
+    const session = getPortalSession();
+    setClient(session);
+    if (session) {
+      setSelectedSupplierId(getSuppliersForClient(session.id)[0]?.id ?? "");
+    }
   }, []);
 
-  const catalog = useMemo(
-    () => (client ? getCatalogForClient(client) : []),
+  const suppliers = useMemo(
+    () => (client ? getSuppliersForClient(client.id) : []),
     [client]
+  );
+  const selectedSupplier = useMemo(
+    () => suppliers.find((supplier) => supplier.id === selectedSupplierId) ?? suppliers[0],
+    [selectedSupplierId, suppliers]
+  );
+  const catalog = useMemo(
+    () => (client && selectedSupplier ? getCatalogForClientSupplier(client, selectedSupplier) : []),
+    [client, selectedSupplier]
   );
   const clientOrders = useMemo(
     () =>
@@ -55,6 +70,7 @@ export default function ClientPortalPage() {
 
     savePortalSession(authenticatedClient);
     setClient(authenticatedClient);
+    setSelectedSupplierId(getSuppliersForClient(authenticatedClient.id)[0]?.id ?? "");
   }
 
   function submitOrder(event: FormEvent<HTMLFormElement>) {
@@ -75,11 +91,20 @@ export default function ClientPortalPage() {
       return;
     }
 
-    createClientOrder(client, parsedQuantities);
-    setQuantities({});
-    setOrdersVersion((version) => version + 1);
-    setError("");
-    setMessage("Order submitted. Status: Pending.");
+    if (!selectedSupplier) {
+      setError("No active supplier is assigned to this client.");
+      return;
+    }
+
+    try {
+      createClientOrder(client, parsedQuantities, selectedSupplier.id);
+      setQuantities({});
+      setOrdersVersion((version) => version + 1);
+      setError("");
+      setMessage("Order submitted. Status: Pending.");
+    } catch (orderError) {
+      setError(orderError instanceof Error ? orderError.message : "Order could not be submitted.");
+    }
   }
 
   if (!client) {
@@ -142,7 +167,7 @@ export default function ClientPortalPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-black uppercase tracking-normal text-brand-700">
-                {client.supplier}
+                Client Ordering Portal
               </p>
               <h1 className="mt-1 text-3xl font-black text-slate-950">
                 {client.clientName}
@@ -165,6 +190,33 @@ export default function ClientPortalPage() {
           </div>
         </section>
 
+        <section className="app-card p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-brand-700" />
+            <h2 className="text-xl font-black text-slate-950">Connected Suppliers</h2>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {suppliers.map((supplier) => (
+              <SupplierCard
+                key={supplier.id}
+                onSelect={() => {
+                  setSelectedSupplierId(supplier.id);
+                  setQuantities({});
+                  setMessage("");
+                  setError("");
+                }}
+                selected={supplier.id === selectedSupplier?.id}
+                supplier={supplier}
+              />
+            ))}
+            {suppliers.length === 0 ? (
+              <p className="text-sm font-semibold text-slate-500">
+                No active suppliers are assigned to this client.
+              </p>
+            ) : null}
+          </div>
+        </section>
+
         {message ? (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
             {message}
@@ -180,7 +232,7 @@ export default function ClientPortalPage() {
           <div className="mb-4 flex items-center gap-2">
             <ShoppingCart className="h-5 w-5 text-brand-700" />
             <h2 className="text-xl font-black text-slate-950">
-              Product Catalog
+              {selectedSupplier ? `${selectedSupplier.name} Product Catalog` : "Product Catalog"}
             </h2>
           </div>
           <div className="grid gap-3">
@@ -224,7 +276,7 @@ export default function ClientPortalPage() {
             <p className="text-2xl font-black text-brand-800">
               Total: {formatMoney(total)} RWF
             </p>
-            <button className="primary-button">
+            <button className="primary-button" disabled={!selectedSupplier || catalog.length === 0}>
               <PackageCheck className="h-4 w-4" />
               Submit Order
             </button>
@@ -253,6 +305,9 @@ export default function ClientPortalPage() {
                 <p className="mt-3 font-bold text-brand-800">
                   {order.totalQuantity} cartons - {formatMoney(order.totalAmount)} RWF
                 </p>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Supplier: {order.supplier} - Payment: {order.paymentStatus}
+                </p>
               </article>
             ))}
             {clientOrders.length === 0 ? (
@@ -264,5 +319,42 @@ export default function ClientPortalPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function SupplierCard({
+  onSelect,
+  selected,
+  supplier
+}: {
+  onSelect: () => void;
+  selected: boolean;
+  supplier: PortalSupplier;
+}) {
+  return (
+    <button
+      className={`rounded-lg border p-4 text-left transition ${
+        selected
+          ? "border-brand-500 bg-brand-50 shadow-sm"
+          : "border-slate-200 bg-white hover:border-brand-200"
+      }`}
+      onClick={onSelect}
+      type="button"
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-brand-700 shadow-sm">
+          <Building2 className="h-5 w-5" />
+        </div>
+        <div>
+          <h3 className="font-black text-slate-950">{supplier.name}</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-600">
+            {supplier.phone} - {supplier.location}
+          </p>
+          <p className="mt-2 text-xs font-bold uppercase tracking-normal text-brand-700">
+            {selected ? "Selected supplier" : "Open supplier"}
+          </p>
+        </div>
+      </div>
+    </button>
   );
 }
