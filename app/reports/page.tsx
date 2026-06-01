@@ -41,37 +41,63 @@ function ReportsContent() {
   });
 
   useEffect(() => {
-    setLoadingRecords(getLoadingRecords());
-    setSalesRecords(getSalesRecords());
-    setReturnRecords(getReturnRecords());
-    setInventoryMovements(getInventoryMovements());
-    setMinimumStocks(getMinimumStocks());
+    setLoadingRecords(safeArray(getLoadingRecords));
+    setSalesRecords(safeArray(getSalesRecords));
+    setReturnRecords(safeArray(getReturnRecords));
+    setInventoryMovements(safeArray(getInventoryMovements));
+    setMinimumStocks(safeArray(getMinimumStocks));
   }, []);
 
   const inventorySummary = useMemo(
-    () =>
-      getInventorySummary(
-        getInventoryRows({
-          loadingRecords,
-          manualMovements: inventoryMovements,
-          minimumStocks,
-          returnRecords
-        })
-      ),
+    () => {
+      try {
+        return getInventorySummary(
+          getInventoryRows({
+            loadingRecords: safeRecords(loadingRecords),
+            manualMovements: safeRecords(inventoryMovements),
+            minimumStocks: safeRecords(minimumStocks),
+            returnRecords: safeRecords(returnRecords)
+          })
+        );
+      } catch (error) {
+        console.warn("[KingApp] Reports inventory summary fallback", error);
+        return {
+          openingStock: 0,
+          receivedStock: 0,
+          loadedOut: 0,
+          actualReturns: 0,
+          closingStock: 0
+        };
+      }
+    },
     [inventoryMovements, loadingRecords, minimumStocks, returnRecords]
   );
 
   const clientSalesSummary = useMemo(() => {
-    const rows = salesRecords.flatMap((record) =>
-      (record.clientSales ?? []).flatMap((client) => {
-        if (!client.productQuantities) {
+    const rows = safeRecords(salesRecords).flatMap((record) =>
+      safeRecords(record?.clientSales).flatMap((client) => {
+        const clientTotalAmount = safeNumber(client?.totalAmount);
+        const clientAmountPaid = safeNumber(client?.amountPaid);
+        const clientBalance = safeNumber(client?.balance);
+
+        if (!client?.productQuantities) {
           return [
             {
               ...client,
-              date: record.date,
-              marketerName: record.marketerName,
-              marketerUsername: record.marketerUsername,
-              salesRecordId: record.id
+              id: String(client?.id ?? `${record.id}-client`),
+              clientName: String(client?.clientName ?? "Unknown Client"),
+              clientPhone: String(client?.clientPhone ?? ""),
+              clientLocation: String(client?.clientLocation ?? ""),
+              productName: String(client?.productName ?? record.productName ?? "Unknown Product"),
+              itemCode: String(client?.itemCode ?? record.itemCode ?? ""),
+              quantityCartons: safeNumber(client?.quantityCartons),
+              totalAmount: clientTotalAmount,
+              amountPaid: clientAmountPaid,
+              balance: clientBalance,
+              date: String(record.date ?? ""),
+              marketerName: String(record.marketerName ?? ""),
+              marketerUsername: String(record.marketerUsername ?? ""),
+              salesRecordId: String(record.id ?? "")
             }
           ];
         }
@@ -87,22 +113,26 @@ function ReportsContent() {
 
             return {
               ...client,
+              id: String(client.id ?? `${record.id}-${product.key}`),
+              clientName: String(client.clientName ?? "Unknown Client"),
+              clientPhone: String(client.clientPhone ?? ""),
+              clientLocation: String(client.clientLocation ?? ""),
               productName: product.productName,
               itemCode: product.itemCode,
               quantityCartons,
               totalAmount,
               amountPaid:
-                client.totalAmount > 0
-                  ? (client.amountPaid * totalAmount) / client.totalAmount
+                clientTotalAmount > 0
+                  ? (clientAmountPaid * totalAmount) / clientTotalAmount
                   : 0,
               balance:
-                client.totalAmount > 0
-                  ? (client.balance * totalAmount) / client.totalAmount
+                clientTotalAmount > 0
+                  ? (clientBalance * totalAmount) / clientTotalAmount
                   : 0,
-              date: record.date,
-              marketerName: record.marketerName,
-              marketerUsername: record.marketerUsername,
-              salesRecordId: record.id
+              date: String(record.date ?? ""),
+              marketerName: String(record.marketerName ?? ""),
+              marketerUsername: String(record.marketerUsername ?? ""),
+              salesRecordId: String(record.id ?? "")
             };
           })
           .filter((row): row is NonNullable<typeof row> => Boolean(row));
@@ -112,15 +142,19 @@ function ReportsContent() {
       const matchesDate = !filters.date || row.date === filters.date;
       const matchesMarketer =
         !filters.marketer ||
-        `${row.marketerName} ${row.marketerUsername}`
+        `${row.marketerName ?? ""} ${row.marketerUsername ?? ""}`
           .toLowerCase()
           .includes(filters.marketer.toLowerCase());
       const matchesProduct =
         !filters.product ||
-        row.productName.toLowerCase().includes(filters.product.toLowerCase());
+        String(row.productName ?? "")
+          .toLowerCase()
+          .includes(filters.product.toLowerCase());
       const matchesLocation =
         !filters.location ||
-        row.clientLocation.toLowerCase().includes(filters.location.toLowerCase());
+        String(row.clientLocation ?? "")
+          .toLowerCase()
+          .includes(filters.location.toLowerCase());
 
       return matchesDate && matchesMarketer && matchesProduct && matchesLocation;
     });
@@ -285,6 +319,25 @@ const reportProducts = [
   { key: "1.5L", productName: "Water 1.5L", itemCode: "WT-1500" },
   { key: "5L", productName: "Water 5L", itemCode: "WT-5000" }
 ] as const;
+
+function safeArray<T>(loader: () => T[]): T[] {
+  try {
+    const records = loader();
+    return Array.isArray(records) ? records : [];
+  } catch (error) {
+    console.warn("[KingApp] Reports data fallback", error);
+    return [];
+  }
+}
+
+function safeRecords<T>(records: T[] | null | undefined): T[] {
+  return Array.isArray(records) ? records : [];
+}
+
+function safeNumber(value: unknown) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : 0;
+}
 
 function ReportMetric({ label, value }: { label: string; value: number }) {
   return (
