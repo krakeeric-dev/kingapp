@@ -12,7 +12,7 @@ import {
   UserCheck,
   UsersRound
 } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
+import { CallCenterShell } from "@/components/CallCenterShell";
 import type { SessionUser } from "@/lib/auth";
 import { formatMoney } from "@/lib/sales-data";
 import {
@@ -45,9 +45,9 @@ const secondsLabel = (seconds: number) => `${Math.floor(seconds / 60)}m ${second
 
 export default function CallQueuePage() {
   return (
-    <AppShell allowedRoles={["admin", "manager", "callcenter"]}>
+    <CallCenterShell title="Incoming Calls" subtitle="Queue Control Desk">
       {(user) => <QueueContent user={user} />}
-    </AppShell>
+    </CallCenterShell>
   );
 }
 

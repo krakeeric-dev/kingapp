@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { CalendarClock, CheckCircle2, Clock, Siren } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
+import { CallCenterShell } from "@/components/CallCenterShell";
 import {
   addCallback,
   getCallbacks,
@@ -18,9 +18,9 @@ const statuses: CallbackItem["status"][] = ["Pending", "Done", "No Answer", "Con
 
 export default function CallbacksPage() {
   return (
-    <AppShell allowedRoles={["admin", "manager", "callcenter"]}>
+    <CallCenterShell title="Callback List" subtitle="Follow-up Scheduler">
       {() => <CallbacksContent />}
-    </AppShell>
+    </CallCenterShell>
   );
 }
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { PhoneCall, PhoneMissed, RefreshCw } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
+import { CallCenterShell } from "@/components/CallCenterShell";
 import {
   addCallback,
   getMissedCalls,
@@ -15,9 +15,9 @@ const statuses: MissedCallStatus[] = ["Not Called Back", "Called Back", "No Answ
 
 export default function MissedCallsPage() {
   return (
-    <AppShell allowedRoles={["admin", "manager", "callcenter"]}>
+    <CallCenterShell title="Missed Calls" subtitle="Callback Recovery Desk">
       {() => <MissedCallsContent />}
-    </AppShell>
+    </CallCenterShell>
   );
 }
 

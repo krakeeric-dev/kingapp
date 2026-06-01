@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Headphones, PhoneCall, UserCheck, UserRound } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
+import { CallCenterShell } from "@/components/CallCenterShell";
 import {
   getAgents,
   updateAgentStatus,
@@ -14,9 +14,9 @@ const statuses: AgentStatus[] = ["Available", "Ringing", "On Call", "Away", "Off
 
 export default function CallCenterAgentsPage() {
   return (
-    <AppShell allowedRoles={["admin", "manager", "callcenter"]}>
+    <CallCenterShell title="Agent Control" subtitle="Availability & Extension Monitor">
       {() => <AgentsContent />}
-    </AppShell>
+    </CallCenterShell>
   );
 }
 
