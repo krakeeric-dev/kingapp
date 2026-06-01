@@ -63,8 +63,8 @@ function CashContent({ user }: { user: SessionUser }) {
     );
   }, [cashRecords]);
 
-  const filteredSales = useMemo(() => {
-    return salesRecords.filter((record) => {
+  const groupedCashRows = useMemo(() => {
+    const filteredRecords = salesRecords.filter((record) => {
       const matchesDate = !filters.date || record.date === filters.date;
       const matchesMarketer =
         !filters.marketer ||
@@ -78,6 +78,8 @@ function CashContent({ user }: { user: SessionUser }) {
 
       return matchesDate && matchesMarketer && matchesProduct;
     });
+
+    return groupSalesByMarketerDate(filteredRecords);
   }, [filters, salesRecords]);
 
   function getDraftCashValue(salesRecord: SalesRecord) {
@@ -216,12 +218,9 @@ function CashContent({ user }: { user: SessionUser }) {
           <thead className="bg-brand-50 text-xs font-bold uppercase tracking-normal text-brand-900">
             <tr>
               <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Product</th>
-              <th className="px-4 py-3">Item Code</th>
               <th className="px-4 py-3">Marketer</th>
-              <th className="px-4 py-3 text-right">Loaded</th>
-              <th className="px-4 py-3 text-right">Sold</th>
-              <th className="px-4 py-3 text-right">Price</th>
+              <th className="px-4 py-3 text-right">Total Loaded</th>
+              <th className="px-4 py-3 text-right">Total Sold</th>
               <th className="px-4 py-3 text-right">Expected Cash</th>
               <th className="px-4 py-3 text-right">Client Paid</th>
               <th className="px-4 py-3 text-right">Unpaid Balance</th>
@@ -232,7 +231,7 @@ function CashContent({ user }: { user: SessionUser }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredSales.map((salesRecord) => (
+            {groupedCashRows.map((salesRecord) => (
               <CashRow
                 cashRecord={cashBySalesId.get(salesRecord.id)}
                 draftCash={draftCash}
@@ -250,7 +249,7 @@ function CashContent({ user }: { user: SessionUser }) {
       </div>
 
       <div className="grid gap-3 xl:hidden">
-        {filteredSales.map((salesRecord) => (
+        {groupedCashRows.map((salesRecord) => (
           <CashCard
             cashRecord={cashBySalesId.get(salesRecord.id)}
             draftCash={draftCash}
@@ -265,7 +264,7 @@ function CashContent({ user }: { user: SessionUser }) {
         ))}
       </div>
 
-      {filteredSales.length === 0 ? (
+      {groupedCashRows.length === 0 ? (
         <div className="rounded-lg border border-dashed border-brand-200 bg-white px-5 py-8 text-center text-sm font-semibold text-slate-500">
           No sales submitted records are ready for cash collection.
         </div>
@@ -338,30 +337,27 @@ function CashRow(props: CashDisplayProps) {
     user
   } = props;
   const cashReceived = getDraftCashValue(salesRecord);
-  const variance = cashReceived - salesRecord.salesValue;
+  const clientPaid = salesRecord.totalPaid ?? salesRecord.salesValue;
+  const unpaidBalance = salesRecord.totalUnpaidBalance ?? Math.max(0, salesRecord.salesValue - clientPaid);
+  const variance = cashReceived - clientPaid;
   const isLocked = Boolean(cashRecord?.locked);
 
   return (
     <tr>
       <td className="px-4 py-3 text-slate-700">{formatDate(salesRecord.date)}</td>
-      <td className="px-4 py-3 font-semibold text-slate-950">
-        {salesRecord.productName}
-      </td>
-      <td className="px-4 py-3 text-slate-700">{salesRecord.itemCode}</td>
       <td className="px-4 py-3 text-slate-700">{salesRecord.marketerName}</td>
       <td className="px-4 py-3 text-right">{salesRecord.loadedCartons}</td>
       <td className="px-4 py-3 text-right font-semibold">
         {salesRecord.soldCartons}
       </td>
-      <td className="px-4 py-3 text-right">{formatMoney(salesRecord.pricePerCarton)}</td>
       <td className="px-4 py-3 text-right font-semibold text-slate-950">
         {formatMoney(salesRecord.salesValue)}
       </td>
       <td className="px-4 py-3 text-right font-semibold text-brand-800">
-        {formatMoney(salesRecord.totalPaid ?? salesRecord.salesValue)}
+        {formatMoney(clientPaid)}
       </td>
       <td className="px-4 py-3 text-right font-semibold text-red-700">
-        {formatMoney(salesRecord.totalUnpaidBalance ?? 0)}
+        {formatMoney(unpaidBalance)}
       </td>
       <td className="px-4 py-3">
         <input
@@ -414,14 +410,17 @@ function CashCard(props: CashDisplayProps) {
     user
   } = props;
   const cashReceived = getDraftCashValue(salesRecord);
-  const variance = cashReceived - salesRecord.salesValue;
+  const clientPaid = salesRecord.totalPaid ?? salesRecord.salesValue;
+  const unpaidBalance =
+    salesRecord.totalUnpaidBalance ?? Math.max(0, salesRecord.salesValue - clientPaid);
+  const variance = cashReceived - clientPaid;
   const isLocked = Boolean(cashRecord?.locked);
 
   return (
     <article className="rounded-lg border border-brand-100 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-bold text-slate-950">{salesRecord.productName}</h3>
+          <h3 className="font-bold text-slate-950">{salesRecord.marketerName}</h3>
           <p className="mt-1 text-sm text-slate-600">
             {salesRecord.itemCode} · {formatDate(salesRecord.date)}
           </p>
@@ -432,14 +431,14 @@ function CashCard(props: CashDisplayProps) {
         <Info label="Marketer" value={salesRecord.marketerName} />
         <Info label="Loaded" value={salesRecord.loadedCartons.toLocaleString()} />
         <Info label="Sold" value={salesRecord.soldCartons.toLocaleString()} />
-        <Info label="Price" value={formatMoney(salesRecord.pricePerCarton)} />
+        <Info label="Expected Cash" value={formatMoney(salesRecord.salesValue)} />
         <Info
           label="Client Paid"
-          value={formatMoney(salesRecord.totalPaid ?? salesRecord.salesValue)}
+          value={formatMoney(clientPaid)}
         />
         <Info
           label="Unpaid"
-          value={formatMoney(salesRecord.totalUnpaidBalance ?? 0)}
+          value={formatMoney(unpaidBalance)}
         />
       </div>
       <label className="mt-4 block">
@@ -461,7 +460,7 @@ function CashCard(props: CashDisplayProps) {
         />
       </label>
       <div className="mt-4 grid grid-cols-3 gap-2">
-        <Metric label="Expected" value={formatMoney(salesRecord.salesValue)} />
+        <Metric label="Client Paid" value={formatMoney(clientPaid)} />
         <Metric label="Received" value={formatMoney(cashReceived)} />
         <Metric label="Variance" value={formatMoney(variance)} warning={variance < 0} />
       </div>
@@ -555,6 +554,49 @@ function CashStatusChip({ cashRecord }: { cashRecord?: CashRecord }) {
       {cashRecord.locked ? "Cash Submitted" : "Unlocked"}
     </span>
   );
+}
+
+function groupSalesByMarketerDate(records: SalesRecord[]) {
+  const groups = new Map<string, SalesRecord[]>();
+
+  records.forEach((record) => {
+    const key = `${record.date}::${record.marketerUsername}`;
+    groups.set(key, [...(groups.get(key) ?? []), record]);
+  });
+
+  return Array.from(groups.entries()).map(([key, groupRecords]) => {
+    const firstRecord = groupRecords[0];
+    const salesValue = groupRecords.reduce(
+      (total, record) => total + record.salesValue,
+      0
+    );
+    const totalPaid = groupRecords.reduce(
+      (total, record) => total + (record.totalPaid ?? record.salesValue),
+      0
+    );
+    const loadedCartons = groupRecords.reduce(
+      (total, record) => total + record.loadedCartons,
+      0
+    );
+    const soldCartons = groupRecords.reduce(
+      (total, record) => total + record.soldCartons,
+      0
+    );
+
+    return {
+      ...firstRecord,
+      id: `CASH-GROUP-${key.replace(/[^a-z0-9]+/gi, "-").toUpperCase()}`,
+      productName: "All Products",
+      itemCode: "GROUP",
+      pricePerCarton: 0,
+      loadedCartons,
+      soldCartons,
+      expectedReturnCartons: loadedCartons - soldCartons,
+      salesValue,
+      totalPaid,
+      totalUnpaidBalance: Math.max(0, salesValue - totalPaid)
+    };
+  });
 }
 
 function FilterField({

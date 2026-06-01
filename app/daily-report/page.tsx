@@ -94,7 +94,7 @@ function DailyReportContent() {
     const sales = salesRecords.filter(
       (record) => record.status === "sales_submitted" && matches(record)
     );
-    const cash = cashRecords.filter((record) => matches(record));
+    const cash = preferGroupedCashRecords(cashRecords.filter((record) => matches(record)));
     const returns = returnRecords.filter((record) => matches(record));
     const expenses = expenseRecords.filter((record) => matches(record));
     const inventoryRows = getInventoryRows({
@@ -540,6 +540,14 @@ function VarianceAlert({
       <p className="mt-1 text-lg font-bold">{balanced ? "0" : display}</p>
     </div>
   );
+}
+
+function preferGroupedCashRecords(records: CashRecord[]) {
+  const groupedRecords = records.filter((record) =>
+    record.salesRecordId.startsWith("CASH-GROUP-")
+  );
+
+  return groupedRecords.length > 0 ? groupedRecords : records;
 }
 
 function stockLabel(value: number) {

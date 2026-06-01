@@ -72,7 +72,8 @@ export function submitCashRecord(
   existingRecord?: CashRecord
 ) {
   const now = new Date().toISOString();
-  const cashVariance = cashReceived - salesRecord.salesValue;
+  const cashVariance =
+    cashReceived - (salesRecord.totalPaid ?? salesRecord.salesValue);
   const record: CashRecord = existingRecord
     ? {
         ...existingRecord,
