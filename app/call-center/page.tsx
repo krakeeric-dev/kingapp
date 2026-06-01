@@ -1,44 +1,67 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
+  Bell,
+  BellRing,
+  BookOpen,
+  Box,
   CalendarClock,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   ClipboardList,
+  CreditCard,
   Headphones,
+  Home,
+  MessageSquare,
   MessageSquareWarning,
+  MicOff,
+  NotebookTabs,
+  Pause,
+  Phone,
   PhoneCall,
-  PhoneMissed,
+  PhoneIncoming,
+  PhoneOff,
   Search,
   ShoppingCart,
-  UserCheck,
+  Truck,
+  UserRound,
+  UsersRound,
   WalletCards
 } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
 import type { SessionUser } from "@/lib/auth";
+import { canAccessPage } from "@/lib/permissions";
 import { formatMoney } from "@/lib/sales-data";
+import { getSession } from "@/lib/storage";
 import {
   addCallLog,
+  addCallback,
   addComplaint,
   addPaymentFollowUp,
   addPendingOrder,
-  addScheduledFollowUp,
+  getAgents,
+  getCallbacks,
   getCallCenterClients,
   getCallLogs,
   getComplaints,
   getPaymentFollowUps,
   getPendingOrders,
-  getScheduledFollowUps,
+  getQueueCalls,
   saveClientNotes,
+  type CallbackItem,
   type CallCenterClient,
   type CallLog,
   type CallType,
-  type ComplaintRecord,
-  type PaymentFollowUp,
   type PendingOrder,
-  type ScheduledFollowUp
+  type QueueCall
 } from "@/lib/call-center-data";
 import { getProducts, type ProductMaster } from "@/lib/products-data";
+
+type ActionMode = "order" | "payment" | "complaint" | "delivery" | "callback";
+type DetailTab = "orders" | "payments" | "notes";
 
 const today = () => {
   const date = new Date();
@@ -47,60 +70,93 @@ const today = () => {
 
 const nowTime = () => new Date().toTimeString().slice(0, 5);
 
+const menuItems = [
+  { label: "Dashboard", href: "/call-center", icon: Home, badge: "" },
+  { label: "Incoming Calls", href: "/call-center/queue", icon: PhoneIncoming, badge: "2" },
+  { label: "Clients", href: "#clients", icon: UsersRound, badge: "" },
+  { label: "Orders", href: "#orders", icon: ClipboardList, badge: "" },
+  { label: "Follow Ups", href: "/call-center/callbacks", icon: CalendarClock, badge: "" },
+  { label: "Complaints", href: "#complaints", icon: MessageSquareWarning, badge: "" },
+  { label: "Payments", href: "#payments", icon: CreditCard, badge: "" },
+  { label: "Reports", href: "/reports", icon: BookOpen, badge: "" }
+];
+
+const toolItems = [
+  { label: "Client Search", href: "#clients", icon: Search },
+  { label: "Order Quick Entry", href: "#current-order", icon: Box },
+  { label: "Callback List", href: "/call-center/callbacks", icon: PhoneCall },
+  { label: "Reminders", href: "#reminders", icon: CalendarClock }
+];
+
 export default function CallCenterPage() {
-  return (
-    <AppShell allowedRoles={["admin", "callcenter"]}>
-      {(user) => <CallCenterContent user={user} />}
-    </AppShell>
-  );
+  const router = useRouter();
+  const [user, setUser] = useState<SessionUser | null>(null);
+
+  useEffect(() => {
+    const session = getSession();
+
+    if (!session) {
+      router.push("/login");
+      return;
+    }
+
+    if (!canAccessPage("/call-center", session.role)) {
+      window.sessionStorage.setItem("kingapp.permissionMessage", "You do not have permission to access this page.");
+      router.push("/dashboard");
+      return;
+    }
+
+    setUser(session);
+  }, [router]);
+
+  if (!user) {
+    return <main className="min-h-screen bg-slate-950" />;
+  }
+
+  return <CallCenterOffice user={user} />;
 }
 
-function CallCenterContent({ user }: { user: SessionUser }) {
+function CallCenterOffice({ user }: { user: SessionUser }) {
   const [clients, setClients] = useState<CallCenterClient[]>([]);
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [orders, setOrders] = useState<PendingOrder[]>([]);
-  const [payments, setPayments] = useState<PaymentFollowUp[]>([]);
-  const [complaints, setComplaints] = useState<ComplaintRecord[]>([]);
-  const [followUps, setFollowUps] = useState<ScheduledFollowUp[]>([]);
+  const [payments, setPayments] = useState(getPaymentFollowUps());
+  const [complaints, setComplaints] = useState(getComplaints());
+  const [callbacks, setCallbacks] = useState<CallbackItem[]>([]);
+  const [queueCalls, setQueueCalls] = useState<QueueCall[]>([]);
   const [products, setProducts] = useState<ProductMaster[]>([]);
-  const [query, setQuery] = useState("");
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [query, setQuery] = useState("");
   const [message, setMessage] = useState("");
-
-  const [callForm, setCallForm] = useState({
-    callType: "Customer Care" as CallType,
-    duration: "",
-    outcome: "Open",
-    nextAction: ""
-  });
+  const [actionMode, setActionMode] = useState<ActionMode>("order");
+  const [tab, setTab] = useState<DetailTab>("orders");
+  const [noteDraft, setNoteDraft] = useState("");
   const [orderForm, setOrderForm] = useState({
     product: "",
-    quantity: "",
+    quantity: "20",
     deliveryDate: today(),
+    deliveryTime: "16:00",
     notes: ""
   });
   const [paymentForm, setPaymentForm] = useState({
     amountDue: "",
     daysOutstanding: "",
     promiseToPayDate: today(),
-    comment: "",
-    status: "Open"
+    comment: ""
   });
   const [complaintForm, setComplaintForm] = useState({
-    complaintType: "damaged stock",
+    complaintType: "delayed truck",
     product: "",
     quantity: "",
     description: "",
-    priority: "Medium",
-    status: "Open"
+    priority: "Medium"
   });
-  const [followUpForm, setFollowUpForm] = useState({
-    date: today(),
-    time: nowTime(),
+  const [callbackForm, setCallbackForm] = useState({
+    callbackDate: today(),
+    callbackTime: "14:00",
     reason: "",
-    assignedAgent: user.displayName
+    priority: "Medium"
   });
-  const [noteDraft, setNoteDraft] = useState("");
 
   useEffect(() => {
     const loadedClients = getCallCenterClients();
@@ -110,11 +166,18 @@ function CallCenterContent({ user }: { user: SessionUser }) {
     setOrders(getPendingOrders());
     setPayments(getPaymentFollowUps());
     setComplaints(getComplaints());
-    setFollowUps(getScheduledFollowUps());
+    setCallbacks(getCallbacks());
+    setQueueCalls(getQueueCalls());
     setProducts(getProducts());
   }, []);
 
-  const selectedClient = clients.find((client) => client.id === selectedClientId);
+  const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
+  const currentCall = queueCalls.find((call) => call.status === "Active") ?? queueCalls.find((call) => call.status === "Incoming");
+  const agentsOnline = getAgents().filter((agent) => agent.status !== "Offline").length;
+  const callsInQueue = queueCalls.filter((call) => call.status === "Waiting" || call.status === "Incoming").length;
+  const todaysLogs = callLogs.filter((record) => record.date === today());
+  const pendingOrders = orders.filter((order) => order.status === "Pending Storekeeper");
+  const dueCallbacks = callbacks.filter((callback) => callback.status === "Pending");
   const filteredClients = useMemo(() => {
     const search = query.trim().toLowerCase();
 
@@ -129,18 +192,20 @@ function CallCenterContent({ user }: { user: SessionUser }) {
     );
   }, [clients, query]);
 
-  const dashboard = useMemo(() => {
-    const todaysCalls = callLogs.filter((record) => record.date === today());
+  const stats = {
+    answered: todaysLogs.filter((record) => record.outcome === "Closed").length,
+    missed: queueCalls.filter((call) => call.status === "Missed").length,
+    ordersTaken: orders.filter((record) => record.createdAt.slice(0, 10) === today()).length,
+    followUps: callbacks.filter((record) => record.callbackDate === today()).length,
+    complaints: complaints.filter((record) => record.createdAt.slice(0, 10) === today()).length
+  };
 
-    return {
-      callsToday: todaysCalls.length,
-      ordersToday: orders.filter((record) => record.createdAt.slice(0, 10) === today()).length,
-      followUpsPending: followUps.filter((record) => record.status === "Scheduled").length,
-      complaintsOpen: complaints.filter((record) => record.status !== "Closed").length,
-      paymentFollowUps: payments.filter((record) => record.status !== "Closed").length,
-      newClientsContacted: todaysCalls.filter((record) => record.callType === "New Client Prospect").length
-    };
-  }, [callLogs, complaints, followUps, orders, payments]);
+  const kpis = {
+    todayOrders: stats.ordersTaken,
+    pendingOrders: pendingOrders.length,
+    deliveriesToday: orders.filter((order) => order.deliveryDate === today()).length,
+    paymentsDue: payments.filter((payment) => payment.status !== "Closed").reduce((sum, payment) => sum + payment.amountDue, 0)
+  };
 
   function requireClient() {
     if (!selectedClient) {
@@ -151,45 +216,32 @@ function CallCenterContent({ user }: { user: SessionUser }) {
     return selectedClient;
   }
 
-  function handleCallSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const client = requireClient();
-
-    if (!client) return;
-
-    setCallLogs(
-      addCallLog(
-        {
-          date: today(),
-          time: nowTime(),
-          clientId: client.id,
-          clientName: client.clientName,
-          phone: client.phone,
-          callType: callForm.callType,
-          duration: callForm.duration || "0 min",
-          outcome: callForm.outcome as CallLog["outcome"],
-          nextAction: callForm.nextAction
-        },
-        user
-      )
-    );
-    setCallForm({ callType: "Customer Care", duration: "", outcome: "Open", nextAction: "" });
-    setMessage("Call logged.");
-  }
-
-  function handleOrderSubmit(event: FormEvent<HTMLFormElement>) {
+  function sendOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const client = requireClient();
     const quantity = Number(orderForm.quantity);
 
-    if (!client || !orderForm.product || !Number.isFinite(quantity) || quantity <= 0) return;
+    if (!client || !orderForm.product || !Number.isFinite(quantity) || quantity <= 0) {
+      setMessage("Select product and quantity before sending order.");
+      return;
+    }
 
-    setOrders(addPendingOrder(client, { ...orderForm, quantity }, user));
-    setOrderForm({ product: "", quantity: "", deliveryDate: today(), notes: "" });
+    setOrders(
+      addPendingOrder(
+        client,
+        {
+          product: orderForm.product,
+          quantity,
+          deliveryDate: orderForm.deliveryDate,
+          notes: `${orderForm.notes} Delivery time: ${orderForm.deliveryTime}`.trim()
+        },
+        user
+      )
+    );
     setMessage("Order sent to Pending Orders for Storekeeper.");
   }
 
-  function handlePaymentSubmit(event: FormEvent<HTMLFormElement>) {
+  function savePaymentReminder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const client = requireClient();
 
@@ -199,20 +251,19 @@ function CallCenterContent({ user }: { user: SessionUser }) {
       addPaymentFollowUp(
         client,
         {
-          amountDue: Number(paymentForm.amountDue) || 0,
+          amountDue: Number(paymentForm.amountDue) || client.currentBalance,
           daysOutstanding: Number(paymentForm.daysOutstanding) || 0,
           promiseToPayDate: paymentForm.promiseToPayDate,
           comment: paymentForm.comment,
-          status: paymentForm.status
+          status: "Open"
         },
         user
       )
     );
-    setPaymentForm({ amountDue: "", daysOutstanding: "", promiseToPayDate: today(), comment: "", status: "Open" });
-    setMessage("Payment follow-up saved for Accountant.");
+    setMessage("Payment reminder saved for Accountant.");
   }
 
-  function handleComplaintSubmit(event: FormEvent<HTMLFormElement>) {
+  function saveComplaint(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const client = requireClient();
 
@@ -227,27 +278,61 @@ function CallCenterContent({ user }: { user: SessionUser }) {
           quantity: Number(complaintForm.quantity) || 0,
           description: complaintForm.description,
           priority: complaintForm.priority,
-          status: complaintForm.status
+          status: "Open"
         },
         user
       )
     );
-    setComplaintForm({ complaintType: "damaged stock", product: "", quantity: "", description: "", priority: "Medium", status: "Open" });
     setMessage("Complaint logged for Supervisor/Admin.");
   }
 
-  function handleFollowUpSubmit(event: FormEvent<HTMLFormElement>) {
+  function scheduleCallback(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const client = requireClient();
 
     if (!client) return;
 
-    setFollowUps(addScheduledFollowUp(client, followUpForm));
-    setFollowUpForm({ date: today(), time: nowTime(), reason: "", assignedAgent: user.displayName });
-    setMessage("Follow-up scheduled.");
+    setCallbacks(
+      addCallback({
+        clientId: client.id,
+        clientName: client.clientName,
+        phone: client.phone,
+        callbackDate: callbackForm.callbackDate,
+        callbackTime: callbackForm.callbackTime,
+        reason: callbackForm.reason || "Client callback",
+        assignedAgent: user.displayName,
+        priority: callbackForm.priority as CallbackItem["priority"],
+        status: "Pending"
+      })
+    );
+    setMessage("Callback scheduled.");
   }
 
-  function handleAddNote() {
+  function endCurrentCall() {
+    const client = requireClient();
+
+    if (!client) return;
+
+    setCallLogs(
+      addCallLog(
+        {
+          date: today(),
+          time: nowTime(),
+          clientId: client.id,
+          clientName: client.clientName,
+          phone: client.phone,
+          callType: "Customer Care" as CallType,
+          duration: "3 min",
+          outcome: "Closed",
+          nextAction: "Call ended from command center"
+        },
+        user
+      )
+    );
+    setMessage("Call ended and logged.");
+  }
+
+  function saveNote() {
     const client = requireClient();
 
     if (!client || !noteDraft.trim()) return;
@@ -259,273 +344,552 @@ function CallCenterContent({ user }: { user: SessionUser }) {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="app-card-soft p-5 sm:p-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
-            <PhoneCall className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-slate-950">Call Center</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Search clients, book orders, log calls, complaints, payments, and follow-ups inside KingApp.
-            </p>
-          </div>
-        </div>
-      </section>
+    <main className="min-h-screen bg-[#f3f6fb] text-slate-950">
+      <div className="flex min-h-screen">
+        <CallCenterSidebar />
+        <section className="min-w-0 flex-1">
+          <TopBar agentsOnline={agentsOnline} callsInQueue={callsInQueue} user={user} />
+          <div className="space-y-4 p-4 lg:p-6">
+            {message ? (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+                {message}
+              </div>
+            ) : null}
 
-      {message ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
-          {message}
-        </div>
-      ) : null}
+            <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
+              <div className="space-y-4">
+                <CurrentCallCard call={currentCall} client={selectedClient} onEnd={endCurrentCall} onMessage={setMessage} />
+                <QuickActions active={actionMode} onSelect={setActionMode} />
+                <CallStats stats={stats} />
+              </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        <Kpi icon={PhoneCall} label="Total Calls Today" value={dashboard.callsToday} />
-        <Kpi icon={ShoppingCart} label="Orders Booked Today" value={dashboard.ordersToday} />
-        <Kpi icon={CalendarClock} label="Follow-ups Pending" value={dashboard.followUpsPending} />
-        <Kpi icon={MessageSquareWarning} label="Complaints Open" value={dashboard.complaintsOpen} />
-        <Kpi icon={WalletCards} label="Payment Follow-ups" value={dashboard.paymentFollowUps} />
-        <Kpi icon={ClipboardList} label="New Clients Contacted" value={dashboard.newClientsContacted} />
-      </div>
+              <div className="min-w-0 space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <KpiCard accent="green" icon={ShoppingCart} label="Today Orders" subtext="+13% vs yesterday" value={kpis.todayOrders.toLocaleString()} />
+                  <KpiCard accent="amber" icon={ClipboardList} label="Pending Orders" subtext="View all pending" value={kpis.pendingOrders.toLocaleString()} />
+                  <KpiCard accent="blue" icon={Truck} label="Deliveries Today" subtext="On the way: 6" value={kpis.deliveriesToday.toLocaleString()} />
+                  <KpiCard accent="red" icon={WalletCards} label="Payments Due" subtext={`From ${payments.length} clients`} value={`${formatMoney(kpis.paymentsDue)} RWF`} />
+                </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <ModuleLink href="/call-center/queue" icon={Headphones} title="Call Queue" text="Incoming, waiting, active, missed, and callbacks." />
-        <ModuleLink href="/call-center/agents" icon={UserCheck} title="Agents" text="Control available, ringing, on-call, away, and offline states." />
-        <ModuleLink href="/call-center/missed-calls" icon={PhoneMissed} title="Missed Calls" text="Call back missed callers and update outcomes." />
-        <ModuleLink href="/call-center/callbacks" icon={CalendarClock} title="Callbacks" text="Prioritize follow-ups and track completion." />
-      </div>
+                <Panel id="orders" title="Pending Orders (Real Time)" action={<Link className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-black text-blue-700" href="/loading">View All Orders</Link>}>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="text-xs font-black uppercase text-slate-500">
+                        <tr>
+                          <th className="px-3 py-3">#</th>
+                          <th className="px-3 py-3">Client</th>
+                          <th className="px-3 py-3">Items</th>
+                          <th className="px-3 py-3">Total</th>
+                          <th className="px-3 py-3">Requested Delivery</th>
+                          <th className="px-3 py-3">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pendingOrders.slice(0, 6).map((order, index) => (
+                          <tr className="border-t border-slate-100" key={order.id}>
+                            <td className="px-3 py-3 font-bold">{index + 1}</td>
+                            <td className="px-3 py-3 font-black">{order.clientName}</td>
+                            <td className="px-3 py-3">{order.quantity} x {order.product}</td>
+                            <td className="px-3 py-3">{formatMoney(order.quantity * 2000)}</td>
+                            <td className="px-3 py-3">{order.deliveryDate}</td>
+                            <td className="px-3 py-3"><StatusPill label="Waiting Loading" tone="amber" /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Panel>
 
-      <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
-        <section className="app-card p-4">
-          <label className="block">
-            <span className="mb-2 flex items-center gap-2 text-sm font-black text-slate-900">
-              <Search className="h-4 w-4 text-brand-700" />
-              Client Search
-            </span>
-            <input
-              className="form-input"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search name, phone, location"
-              value={query}
-            />
-          </label>
-          <div className="mt-4 grid gap-2">
-            {filteredClients.map((client) => (
-              <button
-                className={`rounded-lg border px-3 py-3 text-left text-sm ${
-                  client.id === selectedClientId
-                    ? "border-brand-300 bg-brand-50 text-brand-950"
-                    : "border-slate-200 bg-white text-slate-700"
-                }`}
-                key={client.id}
-                onClick={() => setSelectedClientId(client.id)}
-                type="button"
-              >
-                <span className="block font-black">{client.clientName}</span>
-                <span className="mt-1 block font-semibold">{client.phone} - {client.area}</span>
-              </button>
-            ))}
+                <Panel title="Call Log (Today)">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="text-xs font-black uppercase text-slate-500">
+                        <tr>
+                          <th className="px-3 py-3">Time</th>
+                          <th className="px-3 py-3">Client</th>
+                          <th className="px-3 py-3">Number</th>
+                          <th className="px-3 py-3">Type</th>
+                          <th className="px-3 py-3">Outcome</th>
+                          <th className="px-3 py-3">Agent</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {todaysLogs.slice(0, 6).map((record) => (
+                          <tr className="border-t border-slate-100" key={record.id}>
+                            <td className="px-3 py-3">{record.time}</td>
+                            <td className="px-3 py-3 font-black">{record.clientName}</td>
+                            <td className="px-3 py-3">{record.phone}</td>
+                            <td className="px-3 py-3">{record.callType}</td>
+                            <td className="px-3 py-3"><StatusPill label={record.outcome} tone={record.outcome === "Closed" ? "green" : "blue"} /></td>
+                            <td className="px-3 py-3">{record.agent}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {todaysLogs.length === 0 ? (
+                      <p className="px-3 py-4 text-sm font-semibold text-slate-500">No calls logged today yet.</p>
+                    ) : null}
+                  </div>
+                </Panel>
+
+                <Panel id="reminders" title="Reminders & Callbacks">
+                  <div className="divide-y divide-slate-100">
+                    {dueCallbacks.slice(0, 4).map((callback) => (
+                      <div className="grid gap-3 py-3 sm:grid-cols-[120px_1fr_48px] sm:items-center" key={callback.id}>
+                        <div className="rounded-lg bg-purple-50 px-3 py-2 text-sm font-black text-purple-700">
+                          {callback.callbackDate === today() ? "Today" : callback.callbackDate}<br />{callback.callbackTime}
+                        </div>
+                        <div>
+                          <p className="font-black">{callback.clientName}</p>
+                          <p className="text-sm font-semibold text-slate-500">{callback.reason}</p>
+                          <p className="text-xs font-bold text-slate-400">Agent: {callback.assignedAgent}</p>
+                        </div>
+                        <button className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700" type="button">
+                          <PhoneCall className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </Panel>
+              </div>
+
+              {selectedClient ? (
+                <aside className="space-y-4">
+                  <ClientDetailsCard client={selectedClient} onSearch={setQuery} query={query} results={filteredClients} onSelect={setSelectedClientId} />
+                  <ClientTabs active={tab} client={selectedClient} orders={orders} payments={payments} onChange={setTab} />
+                  <CurrentOrderCard
+                    actionMode={actionMode}
+                    callbackForm={callbackForm}
+                    complaintForm={complaintForm}
+                    onCallbackChange={setCallbackForm}
+                    onCallbackSubmit={scheduleCallback}
+                    onComplaintChange={setComplaintForm}
+                    onComplaintSubmit={saveComplaint}
+                    onOrderChange={setOrderForm}
+                    onOrderSubmit={sendOrder}
+                    onPaymentChange={setPaymentForm}
+                    onPaymentSubmit={savePaymentReminder}
+                    orderForm={orderForm}
+                    paymentForm={paymentForm}
+                    products={products}
+                  />
+                  <NotesCard client={selectedClient} noteDraft={noteDraft} onNoteChange={setNoteDraft} onSave={saveNote} />
+                </aside>
+              ) : null}
+            </div>
           </div>
         </section>
-
-        {selectedClient ? (
-          <section className="space-y-4">
-            <ClientProfile client={selectedClient} />
-            <Panel title="Client Call History">
-              <div className="overflow-x-auto">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Time</th>
-                      <th>Agent</th>
-                      <th>Call Type</th>
-                      <th>Duration</th>
-                      <th>Outcome</th>
-                      <th>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {callLogs.filter((record) => record.clientId === selectedClient.id).map((record) => (
-                      <tr key={record.id}>
-                        <td>{record.date}</td>
-                        <td>{record.time}</td>
-                        <td>{record.agent}</td>
-                        <td>{record.callType}</td>
-                        <td>{record.duration}</td>
-                        <td>{record.outcome}</td>
-                        <td>{record.nextAction}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {callLogs.filter((record) => record.clientId === selectedClient.id).length === 0 ? (
-                <p className="mt-3 text-sm font-semibold text-slate-500">No previous call history for this client.</p>
-              ) : null}
-            </Panel>
-            <div className="grid gap-4 xl:grid-cols-2">
-              <Panel title="+ New Order">
-                <form className="grid gap-3" onSubmit={handleOrderSubmit}>
-                  <Select label="Product" value={orderForm.product} onChange={(value) => setOrderForm((current) => ({ ...current, product: value }))}>
-                    <option value="">Select product</option>
-                    {products.map((product) => <option key={product.itemCode}>{product.name}</option>)}
-                  </Select>
-                  <Input label="Quantity" type="number" value={orderForm.quantity} onChange={(value) => setOrderForm((current) => ({ ...current, quantity: value }))} />
-                  <Input label="Delivery Date" type="date" value={orderForm.deliveryDate} onChange={(value) => setOrderForm((current) => ({ ...current, deliveryDate: value }))} />
-                  <Input label="Notes" value={orderForm.notes} onChange={(value) => setOrderForm((current) => ({ ...current, notes: value }))} />
-                  <button className="primary-button">Save order</button>
-                </form>
-              </Panel>
-
-              <Panel title="Schedule Follow-Up">
-                <form className="grid gap-3" onSubmit={handleFollowUpSubmit}>
-                  <Input label="Date" type="date" value={followUpForm.date} onChange={(value) => setFollowUpForm((current) => ({ ...current, date: value }))} />
-                  <Input label="Time" type="time" value={followUpForm.time} onChange={(value) => setFollowUpForm((current) => ({ ...current, time: value }))} />
-                  <Input label="Reason" value={followUpForm.reason} onChange={(value) => setFollowUpForm((current) => ({ ...current, reason: value }))} />
-                  <Input label="Assigned Agent" value={followUpForm.assignedAgent} onChange={(value) => setFollowUpForm((current) => ({ ...current, assignedAgent: value }))} />
-                  <button className="primary-button">Schedule</button>
-                </form>
-              </Panel>
-
-              <Panel title="Payment Follow-Up">
-                <form className="grid gap-3" onSubmit={handlePaymentSubmit}>
-                  <Input label="Amount Due" type="number" value={paymentForm.amountDue} onChange={(value) => setPaymentForm((current) => ({ ...current, amountDue: value }))} />
-                  <Input label="Days Outstanding" type="number" value={paymentForm.daysOutstanding} onChange={(value) => setPaymentForm((current) => ({ ...current, daysOutstanding: value }))} />
-                  <Input label="Promise To Pay Date" type="date" value={paymentForm.promiseToPayDate} onChange={(value) => setPaymentForm((current) => ({ ...current, promiseToPayDate: value }))} />
-                  <Input label="Comment" value={paymentForm.comment} onChange={(value) => setPaymentForm((current) => ({ ...current, comment: value }))} />
-                  <Input label="Status" value={paymentForm.status} onChange={(value) => setPaymentForm((current) => ({ ...current, status: value }))} />
-                  <button className="primary-button">Save payment follow-up</button>
-                </form>
-              </Panel>
-
-              <Panel title="Complaint Logging">
-                <form className="grid gap-3" onSubmit={handleComplaintSubmit}>
-                  <Select label="Complaint Type" value={complaintForm.complaintType} onChange={(value) => setComplaintForm((current) => ({ ...current, complaintType: value }))}>
-                    {["damaged stock", "wrong delivery", "short delivery", "delayed truck", "payment dispute"].map((item) => <option key={item}>{item}</option>)}
-                  </Select>
-                  <Input label="Product" value={complaintForm.product} onChange={(value) => setComplaintForm((current) => ({ ...current, product: value }))} />
-                  <Input label="Quantity" type="number" value={complaintForm.quantity} onChange={(value) => setComplaintForm((current) => ({ ...current, quantity: value }))} />
-                  <Input label="Description" value={complaintForm.description} onChange={(value) => setComplaintForm((current) => ({ ...current, description: value }))} />
-                  <Select label="Priority" value={complaintForm.priority} onChange={(value) => setComplaintForm((current) => ({ ...current, priority: value }))}>
-                    {["Low", "Medium", "High", "Urgent"].map((item) => <option key={item}>{item}</option>)}
-                  </Select>
-                  <Input label="Status" value={complaintForm.status} onChange={(value) => setComplaintForm((current) => ({ ...current, status: value }))} />
-                  <button className="primary-button">Log complaint</button>
-                </form>
-              </Panel>
-            </div>
-
-            <Panel title="Call Notes">
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input className="form-input" value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} placeholder="Add client note" />
-                <button className="primary-button" onClick={handleAddNote} type="button">Save note</button>
-              </div>
-              <div className="mt-3 grid gap-2">
-                {selectedClient.notes.map((note) => (
-                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700" key={note}>{note}</div>
-                ))}
-              </div>
-            </Panel>
-          </section>
-        ) : null}
       </div>
+    </main>
+  );
+}
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Panel title="Log Call">
-          <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCallSubmit}>
-            <Select label="Call Type" value={callForm.callType} onChange={(value) => setCallForm((current) => ({ ...current, callType: value as CallType }))}>
-              {["New Order", "Reorder", "Complaint", "Payment Follow-up", "Customer Care", "New Client Prospect"].map((item) => <option key={item}>{item}</option>)}
-            </Select>
-            <Input label="Duration" value={callForm.duration} onChange={(value) => setCallForm((current) => ({ ...current, duration: value }))} placeholder="4 min" />
-            <Select label="Outcome" value={callForm.outcome} onChange={(value) => setCallForm((current) => ({ ...current, outcome: value }))}>
-              {["Open", "Closed", "Pending Callback", "Scheduled"].map((item) => <option key={item}>{item}</option>)}
-            </Select>
-            <Input label="Next Action" value={callForm.nextAction} onChange={(value) => setCallForm((current) => ({ ...current, nextAction: value }))} />
-            <button className="primary-button md:col-span-2">Save call log</button>
-          </form>
-        </Panel>
-
-        <Panel title="Today's Follow-ups">
-          <div className="grid gap-2">
-            {followUps.filter((record) => record.date === today()).map((record) => (
-              <div className="rounded-lg border border-slate-100 px-3 py-2 text-sm" key={record.id}>
-                <span className="font-black">{record.time}</span> - {record.clientName}: {record.reason}
-              </div>
-            ))}
-            {followUps.filter((record) => record.date === today()).length === 0 ? (
-              <p className="text-sm font-semibold text-slate-500">No follow-ups scheduled for today.</p>
-            ) : null}
+function CallCenterSidebar() {
+  return (
+    <aside className="hidden w-72 shrink-0 flex-col bg-[#061b33] text-white shadow-2xl lg:flex">
+      <div className="border-b border-white/10 p-7">
+        <div className="flex items-center gap-3">
+          <div className="text-4xl leading-none text-amber-300">♛</div>
+          <div>
+            <h1 className="text-2xl font-black tracking-wide">KINGAPP</h1>
+            <p className="text-xs font-semibold text-blue-200">Powering Distribution</p>
           </div>
-        </Panel>
+        </div>
       </div>
 
-      <Panel title="Call Log Table">
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Time</th>
-                <th>Client</th>
-                <th>Phone</th>
-                <th>Call Type</th>
-                <th>Duration</th>
-                <th>Outcome</th>
-                <th>Next Action</th>
-                <th>Agent</th>
-              </tr>
-            </thead>
-            <tbody>
-              {callLogs.map((record) => (
-                <tr key={record.id}>
-                  <td>{record.date}</td>
-                  <td>{record.time}</td>
-                  <td className="font-bold text-slate-950">{record.clientName}</td>
-                  <td>{record.phone}</td>
-                  <td>{record.callType}</td>
-                  <td>{record.duration}</td>
-                  <td>{record.outcome}</td>
-                  <td>{record.nextAction}</td>
-                  <td>{record.agent}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <nav className="flex-1 space-y-8 overflow-y-auto p-5">
+        <SidebarGroup title="Main">
+          {menuItems.map((item, index) => (
+            <SidebarLink active={index === 0} href={item.href} icon={item.icon} key={item.label} label={item.label} badge={item.badge} />
+          ))}
+        </SidebarGroup>
+        <SidebarGroup title="Tools">
+          {toolItems.map((item) => (
+            <SidebarLink href={item.href} icon={item.icon} key={item.label} label={item.label} />
+          ))}
+        </SidebarGroup>
+      </nav>
+
+      <div className="border-t border-white/10 p-6 text-center">
+        <div className="mx-auto mb-3 text-5xl text-amber-300">♛</div>
+        <p className="text-xl font-black">KINGAPP</p>
+        <p className="text-sm font-semibold text-blue-100">Call Center Module</p>
+        <p className="mt-8 text-xs font-semibold text-blue-200">Version 1.0.0</p>
+      </div>
+    </aside>
+  );
+}
+
+function TopBar({ agentsOnline, callsInQueue, user }: { agentsOnline: number; callsInQueue: number; user: SessionUser }) {
+  return (
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-4 shadow-sm backdrop-blur lg:px-7">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-slate-950">Call Center Office</h2>
+          <p className="text-sm font-black text-blue-700">Client Calls Team</p>
         </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <TopMetric icon={PhoneCall} label="Connected" value="00:03:12" tone="green" />
+          <TopMetric label="Calls in Queue" value={callsInQueue.toLocaleString()} />
+          <TopMetric label="Agents Online" value={agentsOnline.toLocaleString()} dot />
+          <button className="relative rounded-lg p-2 text-slate-700 hover:bg-slate-100" type="button">
+            <Bell className="h-5 w-5" />
+            <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white">5</span>
+          </button>
+          <div className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-amber-100 text-sm font-black text-amber-800">
+              {user.displayName.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <p className="font-black text-slate-950">{user.displayName}</p>
+              <p className="text-xs font-semibold text-slate-500">Call Center Agent</p>
+            </div>
+            <ChevronDown className="h-4 w-4 text-slate-500" />
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function CurrentCallCard({ call, client, onEnd, onMessage }: { call?: QueueCall; client?: CallCenterClient; onEnd: () => void; onMessage: (message: string) => void }) {
+  const displayName = call?.clientName ?? client?.clientName ?? "No active client";
+  const phone = call?.phone ?? client?.phone ?? "";
+  const location = call?.location ?? client?.area ?? "";
+
+  return (
+    <Panel title="Current Call" action={<span className="rounded-md bg-emerald-500 px-2 py-1 text-xs font-black text-white">LIVE</span>}>
+      <div className="flex flex-col items-center text-center">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+          <PhoneCall className="h-8 w-8" />
+        </div>
+        <h3 className="text-lg font-black">{displayName}</h3>
+        <p className="mt-1 font-bold text-slate-700">{phone}</p>
+        <p className="text-sm font-semibold text-slate-500">{location}</p>
+        <p className="mt-5 flex items-center gap-2 text-sm font-bold text-slate-500">
+          <span className="h-2 w-2 rounded-full bg-emerald-300" />
+          00:01:24
+        </p>
+      </div>
+      <div className="mt-5 grid gap-2">
+        <button className="rounded-lg bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm" onClick={() => onMessage("Call marked answered.")} type="button">
+          <Phone className="mr-2 inline h-4 w-4" />
+          Answered
+        </button>
+        <button className="secondary-button w-full" onClick={() => onMessage("Call placed on hold.")} type="button"><Pause className="h-4 w-4" /> Hold</button>
+        <button className="secondary-button w-full" onClick={() => onMessage("Call muted.")} type="button"><MicOff className="h-4 w-4" /> Mute</button>
+        <button className="danger-button w-full" onClick={onEnd} type="button"><PhoneOff className="h-4 w-4" /> End Call</button>
+      </div>
+    </Panel>
+  );
+}
+
+function QuickActions({ active, onSelect }: { active: ActionMode; onSelect: (mode: ActionMode) => void }) {
+  const actions: Array<{ icon: typeof ShoppingCart; label: string; mode: ActionMode; tone: string }> = [
+    { icon: ShoppingCart, label: "New Order", mode: "order", tone: "bg-emerald-500" },
+    { icon: BellRing, label: "Payment Reminder", mode: "payment", tone: "bg-amber-500" },
+    { icon: MessageSquareWarning, label: "Complaint", mode: "complaint", tone: "bg-red-500" },
+    { icon: Truck, label: "Delivery Follow Up", mode: "delivery", tone: "bg-blue-500" },
+    { icon: Headphones, label: "Schedule Call Back", mode: "callback", tone: "bg-purple-500" }
+  ];
+
+  return (
+    <Panel title="Quick Actions">
+      <div className="space-y-2">
+        {actions.map((action) => (
+          <button
+            className={`flex w-full items-center justify-between rounded-lg border px-3 py-3 text-left text-sm font-black transition ${
+              active === action.mode ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-100 bg-white text-slate-800 hover:bg-slate-50"
+            }`}
+            key={action.mode}
+            onClick={() => onSelect(action.mode)}
+            type="button"
+          >
+            <span className="flex items-center gap-3">
+              <span className={`flex h-8 w-8 items-center justify-center rounded-lg text-white ${action.tone}`}>
+                <action.icon className="h-4 w-4" />
+              </span>
+              {action.label}
+            </span>
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function CallStats({ stats }: { stats: { answered: number; missed: number; ordersTaken: number; followUps: number; complaints: number } }) {
+  return (
+    <Panel title="Call Stats (Today)">
+      <div className="space-y-4 text-sm font-bold">
+        <StatLine label="Answered Calls" value={stats.answered} />
+        <StatLine label="Missed Calls" value={stats.missed} danger />
+        <StatLine label="Orders Taken" value={stats.ordersTaken} />
+        <StatLine label="Follow Ups" value={stats.followUps} />
+        <StatLine label="Complaints" value={stats.complaints} />
+      </div>
+    </Panel>
+  );
+}
+
+function ClientDetailsCard({
+  client,
+  onSearch,
+  onSelect,
+  query,
+  results
+}: {
+  client: CallCenterClient;
+  onSearch: (value: string) => void;
+  onSelect: (id: string) => void;
+  query: string;
+  results: CallCenterClient[];
+}) {
+  return (
+    <Panel id="clients" title="Client Details" action={<span className="text-xl font-black text-slate-400">...</span>}>
+      <label className="mb-4 block">
+        <span className="mb-1 block text-xs font-black uppercase text-slate-500">Client Search</span>
+        <input className="form-input" onChange={(event) => onSearch(event.target.value)} placeholder="Search client or phone" value={query} />
+      </label>
+      {query ? (
+        <div className="mb-4 max-h-36 space-y-2 overflow-y-auto">
+          {results.slice(0, 5).map((result) => (
+            <button className="w-full rounded-lg bg-slate-50 px-3 py-2 text-left text-sm font-bold hover:bg-blue-50" key={result.id} onClick={() => onSelect(result.id)} type="button">
+              {result.clientName} - {result.phone}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div className="flex items-start gap-3">
+        <div className="mt-1 h-3 w-3 rounded-full bg-emerald-400" />
+        <div>
+          <h3 className="font-black">{client.clientName}</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-600">{client.phone}</p>
+          <p className="text-sm font-semibold text-slate-500">{client.area}</p>
+        </div>
+      </div>
+      <div className="mt-5 grid grid-cols-2 divide-x divide-slate-100 border-y border-slate-100 py-4">
+        <div>
+          <p className="text-xs font-bold text-slate-500">Credit Status</p>
+          <p className={`mt-1 font-black ${client.currentBalance > 0 ? "text-red-600" : "text-emerald-600"}`}>
+            {formatMoney(client.currentBalance)} RWF
+          </p>
+          <p className="text-xs font-bold text-slate-500">{client.currentBalance > 0 ? "BALANCE DUE" : "CLEAR"}</p>
+        </div>
+        <div className="pl-4">
+          <p className="text-xs font-bold text-slate-500">Credit Limit</p>
+          <p className="mt-1 font-black">500,000 RWF</p>
+          <p className="text-xs font-bold text-slate-500">AVAILABLE</p>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <InfoLine label="Last Order" value={`${client.lastOrderQuantity} cartons`} sub={client.lastOrderDate} />
+        <InfoLine label="Last Payment" value={client.lastPaymentDate} sub="Recorded" />
+      </div>
+      <button className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-black text-white" type="button">View Full Client Profile</button>
+    </Panel>
+  );
+}
+
+function ClientTabs({ active, client, onChange, orders, payments }: { active: DetailTab; client: CallCenterClient; onChange: (tab: DetailTab) => void; orders: PendingOrder[]; payments: ReturnType<typeof getPaymentFollowUps> }) {
+  const tabs: Array<{ id: DetailTab; label: string }> = [
+    { id: "orders", label: "Order History" },
+    { id: "payments", label: "Payments" },
+    { id: "notes", label: "Notes" }
+  ];
+
+  return (
+    <Panel>
+      <div className="mb-4 flex border-b border-slate-100">
+        {tabs.map((item) => (
+          <button
+            className={`flex-1 border-b-2 px-2 pb-3 text-xs font-black uppercase ${
+              active === item.id ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500"
+            }`}
+            key={item.id}
+            onClick={() => onChange(item.id)}
+            type="button"
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <div className="space-y-3 text-sm">
+        {active === "orders" ? (
+          orders.filter((order) => order.clientId === client.id).slice(0, 5).map((order) => (
+            <Row key={order.id} left={order.deliveryDate} middle={`${order.quantity} x ${order.product}`} right="Pending" />
+          ))
+        ) : null}
+        {active === "payments" ? (
+          payments.filter((payment) => payment.clientId === client.id).slice(0, 5).map((payment) => (
+            <Row key={payment.id} left={payment.promiseToPayDate} middle={`${formatMoney(payment.amountDue)} RWF`} right={payment.status} />
+          ))
+        ) : null}
+        {active === "notes" ? client.notes.slice(0, 5).map((note) => <p className="rounded-lg bg-slate-50 px-3 py-2 font-semibold" key={note}>{note}</p>) : null}
+      </div>
+    </Panel>
+  );
+}
+
+function CurrentOrderCard(props: {
+  actionMode: ActionMode;
+  callbackForm: { callbackDate: string; callbackTime: string; reason: string; priority: string };
+  complaintForm: { complaintType: string; product: string; quantity: string; description: string; priority: string };
+  onCallbackChange: (value: { callbackDate: string; callbackTime: string; reason: string; priority: string }) => void;
+  onCallbackSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onComplaintChange: (value: { complaintType: string; product: string; quantity: string; description: string; priority: string }) => void;
+  onComplaintSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onOrderChange: (value: { product: string; quantity: string; deliveryDate: string; deliveryTime: string; notes: string }) => void;
+  onOrderSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onPaymentChange: (value: { amountDue: string; daysOutstanding: string; promiseToPayDate: string; comment: string }) => void;
+  onPaymentSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  orderForm: { product: string; quantity: string; deliveryDate: string; deliveryTime: string; notes: string };
+  paymentForm: { amountDue: string; daysOutstanding: string; promiseToPayDate: string; comment: string };
+  products: ProductMaster[];
+}) {
+  if (props.actionMode === "payment") {
+    return (
+      <Panel id="payments" title="Payment Reminder">
+        <form className="space-y-3" onSubmit={props.onPaymentSubmit}>
+          <Field label="Amount Due" onChange={(value) => props.onPaymentChange({ ...props.paymentForm, amountDue: value })} type="number" value={props.paymentForm.amountDue} />
+          <Field label="Days Outstanding" onChange={(value) => props.onPaymentChange({ ...props.paymentForm, daysOutstanding: value })} type="number" value={props.paymentForm.daysOutstanding} />
+          <Field label="Promise Date" onChange={(value) => props.onPaymentChange({ ...props.paymentForm, promiseToPayDate: value })} type="date" value={props.paymentForm.promiseToPayDate} />
+          <Field label="Comment" onChange={(value) => props.onPaymentChange({ ...props.paymentForm, comment: value })} value={props.paymentForm.comment} />
+          <button className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-black text-white">Save Reminder</button>
+        </form>
       </Panel>
+    );
+  }
+
+  if (props.actionMode === "complaint" || props.actionMode === "delivery") {
+    return (
+      <Panel id="complaints" title={props.actionMode === "delivery" ? "Delivery Follow Up" : "Complaint"}>
+        <form className="space-y-3" onSubmit={props.onComplaintSubmit}>
+          <Field label="Type" onChange={(value) => props.onComplaintChange({ ...props.complaintForm, complaintType: value })} value={props.complaintForm.complaintType} />
+          <Field label="Product" onChange={(value) => props.onComplaintChange({ ...props.complaintForm, product: value })} value={props.complaintForm.product} />
+          <Field label="Quantity" onChange={(value) => props.onComplaintChange({ ...props.complaintForm, quantity: value })} type="number" value={props.complaintForm.quantity} />
+          <Field label="Description" onChange={(value) => props.onComplaintChange({ ...props.complaintForm, description: value })} value={props.complaintForm.description} />
+          <button className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-black text-white">Save</button>
+        </form>
+      </Panel>
+    );
+  }
+
+  if (props.actionMode === "callback") {
+    return (
+      <Panel title="Schedule Call Back">
+        <form className="space-y-3" onSubmit={props.onCallbackSubmit}>
+          <Field label="Date" onChange={(value) => props.onCallbackChange({ ...props.callbackForm, callbackDate: value })} type="date" value={props.callbackForm.callbackDate} />
+          <Field label="Time" onChange={(value) => props.onCallbackChange({ ...props.callbackForm, callbackTime: value })} type="time" value={props.callbackForm.callbackTime} />
+          <Field label="Reason" onChange={(value) => props.onCallbackChange({ ...props.callbackForm, reason: value })} value={props.callbackForm.reason} />
+          <Field label="Priority" onChange={(value) => props.onCallbackChange({ ...props.callbackForm, priority: value })} value={props.callbackForm.priority} />
+          <button className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-black text-white">Schedule</button>
+        </form>
+      </Panel>
+    );
+  }
+
+  const product = props.products.find((item) => item.name === props.orderForm.product) ?? props.products[0];
+  const quantity = Number(props.orderForm.quantity) || 0;
+  const total = quantity * (product?.pricePerCarton ?? 0);
+
+  return (
+    <Panel id="current-order" title="Current Order (New)">
+      <form className="space-y-3" onSubmit={props.onOrderSubmit}>
+        <label className="block">
+          <span className="mb-1 block text-xs font-black uppercase text-slate-500">Product</span>
+          <select className="form-input" onChange={(event) => props.onOrderChange({ ...props.orderForm, product: event.target.value })} value={props.orderForm.product}>
+            <option value="">Select product</option>
+            {props.products.map((item) => <option key={item.itemCode}>{item.name}</option>)}
+          </select>
+        </label>
+        <Field label="Quantity" onChange={(value) => props.onOrderChange({ ...props.orderForm, quantity: value })} type="number" value={props.orderForm.quantity} />
+        <div className="flex items-center justify-between text-sm font-bold">
+          <span>{quantity} x {product?.name ?? "Product"}</span>
+          <span>{formatMoney(total)} RWF</span>
+        </div>
+        <Field label="Delivery Date" onChange={(value) => props.onOrderChange({ ...props.orderForm, deliveryDate: value })} type="date" value={props.orderForm.deliveryDate} />
+        <Field label="Delivery Time" onChange={(value) => props.onOrderChange({ ...props.orderForm, deliveryTime: value })} type="time" value={props.orderForm.deliveryTime} />
+        <Field label="Notes" onChange={(value) => props.onOrderChange({ ...props.orderForm, notes: value })} value={props.orderForm.notes} />
+        <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-lg font-black">
+          <span>Total</span>
+          <span>{formatMoney(total)} RWF</span>
+        </div>
+        <button className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-black text-white">Send Order</button>
+      </form>
+    </Panel>
+  );
+}
+
+function NotesCard({ client, noteDraft, onNoteChange, onSave }: { client: CallCenterClient; noteDraft: string; onNoteChange: (value: string) => void; onSave: () => void }) {
+  return (
+    <Panel title="Notes">
+      <div className="space-y-2 text-sm font-semibold text-slate-700">
+        {client.notes.slice(0, 3).map((note) => <p key={note}>{note}</p>)}
+      </div>
+      <div className="mt-4 space-y-2">
+        <input className="form-input" onChange={(event) => onNoteChange(event.target.value)} placeholder="Add note" value={noteDraft} />
+        <button className="secondary-button w-full" onClick={onSave} type="button">Save Note</button>
+      </div>
+    </Panel>
+  );
+}
+
+function SidebarGroup({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <div>
+      <p className="mb-3 px-3 text-xs font-black uppercase tracking-wide text-blue-200/70">{title}</p>
+      <div className="space-y-1.5">{children}</div>
     </div>
   );
 }
 
-function ClientProfile({ client }: { client: CallCenterClient }) {
+function SidebarLink({ active = false, badge, href, icon: Icon, label }: { active?: boolean; badge?: string; href: string; icon: typeof Home; label: string }) {
+  const content = (
+    <span className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm font-black transition ${active ? "bg-blue-600 text-white" : "text-blue-100 hover:bg-white/10 hover:text-white"}`}>
+      <span className="flex items-center gap-3">
+        <Icon className="h-5 w-5" />
+        {label}
+      </span>
+      {badge ? <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs text-white">{badge}</span> : null}
+    </span>
+  );
+
+  return href.startsWith("#") ? <a href={href}>{content}</a> : <Link href={href}>{content}</Link>;
+}
+
+function Panel({ action, children, id, title }: { action?: ReactNode; children: ReactNode; id?: string; title?: string }) {
   return (
-    <section className="app-card p-5">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <ProfileItem label="Client Name" value={client.clientName} />
-        <ProfileItem label="Owner Name" value={client.ownerName} />
-        <ProfileItem label="Phone" value={client.phone} />
-        <ProfileItem label="Area" value={client.area} />
-        <ProfileItem label="Assigned Marketer" value={client.assignedMarketer} />
-        <ProfileItem label="Current Balance" value={`${formatMoney(client.currentBalance)} RWF`} />
-        <ProfileItem label="Last Order Date" value={client.lastOrderDate} />
-        <ProfileItem label="Last Order Quantity" value={client.lastOrderQuantity.toLocaleString()} />
-        <ProfileItem label="Last Payment Date" value={client.lastPaymentDate} />
-      </div>
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm" id={id}>
+      {title ? (
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-black uppercase tracking-normal text-slate-950">{title}</h3>
+          {action}
+        </div>
+      ) : null}
+      {children}
     </section>
   );
 }
 
-function Kpi({ icon: Icon, label, value }: { icon: typeof PhoneCall; label: string; value: number }) {
+function KpiCard({ accent, icon: Icon, label, subtext, value }: { accent: "green" | "amber" | "blue" | "red"; icon: typeof ShoppingCart; label: string; subtext: string; value: string }) {
+  const color = {
+    green: "bg-emerald-100 text-emerald-700",
+    amber: "bg-amber-100 text-amber-700",
+    blue: "bg-blue-100 text-blue-700",
+    red: "bg-red-100 text-red-700"
+  }[accent];
+
   return (
-    <article className="app-card p-4">
+    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-normal text-slate-500">{label}</p>
-          <p className="mt-2 text-3xl font-black text-brand-800">{value}</p>
+          <p className="text-xs font-black uppercase text-slate-500">{label}</p>
+          <p className="mt-4 text-2xl font-black">{value}</p>
+          <p className={`mt-2 text-xs font-black ${accent === "red" ? "text-slate-500" : "text-emerald-600"}`}>{subtext}</p>
         </div>
-        <div className="rounded-lg bg-brand-50 p-2 text-brand-700">
+        <div className={`rounded-full p-3 ${color}`}>
           <Icon className="h-5 w-5" />
         </div>
       </div>
@@ -533,88 +897,63 @@ function Kpi({ icon: Icon, label, value }: { icon: typeof PhoneCall; label: stri
   );
 }
 
-function ModuleLink({
-  href,
-  icon: Icon,
-  text,
-  title
-}: {
-  href: string;
-  icon: typeof PhoneCall;
-  text: string;
-  title: string;
-}) {
+function TopMetric({ dot = false, icon: Icon, label, tone, value }: { dot?: boolean; icon?: typeof PhoneCall; label: string; tone?: "green"; value: string }) {
   return (
-    <Link className="app-card p-4 transition hover:border-brand-200 hover:bg-brand-50" href={href}>
-      <div className="flex items-start gap-3">
-        <div className="rounded-lg bg-brand-50 p-2 text-brand-700">
-          <Icon className="h-5 w-5" />
-        </div>
-        <div>
-          <h3 className="font-black text-slate-950">{title}</h3>
-          <p className="mt-1 text-sm font-semibold text-slate-500">{text}</p>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function Panel({ children, title }: { children: React.ReactNode; title: string }) {
-  return (
-    <section className="app-card p-5">
-      <h3 className="mb-4 text-lg font-black text-slate-950">{title}</h3>
-      {children}
-    </section>
-  );
-}
-
-function ProfileItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-slate-50 px-3 py-2">
-      <p className="text-xs font-bold uppercase tracking-normal text-slate-500">{label}</p>
+    <div className="min-w-28 rounded-lg bg-slate-50 px-4 py-2">
+      <p className={`flex items-center gap-2 text-xs font-bold ${tone === "green" ? "text-emerald-700" : "text-slate-500"}`}>
+        {Icon ? <Icon className="h-4 w-4" /> : null}
+        {dot ? <span className="h-2 w-2 rounded-full bg-emerald-500" /> : null}
+        {label}
+      </p>
       <p className="mt-1 font-black text-slate-950">{value}</p>
     </div>
   );
 }
 
-function Input({
-  label,
-  onChange,
-  placeholder,
-  type = "text",
-  value
-}: {
-  label: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  type?: string;
-  value: string;
-}) {
+function StatLine({ danger = false, label, value }: { danger?: boolean; label: string; value: number }) {
   return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-bold uppercase tracking-normal text-slate-500">{label}</span>
-      <input className="form-input" min={type === "number" ? "0" : undefined} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} type={type} value={value} />
-    </label>
+    <div className="flex items-center justify-between">
+      <span className={danger ? "text-red-600" : "text-slate-700"}>{label}</span>
+      <span>{value}</span>
+    </div>
   );
 }
 
-function Select({
-  children,
-  label,
-  onChange,
-  value
-}: {
-  children: React.ReactNode;
-  label: string;
-  onChange: (value: string) => void;
-  value: string;
-}) {
+function InfoLine({ label, sub, value }: { label: string; sub: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-bold text-slate-500">{label}</p>
+      <p className="mt-1 font-black">{sub}</p>
+      <p className="text-xs font-bold text-slate-600">{value}</p>
+    </div>
+  );
+}
+
+function Row({ left, middle, right }: { left: string; middle: string; right: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="font-semibold text-slate-600">{left}</span>
+      <span className="font-black">{middle}</span>
+      <StatusPill label={right} tone="green" />
+    </div>
+  );
+}
+
+function StatusPill({ label, tone }: { label: string; tone: "green" | "amber" | "blue" }) {
+  const styles = {
+    green: "bg-emerald-50 text-emerald-700",
+    amber: "bg-amber-50 text-amber-700",
+    blue: "bg-blue-50 text-blue-700"
+  };
+
+  return <span className={`rounded-md px-2 py-1 text-xs font-black ${styles[tone]}`}>{label}</span>;
+}
+
+function Field({ label, onChange, type = "text", value }: { label: string; onChange: (value: string) => void; type?: string; value: string }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-bold uppercase tracking-normal text-slate-500">{label}</span>
-      <select className="form-input" onChange={(event) => onChange(event.target.value)} value={value}>
-        {children}
-      </select>
+      <span className="mb-1 block text-xs font-black uppercase text-slate-500">{label}</span>
+      <input className="form-input" min={type === "number" ? "0" : undefined} onChange={(event) => onChange(event.target.value)} type={type} value={value} />
     </label>
   );
 }
