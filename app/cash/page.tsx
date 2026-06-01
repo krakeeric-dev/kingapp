@@ -223,6 +223,8 @@ function CashContent({ user }: { user: SessionUser }) {
               <th className="px-4 py-3 text-right">Sold</th>
               <th className="px-4 py-3 text-right">Price</th>
               <th className="px-4 py-3 text-right">Expected Cash</th>
+              <th className="px-4 py-3 text-right">Client Paid</th>
+              <th className="px-4 py-3 text-right">Unpaid Balance</th>
               <th className="px-4 py-3 text-right">Cash Received</th>
               <th className="px-4 py-3 text-right">Variance</th>
               <th className="px-4 py-3">Status</th>
@@ -355,6 +357,12 @@ function CashRow(props: CashDisplayProps) {
       <td className="px-4 py-3 text-right font-semibold text-slate-950">
         {formatMoney(salesRecord.salesValue)}
       </td>
+      <td className="px-4 py-3 text-right font-semibold text-brand-800">
+        {formatMoney(salesRecord.totalPaid ?? salesRecord.salesValue)}
+      </td>
+      <td className="px-4 py-3 text-right font-semibold text-red-700">
+        {formatMoney(salesRecord.totalUnpaidBalance ?? 0)}
+      </td>
       <td className="px-4 py-3">
         <input
           className="form-input ml-auto max-w-32 text-right"
@@ -425,6 +433,14 @@ function CashCard(props: CashDisplayProps) {
         <Info label="Loaded" value={salesRecord.loadedCartons.toLocaleString()} />
         <Info label="Sold" value={salesRecord.soldCartons.toLocaleString()} />
         <Info label="Price" value={formatMoney(salesRecord.pricePerCarton)} />
+        <Info
+          label="Client Paid"
+          value={formatMoney(salesRecord.totalPaid ?? salesRecord.salesValue)}
+        />
+        <Info
+          label="Unpaid"
+          value={formatMoney(salesRecord.totalUnpaidBalance ?? 0)}
+        />
       </div>
       <label className="mt-4 block">
         <span className="mb-2 block text-sm font-semibold text-slate-700">

@@ -54,6 +54,15 @@ export const defaultProducts: ProductMaster[] = [
     minimumStock: 60,
     openingStock: 200,
     pricePerCarton: 3000
+  },
+  {
+    name: "Water 5L",
+    itemCode: "WT-5000",
+    unit: "Cartons",
+    category: "Bottled Water",
+    minimumStock: 40,
+    openingStock: 0,
+    pricePerCarton: 5000
   }
 ];
 
@@ -102,13 +111,31 @@ export function productMasterKey(productName: string, itemCode: string) {
 }
 
 export function ensureDefaultProducts() {
-  writeJson(PRODUCT_MASTER_KEY, defaultProducts);
-  void upsertSupabaseRows(
-    "products",
-    defaultProducts,
-    (product) => product.itemCode
+  const currentProducts = readJson<ProductMaster[]>(
+    PRODUCT_MASTER_KEY,
+    defaultProducts
   );
-  return defaultProducts;
+  const mergedProducts = [...currentProducts];
+  let changed = false;
+
+  defaultProducts.forEach((defaultProduct) => {
+    const existingIndex = mergedProducts.findIndex(
+      (product) => product.itemCode === defaultProduct.itemCode
+    );
+
+    if (existingIndex >= 0) {
+      return;
+    }
+
+    mergedProducts.push(defaultProduct);
+    changed = true;
+  });
+
+  if (changed) {
+    writeJson(PRODUCT_MASTER_KEY, mergedProducts);
+  }
+
+  return mergedProducts;
 }
 
 export function getProducts() {

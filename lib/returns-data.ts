@@ -1,6 +1,7 @@
 import type { SessionUser } from "@/lib/auth";
 import { mirrorRecordsToSupabase } from "@/lib/live-data";
 import { appendAuditLog, getTodayIsoDate } from "@/lib/loading-data";
+import { dedupeById } from "@/lib/record-utils";
 import type { SalesRecord } from "@/lib/sales-data";
 
 export type ReturnStatus = "return_received";
@@ -49,14 +50,15 @@ function writeJson<T>(key: string, value: T) {
 }
 
 export function getReturnRecords() {
-  return readJson<ReturnRecord[]>(RETURN_RECORDS_KEY, []);
+  return dedupeById(readJson<ReturnRecord[]>(RETURN_RECORDS_KEY, []));
 }
 
 export function saveReturnRecords(records: ReturnRecord[]) {
-  writeJson(RETURN_RECORDS_KEY, records);
+  const dedupedRecords = dedupeById(records);
+  writeJson(RETURN_RECORDS_KEY, dedupedRecords);
   mirrorRecordsToSupabase(
     "returns_records",
-    records,
+    dedupedRecords,
     (record) => record.id,
     (record) => record.updatedAt ?? record.createdAt
   );

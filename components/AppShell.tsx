@@ -42,6 +42,8 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
+let hasStartedBackgroundSync = false;
+
 const navItems: NavItem[] = [
   {
     href: "/dashboard",
@@ -150,7 +152,6 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
 
     async function openApp() {
       cleanupLegacyDemoProductData();
-      await syncSupabaseToLocalStorage();
       const session = getSession();
 
       if (!session) {
@@ -172,6 +173,17 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
       if (isMounted) {
         setUser(session);
         setIsReady(true);
+      }
+
+      if (!hasStartedBackgroundSync) {
+        hasStartedBackgroundSync = true;
+        window.setTimeout(() => {
+          void syncSupabaseToLocalStorage()
+            .then(() => window.dispatchEvent(new Event("kingapp:data-synced")))
+            .catch((error) => {
+              console.warn("[KingApp] Background Supabase sync failed", error);
+            });
+        }, 1000);
       }
     }
 

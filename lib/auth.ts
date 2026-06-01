@@ -29,7 +29,12 @@ function getAvailableUsers() {
     return mockUsers;
   }
 
-  return getUsers();
+  try {
+    return getUsers();
+  } catch (error) {
+    console.warn("[KingApp] Falling back to default login users", error);
+    return mockUsers;
+  }
 }
 
 export function authenticateUser(
@@ -47,6 +52,11 @@ export function authenticateUser(
   }
 
   const user = getAvailableUsers().find(
+    (mockUser) =>
+      mockUser.username.toLowerCase() === normalizedUsername &&
+      mockUser.password === password &&
+      mockUser.status !== "inactive"
+  ) ?? mockUsers.find(
     (mockUser) =>
       mockUser.username.toLowerCase() === normalizedUsername &&
       mockUser.password === password &&

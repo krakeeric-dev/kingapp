@@ -5,8 +5,31 @@ import {
   getTodayIsoDate,
   type LoadingRecord
 } from "@/lib/loading-data";
+import { dedupeById } from "@/lib/record-utils";
 
 export type SalesStatus = "draft" | "sales_submitted";
+
+export type PaymentStatus = "Paid" | "Partial" | "Unpaid" | "Not Paid";
+
+export type ClientSaleLine = {
+  id: string;
+  clientName: string;
+  clientPhone: string;
+  clientLocation: string;
+  saleDate?: string;
+  marketerName?: string;
+  productName: string;
+  itemCode: string;
+  productQuantities?: Record<string, number>;
+  productAmounts?: Record<string, number>;
+  quantityCartons: number;
+  pricePerCarton: number;
+  totalAmount: number;
+  paymentStatus: PaymentStatus;
+  amountPaid: number;
+  balance: number;
+  notes: string;
+};
 
 export type SalesRecord = {
   id: string;
@@ -22,6 +45,10 @@ export type SalesRecord = {
   soldCartons: number;
   expectedReturnCartons: number;
   salesValue: number;
+  clientSales?: ClientSaleLine[];
+  totalPaid?: number;
+  totalUnpaidBalance?: number;
+  clientsServed?: number;
   status: SalesStatus;
   locked: boolean;
   submittedAt?: string;
@@ -51,17 +78,60 @@ function writeJson<T>(key: string, value: T) {
 }
 
 export function getSalesRecords() {
-  return readJson<SalesRecord[]>(SALES_RECORDS_KEY, []);
+  return dedupeById(readJson<SalesRecord[]>(SALES_RECORDS_KEY, [])).map(
+    normalizeSalesRecord
+  );
 }
 
 export function saveSalesRecords(records: SalesRecord[]) {
-  writeJson(SALES_RECORDS_KEY, records);
+  const normalizedRecords = dedupeById(records).map(normalizeSalesRecord);
+  writeJson(SALES_RECORDS_KEY, normalizedRecords);
   mirrorRecordsToSupabase(
     "sales_records",
-    records,
+    normalizedRecords,
     (record) => record.id,
     (record) => record.updatedAt ?? record.createdAt
   );
+}
+
+export function normalizeSalesRecord(record: SalesRecord): SalesRecord {
+  const clientSales = record.clientSales ?? [];
+
+  if (clientSales.length === 0) {
+    return {
+      ...record,
+      clientsServed: record.clientsServed ?? 0,
+      totalPaid: record.totalPaid ?? record.salesValue,
+      totalUnpaidBalance: record.totalUnpaidBalance ?? 0
+    };
+  }
+
+  const soldCartons = clientSales.reduce(
+    (total, row) => total + (Number(row.quantityCartons) || 0),
+    0
+  );
+  const salesValue = clientSales.reduce(
+    (total, row) => total + (Number(row.totalAmount) || 0),
+    0
+  );
+  const totalPaid = clientSales.reduce(
+    (total, row) => total + (Number(row.amountPaid) || 0),
+    0
+  );
+  const totalUnpaidBalance = clientSales.reduce(
+    (total, row) => total + (Number(row.balance) || 0),
+    0
+  );
+
+  return {
+    ...record,
+    soldCartons,
+    expectedReturnCartons: record.loadedCartons - soldCartons,
+    salesValue,
+    totalPaid,
+    totalUnpaidBalance,
+    clientsServed: clientSales.length
+  };
 }
 
 export function getSalesRecordForLoad(loadingRecordId: string) {
@@ -72,10 +142,20 @@ export function getSalesRecordForLoad(loadingRecordId: string) {
 
 export function createSalesRecordFromLoad(
   loadingRecord: LoadingRecord,
-  soldCartons: number
+  soldCartons: number,
+  clientSales: ClientSaleLine[] = []
 ): SalesRecord {
   const now = new Date().toISOString();
   const expectedReturnCartons = loadingRecord.loadedCartons - soldCartons;
+  const salesValue =
+    clientSales.length > 0
+      ? clientSales.reduce((total, row) => total + row.totalAmount, 0)
+      : soldCartons * loadingRecord.pricePerCarton;
+  const totalPaid = clientSales.reduce((total, row) => total + row.amountPaid, 0);
+  const totalUnpaidBalance = clientSales.reduce(
+    (total, row) => total + row.balance,
+    0
+  );
 
   return {
     id: `SALE-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase(),
@@ -90,7 +170,11 @@ export function createSalesRecordFromLoad(
     loadedCartons: loadingRecord.loadedCartons,
     soldCartons,
     expectedReturnCartons,
-    salesValue: soldCartons * loadingRecord.pricePerCarton,
+    salesValue,
+    clientSales,
+    totalPaid,
+    totalUnpaidBalance,
+    clientsServed: clientSales.length,
     status: "sales_submitted",
     locked: true,
     submittedAt: now,
@@ -116,23 +200,36 @@ export function upsertSalesRecord(record: SalesRecord) {
 export function submitSalesRecord(
   loadingRecord: LoadingRecord,
   soldCartons: number,
-  existingRecord?: SalesRecord
+  existingRecord?: SalesRecord,
+  clientSales: ClientSaleLine[] = []
 ) {
   const now = new Date().toISOString();
   const expectedReturnCartons = loadingRecord.loadedCartons - soldCartons;
-  const salesValue = soldCartons * loadingRecord.pricePerCarton;
+  const salesValue =
+    clientSales.length > 0
+      ? clientSales.reduce((total, row) => total + row.totalAmount, 0)
+      : soldCartons * loadingRecord.pricePerCarton;
+  const totalPaid = clientSales.reduce((total, row) => total + row.amountPaid, 0);
+  const totalUnpaidBalance = clientSales.reduce(
+    (total, row) => total + row.balance,
+    0
+  );
   const record = existingRecord
     ? {
         ...existingRecord,
         soldCartons,
         expectedReturnCartons,
         salesValue,
+        clientSales,
+        totalPaid,
+        totalUnpaidBalance,
+        clientsServed: clientSales.length,
         status: "sales_submitted" as const,
         locked: true,
         submittedAt: now,
         updatedAt: now
       }
-    : createSalesRecordFromLoad(loadingRecord, soldCartons);
+    : createSalesRecordFromLoad(loadingRecord, soldCartons, clientSales);
 
   return {
     record,

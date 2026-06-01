@@ -6,7 +6,7 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/inventory": ["admin", "manager", "supervisor", "storekeeper"],
   "/price-management": ["admin"],
   "/confirm-loading": ["admin", "supervisor", "marketer"],
-  "/sales": ["admin", "supervisor", "marketer"],
+  "/sales": ["admin", "manager", "supervisor", "marketer", "accountant"],
   "/returns": ["admin", "supervisor", "storekeeper"],
   "/cash": ["admin", "supervisor", "accountant"],
   "/expenses": ["admin", "supervisor", "accountant"],

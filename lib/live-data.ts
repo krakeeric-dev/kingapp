@@ -13,6 +13,7 @@ type LocalTableConfig<T> = {
   getId: (record: T) => string;
   getUpdatedAt?: (record: T) => string | undefined;
   seed?: T[];
+  seedCloudWhenEmpty?: boolean;
 };
 
 const configs: LocalTableConfig<unknown>[] = [
@@ -20,13 +21,15 @@ const configs: LocalTableConfig<unknown>[] = [
     localKey: "kingapp.users",
     table: "users",
     getId: (record) => (record as { username: string }).username,
-    seed: defaultUsers
+    seed: defaultUsers,
+    seedCloudWhenEmpty: true
   },
   {
     localKey: "kingapp.productMaster",
     table: "products",
     getId: (record) => (record as { itemCode: string }).itemCode,
-    seed: defaultProducts
+    seed: defaultProducts,
+    seedCloudWhenEmpty: true
   },
   {
     localKey: "kingapp.priceHistory",
@@ -107,6 +110,16 @@ function writeJson<T>(key: string, value: T) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
+function dedupeCloudRecords<T>(records: T[], getId: (record: T) => string) {
+  const map = new Map<string, T>();
+
+  records.forEach((record) => {
+    map.set(getId(record), record);
+  });
+
+  return Array.from(map.values());
+}
+
 export async function syncSupabaseToLocalStorage() {
   if (!isSupabaseConfigured()) {
     return;
@@ -116,8 +129,34 @@ export async function syncSupabaseToLocalStorage() {
     configs.map(async (config) => {
       const cloudRecords = await fetchSupabaseTable<unknown>(config.table);
 
-      if (cloudRecords && cloudRecords.length > 0) {
-        writeJson(config.localKey, cloudRecords);
+      if (cloudRecords) {
+        const normalizedCloudRecords = dedupeCloudRecords(
+          cloudRecords,
+          config.getId
+        );
+
+        if (normalizedCloudRecords.length > 0) {
+          writeJson(config.localKey, normalizedCloudRecords);
+          return;
+        }
+
+        const localRecords = readJson<unknown[]>(
+          config.localKey,
+          config.seed ?? []
+        );
+
+        if (config.seedCloudWhenEmpty && localRecords.length > 0) {
+          writeJson(config.localKey, localRecords);
+          await upsertSupabaseRows(
+            config.table,
+            localRecords,
+            config.getId,
+            config.getUpdatedAt
+          );
+          return;
+        }
+
+        writeJson(config.localKey, config.seed ?? []);
         return;
       }
 

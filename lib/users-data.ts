@@ -161,6 +161,7 @@ function normalizeUser(user: LegacyUser): PlatformUser {
 
 function ensureDefaultUsers(users: PlatformUser[]) {
   const mergedUsers = [...users];
+  let changed = false;
 
   defaultUsers.forEach((defaultUser) => {
     const existingIndex = mergedUsers.findIndex(
@@ -176,10 +177,11 @@ function ensureDefaultUsers(users: PlatformUser[]) {
       };
     } else {
       mergedUsers.push(defaultUser);
+      changed = true;
     }
   });
 
-  return mergedUsers;
+  return { changed, users: mergedUsers };
 }
 
 function auditUserAction({
@@ -222,8 +224,13 @@ export function saveUsers(users: PlatformUser[]) {
 
 export function getUsers() {
   const rawUsers = readJson<LegacyUser[]>(USERS_KEY, defaultUsers);
-  const users = ensureDefaultUsers(rawUsers.map(normalizeUser));
-  saveUsers(users);
+  const normalizedUsers = rawUsers.map(normalizeUser);
+  const { changed, users } = ensureDefaultUsers(normalizedUsers);
+
+  if (changed) {
+    writeJson(USERS_KEY, users);
+  }
+
   return users;
 }
 

@@ -151,6 +151,25 @@ function DailyReportContent() {
       (total, record) => total + record.salesValue,
       0
     );
+    const totalClientSales = sales.reduce(
+      (total, record) =>
+        total +
+        (record.clientSales?.reduce((sum, row) => sum + row.totalAmount, 0) ??
+          record.salesValue),
+      0
+    );
+    const paidAmount = sales.reduce(
+      (total, record) => total + (record.totalPaid ?? record.salesValue),
+      0
+    );
+    const unpaidBalance = sales.reduce(
+      (total, record) => total + (record.totalUnpaidBalance ?? 0),
+      0
+    );
+    const clientsServed = sales.reduce(
+      (total, record) => total + (record.clientsServed ?? record.clientSales?.length ?? 0),
+      0
+    );
     const expectedCash = cash.length
       ? cash.reduce((total, record) => total + record.expectedCash, 0)
       : totalSalesValue;
@@ -167,6 +186,10 @@ function DailyReportContent() {
       actualReturns,
       stockVariance,
       totalSalesValue,
+      totalClientSales,
+      paidAmount,
+      unpaidBalance,
+      clientsServed,
       expectedCash,
       cashReceived,
       cashVariance,
@@ -318,6 +341,22 @@ function DailyReportContent() {
             <ReportLine
               label="Total Sales Value"
               value={`${formatMoney(report.totalSalesValue)} RWF`}
+            />
+            <ReportLine
+              label="Total Client Sales"
+              value={`${formatMoney(report.totalClientSales)} RWF`}
+            />
+            <ReportLine
+              label="Paid Amount"
+              value={`${formatMoney(report.paidAmount)} RWF`}
+            />
+            <ReportLine
+              label="Unpaid Balance"
+              value={`${formatMoney(report.unpaidBalance)} RWF`}
+            />
+            <ReportLine
+              label="Clients Served"
+              value={report.clientsServed.toLocaleString()}
             />
           </ReportSection>
 

@@ -1,5 +1,6 @@
 import type { SessionUser } from "@/lib/auth";
 import { mirrorRecordsToSupabase } from "@/lib/live-data";
+import { dedupeById } from "@/lib/record-utils";
 
 export type LoadingStatus = "draft" | "pending" | "confirmed" | "rejected";
 
@@ -82,14 +83,15 @@ function writeJson<T>(key: string, value: T) {
 }
 
 export function getLoadingRecords() {
-  return readJson<LoadingRecord[]>(LOADING_RECORDS_KEY, []);
+  return dedupeById(readJson<LoadingRecord[]>(LOADING_RECORDS_KEY, []));
 }
 
 export function saveLoadingRecords(records: LoadingRecord[]) {
-  writeJson(LOADING_RECORDS_KEY, records);
+  const dedupedRecords = dedupeById(records);
+  writeJson(LOADING_RECORDS_KEY, dedupedRecords);
   mirrorRecordsToSupabase(
     "loading_records",
-    records,
+    dedupedRecords,
     (record) => record.id,
     (record) => record.updatedAt ?? record.createdAt
   );
@@ -156,7 +158,12 @@ export function unlockLoadingRecord(
 }
 
 export function getTodayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 export function formatDate(value: string) {

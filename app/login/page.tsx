@@ -3,8 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LockKeyhole, LogIn, ShieldCheck, UserRound } from "lucide-react";
-import { authenticateUser, mockUsers, roleLabels } from "@/lib/auth";
-import { syncSupabaseToLocalStorage } from "@/lib/live-data";
+import { mockUsers, roleLabels } from "@/lib/auth";
 import { getSession, saveSession } from "@/lib/storage";
 
 export default function LoginPage() {
@@ -15,28 +14,45 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    void syncSupabaseToLocalStorage();
+    if ("serviceWorker" in navigator && isLocalhost()) {
+      void navigator.serviceWorker
+        .getRegistrations()
+        .then((registrations) =>
+          Promise.all(registrations.map((registration) => registration.unregister()))
+        )
+        .catch(() => undefined);
+    }
 
     if (getSession()) {
       router.replace("/dashboard");
     }
   }, [router]);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setIsSubmitting(true);
 
-    const user = authenticateUser(username, password);
+    try {
+      const user = await withTimeout(
+        Promise.resolve().then(() => authenticateLocalDefaultUser(username, password)),
+        3000
+      );
 
-    if (!user) {
+      if (!user) {
+        setError("Incorrect username or password.");
+        return;
+      }
+
+      saveSession(user);
+      window.location.assign("/dashboard");
+    } catch {
+      setError(
+        "Sign in could not be completed. Check your details and try again."
+      );
+    } finally {
       setIsSubmitting(false);
-      setError("Incorrect username or password.");
-      return;
     }
-
-    saveSession(user);
-    router.replace("/dashboard");
   }
 
   return (
@@ -158,4 +174,34 @@ export default function LoginPage() {
       </section>
     </main>
   );
+}
+
+function authenticateLocalDefaultUser(username: string, password: string) {
+  const normalizedUsername = username.trim().toLowerCase();
+  const user = mockUsers.find(
+    (item) =>
+      item.username.toLowerCase() === normalizedUsername &&
+      item.password === password &&
+      item.status !== "inactive"
+  );
+
+  if (!user) {
+    return null;
+  }
+
+  const { password: _password, ...sessionUser } = user;
+  return sessionUser;
+}
+
+function isLocalhost() {
+  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      window.setTimeout(() => reject(new Error("Login timed out")), timeoutMs);
+    })
+  ]);
 }

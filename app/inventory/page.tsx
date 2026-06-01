@@ -35,7 +35,14 @@ type StockForm = {
   notes: string;
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
 
 const emptyStockForm: StockForm = {
   date: today(),
@@ -280,8 +287,9 @@ function InventoryContent({ user }: { user: SessionUser }) {
         </div>
       </section>
 
-      {user.role === "admin" ? (
-        <div className="grid gap-4 xl:grid-cols-2">
+      {user.role === "admin" || user.role === "storekeeper" ? (
+        <div className={`grid gap-4 ${user.role === "admin" ? "xl:grid-cols-2" : ""}`}>
+          {user.role === "admin" ? (
           <StockMovementForm
             form={openingForm}
             icon={<SlidersHorizontal className="h-5 w-5" />}
@@ -296,6 +304,7 @@ function InventoryContent({ user }: { user: SessionUser }) {
             products={products}
             title="Set Opening Stock"
           />
+          ) : null}
           <StockMovementForm
             form={receivedForm}
             icon={<PackagePlus className="h-5 w-5" />}
@@ -308,8 +317,9 @@ function InventoryContent({ user }: { user: SessionUser }) {
               )
             }
             products={products}
+            receivedBy={user.displayName}
             showSupplier
-            title="Add Stock Received"
+            title="+ Receive Stock"
           />
         </div>
       ) : null}
@@ -456,6 +466,7 @@ function StockMovementForm({
   onChange,
   onSubmit,
   products,
+  receivedBy,
   showSupplier = false,
   title
 }: {
@@ -464,6 +475,7 @@ function StockMovementForm({
   onChange: (field: keyof StockForm, value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   products: ProductMaster[];
+  receivedBy?: string;
   showSupplier?: boolean;
   title: string;
 }) {
@@ -495,29 +507,38 @@ function StockMovementForm({
         <Input
           label="Item Code"
           onChange={(value) => onChange("itemCode", value)}
+          disabled={showSupplier}
           value={form.itemCode}
         />
         <Input
-          label="Quantity"
+          label={showSupplier ? "Quantity Received" : "Quantity"}
           onChange={(value) => onChange("quantity", value)}
           type="number"
           value={form.quantity}
         />
         {showSupplier ? (
           <Input
-            label="Supplier / Factory"
+            label="Reference / Supplier"
             onChange={(value) => onChange("supplier", value)}
             value={form.supplier}
           />
         ) : null}
+        {receivedBy ? (
+          <Input
+            disabled
+            label="Received By"
+            onChange={() => undefined}
+            value={receivedBy}
+          />
+        ) : null}
         <Input
-          label="Notes"
+          label={showSupplier ? "Note" : "Notes"}
           onChange={(value) => onChange("notes", value)}
           value={form.notes}
         />
       </div>
       <button className="mt-4 rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-800">
-        Save
+        {showSupplier ? "Save received stock" : "Save"}
       </button>
     </form>
   );
@@ -719,11 +740,13 @@ function SummaryCard({
 }
 
 function Input({
+  disabled = false,
   label,
   onChange,
   type = "text",
   value
 }: {
+  disabled?: boolean;
   label: string;
   onChange: (value: string) => void;
   type?: string;
@@ -736,6 +759,7 @@ function Input({
       </span>
       <input
         className="form-input"
+        disabled={disabled}
         min={type === "number" ? "0" : undefined}
         onChange={(event) => onChange(event.target.value)}
         type={type}

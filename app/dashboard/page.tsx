@@ -84,9 +84,10 @@ function DashboardContent({ user }: { user: SessionUser }) {
     failed: 0,
     pending: 0
   });
+  const [selectedDate, setSelectedDate] = useState(getTodayIsoDate());
   const [permissionMessage, setPermissionMessage] = useState("");
 
-  useEffect(() => {
+  function loadDashboardData() {
     setRecords(getLoadingRecords());
     setSalesRecords(getSalesRecords());
     setCashRecords(getCashRecords());
@@ -101,6 +102,10 @@ function DashboardContent({ user }: { user: SessionUser }) {
         pending: summary.pending
       })
     );
+  }
+
+  useEffect(() => {
+    loadDashboardData();
     const blockedMessage = window.sessionStorage.getItem(
       "kingapp.permissionMessage"
     );
@@ -109,10 +114,15 @@ function DashboardContent({ user }: { user: SessionUser }) {
       setPermissionMessage(blockedMessage);
       window.sessionStorage.removeItem("kingapp.permissionMessage");
     }
+
+    window.addEventListener("kingapp:data-synced", loadDashboardData);
+
+    return () => {
+      window.removeEventListener("kingapp:data-synced", loadDashboardData);
+    };
   }, []);
 
   const dashboard = useMemo(() => {
-    const today = getTodayIsoDate();
     const roleRecords =
       user.role === "marketer"
         ? records.filter((record) => record.marketerUsername === user.username)
@@ -125,16 +135,39 @@ function DashboardContent({ user }: { user: SessionUser }) {
             (record) => record.marketerUsername === user.username
           )
         : salesRecords;
+    const roleCashRecords =
+      user.role === "marketer"
+        ? cashRecords.filter((record) => record.marketerUsername === user.username)
+        : cashRecords;
+    const roleReturnRecords =
+      user.role === "marketer"
+        ? returnRecords.filter(
+            (record) => record.marketerUsername === user.username
+          )
+        : returnRecords;
+    const roleExpenseRecords =
+      user.role === "marketer"
+        ? expenseRecords.filter(
+            (record) => record.marketerUsername === user.username
+          )
+        : expenseRecords;
 
     const todayLoads = roleRecords.filter(
-      (record) => record.date === today && record.status !== "draft"
+      (record) => record.date === selectedDate && record.status !== "draft"
     );
     const todaySales = roleSalesRecords.filter(
-      (record) => record.date === today && record.status === "sales_submitted"
+      (record) =>
+        record.date === selectedDate && record.status === "sales_submitted"
     );
-    const todayCash = cashRecords.filter((record) => record.date === today);
-    const todayReturns = returnRecords.filter((record) => record.date === today);
-    const todayExpenses = expenseRecords.filter((record) => record.date === today);
+    const todayCash = roleCashRecords.filter(
+      (record) => record.date === selectedDate
+    );
+    const todayReturns = roleReturnRecords.filter(
+      (record) => record.date === selectedDate
+    );
+    const todayExpenses = roleExpenseRecords.filter(
+      (record) => record.date === selectedDate
+    );
     const inventoryRows = getInventoryRows({
       loadingRecords: records,
       manualMovements: inventoryMovements,
@@ -148,11 +181,12 @@ function DashboardContent({ user }: { user: SessionUser }) {
       0
     );
     const totalSold = todaySales.reduce(
-      (total, record) => total + record.soldCartons,
+      (total, record) => total + getSalesSoldCartons(record),
       0
     );
     const expectedReturns = todaySales.reduce(
-      (total, record) => total + record.expectedReturnCartons,
+      (total, record) =>
+        total + (record.loadedCartons - getSalesSoldCartons(record)),
       0
     );
     const actualReturns = todayReturns.reduce(
@@ -160,12 +194,10 @@ function DashboardContent({ user }: { user: SessionUser }) {
       0
     );
     const salesValue = todaySales.reduce(
-      (total, record) => total + record.salesValue,
+      (total, record) => total + getSalesValue(record),
       0
     );
-    const expectedCash = todayCash.length
-      ? todayCash.reduce((total, record) => total + record.expectedCash, 0)
-      : salesValue;
+    const expectedCash = salesValue;
     const cashReceived = todayCash.reduce(
       (total, record) => total + record.cashReceived,
       0
@@ -247,14 +279,16 @@ function DashboardContent({ user }: { user: SessionUser }) {
       ...syncStats
     ];
 
-    const overviewDays = getLastSevenDays(today).map((date) => {
+    const overviewDays = getLastSevenDays(selectedDate).map((date) => {
       const loaded = roleRecords
         .filter((record) => record.date === date && record.status !== "draft")
         .reduce((total, record) => total + record.loadedCartons, 0);
       const sold = roleSalesRecords
-        .filter((record) => record.date === date)
-        .reduce((total, record) => total + record.soldCartons, 0);
-      const cash = cashRecords
+        .filter(
+          (record) => record.date === date && record.status === "sales_submitted"
+        )
+        .reduce((total, record) => total + getSalesSoldCartons(record), 0);
+      const cash = roleCashRecords
         .filter((record) => record.date === date)
         .reduce((total, record) => total + record.cashReceived, 0);
 
@@ -309,8 +343,8 @@ function DashboardContent({ user }: { user: SessionUser }) {
           value: 0
         };
 
-        current.sold += record.soldCartons;
-        current.value += record.salesValue;
+        current.sold += getSalesSoldCartons(record);
+        current.value += getSalesValue(record);
         map.set(record.marketerName, current);
         return map;
       }, new Map<string, { marketer: string; sold: number; value: number }>())
@@ -387,6 +421,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
     records,
     returnRecords,
     salesRecords,
+    selectedDate,
     syncSummary.conflicts,
     syncSummary.failed,
     syncSummary.pending,
@@ -413,6 +448,17 @@ function DashboardContent({ user }: { user: SessionUser }) {
             {user.displayName} - {user.username}
           </div>
         </div>
+        <label className="mt-5 block max-w-xs">
+          <span className="mb-1 block text-xs font-bold uppercase tracking-normal text-slate-500">
+            Dashboard Date
+          </span>
+          <input
+            className="form-input"
+            onChange={(event) => setSelectedDate(event.target.value)}
+            type="date"
+            value={selectedDate}
+          />
+        </label>
       </div>
 
       {permissionMessage ? (
@@ -503,7 +549,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
 
       <ExecutiveSection
         icon={WalletCards}
-        subtitle={formatDate(getTodayIsoDate())}
+        subtitle={formatDate(selectedDate)}
         title="Today's Closing Summary"
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -769,7 +815,11 @@ function getLastSevenDays(today: string) {
   return Array.from({ length: 7 }, (_, index) => {
     const date = new Date(current);
     date.setDate(current.getDate() - (6 - index));
-    return date.toISOString().slice(0, 10);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
   });
 }
 
@@ -787,4 +837,26 @@ function formatDateTimeShort(value: string) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function getSalesSoldCartons(record: SalesRecord) {
+  if (!record.clientSales?.length) {
+    return Number(record.soldCartons) || 0;
+  }
+
+  return record.clientSales.reduce(
+    (total, row) => total + (Number(row.quantityCartons) || 0),
+    0
+  );
+}
+
+function getSalesValue(record: SalesRecord) {
+  if (!record.clientSales?.length) {
+    return Number(record.salesValue) || 0;
+  }
+
+  return record.clientSales.reduce(
+    (total, row) => total + (Number(row.totalAmount) || 0),
+    0
+  );
 }

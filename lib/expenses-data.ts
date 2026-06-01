@@ -2,6 +2,7 @@ import type { SessionUser } from "@/lib/auth";
 import type { CashRecord } from "@/lib/cash-data";
 import { mirrorRecordsToSupabase } from "@/lib/live-data";
 import { appendAuditLog, getTodayIsoDate } from "@/lib/loading-data";
+import { dedupeById } from "@/lib/record-utils";
 
 export type ExpenseStatus = "expenses_submitted";
 
@@ -67,14 +68,15 @@ function writeJson<T>(key: string, value: T) {
 }
 
 export function getExpenseRecords() {
-  return readJson<ExpenseRecord[]>(EXPENSE_RECORDS_KEY, []);
+  return dedupeById(readJson<ExpenseRecord[]>(EXPENSE_RECORDS_KEY, []));
 }
 
 export function saveExpenseRecords(records: ExpenseRecord[]) {
-  writeJson(EXPENSE_RECORDS_KEY, records);
+  const dedupedRecords = dedupeById(records);
+  writeJson(EXPENSE_RECORDS_KEY, dedupedRecords);
   mirrorRecordsToSupabase(
     "expenses_records",
-    records,
+    dedupedRecords,
     (record) => record.id,
     (record) => record.updatedAt ?? record.createdAt
   );
