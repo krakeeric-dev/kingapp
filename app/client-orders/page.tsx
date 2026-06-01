@@ -8,6 +8,7 @@ import { formatMoney } from "@/lib/sales-data";
 import {
   createPortalClient,
   createSupplier,
+  formatEta,
   getClientOrders,
   getClientsForSupplier,
   getPortalClients,
@@ -17,6 +18,7 @@ import {
   removeClientFromSupplier,
   updateLinkPrices,
   updateSupplier,
+  updateClientOrderDelivery,
   updateClientOrderStatus,
   type ClientOrderStatus,
   type ClientPortalOrder,
@@ -77,6 +79,22 @@ function ClientOrdersContent({ user }: { user: SessionUser }) {
     }
 
     setOrders(updateClientOrderStatus(order.id, status, updates));
+  }
+
+  function saveDeliveryDetails(event: FormEvent<HTMLFormElement>, order: ClientPortalOrder) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setOrders(
+      updateClientOrderDelivery(order.id, {
+        deliveryDate: String(form.get("deliveryDate") ?? ""),
+        deliveryTruck: String(form.get("deliveryTruck") ?? ""),
+        deliveryDriver: String(form.get("deliveryDriver") ?? ""),
+        estimatedArrivalTime: String(form.get("estimatedArrivalTime") ?? ""),
+        estimatedArrivalEndTime: String(form.get("estimatedArrivalEndTime") ?? ""),
+        driverMinutesAway: Number(form.get("driverMinutesAway")) || undefined
+      })
+    );
+    setMessage("Delivery ETA updated.");
   }
 
   function markPaid(order: ClientPortalOrder) {
@@ -238,6 +256,10 @@ function ClientOrdersContent({ user }: { user: SessionUser }) {
                   </tbody>
                 </table>
               </div>
+              <DeliverySummary order={order} />
+              {user.role === "admin" ? (
+                <DeliveryAssignmentForm order={order} onSubmit={saveDeliveryDetails} />
+              ) : null}
               <div className="mt-4 flex flex-wrap gap-2">
                 {user.role === "admin" && order.status === "Pending" ? (
                   <button className="primary-button" onClick={() => setStatus(order, "Approved")} type="button">Approve</button>
@@ -247,6 +269,9 @@ function ClientOrdersContent({ user }: { user: SessionUser }) {
                 ) : null}
                 {user.role === "storekeeper" && order.status === "Approved" ? (
                   <button className="primary-button" onClick={() => setStatus(order, "Loaded")} type="button">Mark Loaded</button>
+                ) : null}
+                {user.role === "admin" && (order.status === "Approved" || order.status === "Loaded") ? (
+                  <button className="primary-button" onClick={() => setStatus(order, "Out for Delivery")} type="button">Dispatch</button>
                 ) : null}
                 {user.role === "marketer" && order.status === "Loaded" ? (
                   <button className="primary-button" onClick={() => setStatus(order, "Out for Delivery")} type="button">Out for Delivery</button>
@@ -463,6 +488,44 @@ function Metric({ icon: Icon, label, value }: { icon: typeof ClipboardList; labe
 
 function Badge({ label }: { label: string }) {
   return <span className="status-badge border-brand-100 bg-brand-50 text-brand-800">{label}</span>;
+}
+
+function DeliverySummary({ order }: { order: ClientPortalOrder }) {
+  const eta = formatEta(order.estimatedArrivalTime, order.estimatedArrivalEndTime);
+  return (
+    <div className="mt-4 rounded-lg border border-brand-100 bg-brand-50 p-4">
+      <p className="text-sm font-black text-brand-900">Delivery Time Notice</p>
+      <div className="mt-2 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <p><span className="font-bold text-slate-500">Date:</span> {order.deliveryDate || "Not assigned"}</p>
+        <p><span className="font-bold text-slate-500">ETA:</span> {eta || "Not assigned"}</p>
+        <p><span className="font-bold text-slate-500">Truck:</span> {order.deliveryTruck || "Pending"}</p>
+        <p><span className="font-bold text-slate-500">Driver:</span> {order.deliveryDriver || order.deliveryPerson || "Pending"}</p>
+      </div>
+      {order.driverMinutesAway && order.status === "Out for Delivery" ? (
+        <p className="mt-2 text-sm font-bold text-emerald-700">Driver is {order.driverMinutesAway} minutes away.</p>
+      ) : null}
+    </div>
+  );
+}
+
+function DeliveryAssignmentForm({
+  onSubmit,
+  order
+}: {
+  onSubmit: (event: FormEvent<HTMLFormElement>, order: ClientPortalOrder) => void;
+  order: ClientPortalOrder;
+}) {
+  return (
+    <form className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-3" onSubmit={(event) => onSubmit(event, order)}>
+      <Input defaultValue={order.deliveryDate ?? ""} label="Delivery Date" name="deliveryDate" type="date" />
+      <Input defaultValue={order.deliveryTruck ?? ""} label="Delivery Truck" name="deliveryTruck" />
+      <Input defaultValue={order.deliveryDriver ?? order.deliveryPerson ?? ""} label="Driver / Delivery Person" name="deliveryDriver" />
+      <Input defaultValue={order.estimatedArrivalTime ?? ""} label="ETA Start" name="estimatedArrivalTime" type="time" />
+      <Input defaultValue={order.estimatedArrivalEndTime ?? ""} label="ETA End" name="estimatedArrivalEndTime" type="time" />
+      <Input defaultValue={String(order.driverMinutesAway ?? "")} label="Driver Minutes Away" name="driverMinutesAway" type="number" />
+      <button className="secondary-button md:col-span-3">Save delivery notice</button>
+    </form>
+  );
 }
 
 function Input({

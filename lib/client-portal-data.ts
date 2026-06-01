@@ -54,6 +54,12 @@ export type ClientOrderLine = {
   amount: number;
 };
 
+export type ClientOrderNotification = {
+  id: string;
+  message: string;
+  createdAt: string;
+};
+
 export type ClientPortalOrder = {
   id: string;
   clientId: string;
@@ -69,8 +75,15 @@ export type ClientPortalOrder = {
   status: ClientOrderStatus;
   paymentStatus: "Unpaid" | "Partial" | "Paid";
   createdAt: string;
+  deliveryDate?: string;
+  deliveryTruck?: string;
+  deliveryDriver?: string;
   deliveryPerson?: string;
   deliveredAt?: string;
+  estimatedArrivalTime?: string;
+  estimatedArrivalEndTime?: string;
+  driverMinutesAway?: number;
+  notifications?: ClientOrderNotification[];
   rejectionReason?: string;
 };
 
@@ -385,7 +398,14 @@ export function createClientOrder(
     totalAmount: lines.reduce((total, line) => total + line.amount, 0),
     status: "Pending",
     paymentStatus: "Unpaid",
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    notifications: [
+      {
+        id: makeId("NTF"),
+        message: "Order submitted. Waiting for supplier approval.",
+        createdAt: new Date().toISOString()
+      }
+    ]
   };
   const orders = [order, ...getClientOrders()];
   saveClientOrders(orders);
@@ -398,10 +418,89 @@ export function updateClientOrderStatus(
   updates: Partial<ClientPortalOrder> = {}
 ) {
   const orders = getClientOrders().map((order) =>
-    order.id === orderId ? { ...order, ...updates, status } : order
+    order.id === orderId
+      ? {
+          ...order,
+          ...updates,
+          status,
+          notifications: [
+            ...(order.notifications ?? []),
+            {
+              id: makeId("NTF"),
+              message: getStatusNotification(status, updates),
+              createdAt: new Date().toISOString()
+            }
+          ]
+        }
+      : order
   );
   saveClientOrders(orders);
   return orders;
+}
+
+export function updateClientOrderDelivery(
+  orderId: string,
+  updates: Pick<
+    ClientPortalOrder,
+    | "deliveryDate"
+    | "deliveryTruck"
+    | "deliveryDriver"
+    | "estimatedArrivalTime"
+    | "estimatedArrivalEndTime"
+    | "driverMinutesAway"
+  >
+) {
+  const orders = getClientOrders().map((order) =>
+    order.id === orderId
+      ? {
+          ...order,
+          ...updates,
+          notifications: [
+            ...(order.notifications ?? []),
+            {
+              id: makeId("NTF"),
+              message: getDeliveryNotice(updates),
+              createdAt: new Date().toISOString()
+            }
+          ]
+        }
+      : order
+  );
+  saveClientOrders(orders);
+  return orders;
+}
+
+function getDeliveryNotice(updates: Partial<ClientPortalOrder>) {
+  const eta = formatEta(updates.estimatedArrivalTime, updates.estimatedArrivalEndTime);
+  const driver = updates.deliveryDriver ? ` Driver: ${updates.deliveryDriver}.` : "";
+  const truck = updates.deliveryTruck ? ` Truck: ${updates.deliveryTruck}.` : "";
+  return eta
+    ? `Delivery ETA updated. Expected ${updates.deliveryDate ? `on ${updates.deliveryDate} ` : ""}${eta}.${driver}${truck}`
+    : "Delivery details updated.";
+}
+
+function getStatusNotification(status: ClientOrderStatus, updates: Partial<ClientPortalOrder>) {
+  if (status === "Approved") return "Order approved by supplier.";
+  if (status === "Loaded") return "Order loaded and ready for dispatch.";
+  if (status === "Out for Delivery") return `Order is out for delivery.${updates.deliveryDriver ? ` Driver: ${updates.deliveryDriver}.` : ""}`;
+  if (status === "Delivered") return "Order delivered.";
+  if (status === "Rejected") return `Order rejected.${updates.rejectionReason ? ` Reason: ${updates.rejectionReason}` : ""}`;
+  if (status === "Paid") return "Payment marked as paid.";
+  return `Order status changed to ${status}.`;
+}
+
+export function formatEta(startTime?: string, endTime?: string) {
+  if (!startTime) return "";
+  const start = formatTime(startTime);
+  const end = endTime ? formatTime(endTime) : "";
+  return end ? `between ${start} and ${end}` : `today at ${start}`;
+}
+
+function formatTime(value: string) {
+  const [hours = "0", minutes = "0"] = value.split(":");
+  const date = new Date();
+  date.setHours(Number(hours), Number(minutes), 0, 0);
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 export function createSupplier(input: Omit<PortalSupplier, "id" | "createdAt">) {

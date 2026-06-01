@@ -1,16 +1,18 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Building2, LogOut, PackageCheck, ShoppingCart, UserRound } from "lucide-react";
+import { Bell, Building2, Clock, LogOut, PackageCheck, ShoppingCart, Truck, UserRound } from "lucide-react";
 import {
   authenticatePortalClient,
   clearPortalSession,
   createClientOrder,
+  formatEta,
   getCatalogForClientSupplier,
   getClientOrders,
   getPortalSession,
   getSuppliersForClient,
   savePortalSession,
+  type ClientPortalOrder,
   type PortalClient,
   type PortalSupplier
 } from "@/lib/client-portal-data";
@@ -97,11 +99,11 @@ export default function ClientPortalPage() {
     }
 
     try {
-      createClientOrder(client, parsedQuantities, selectedSupplier.id);
+      const { order } = createClientOrder(client, parsedQuantities, selectedSupplier.id);
       setQuantities({});
       setOrdersVersion((version) => version + 1);
       setError("");
-      setMessage("Order submitted. Status: Pending.");
+      setMessage(`Order ${order.id} submitted. Status: ${order.status}.`);
     } catch (orderError) {
       setError(orderError instanceof Error ? orderError.message : "Order could not be submitted.");
     }
@@ -308,6 +310,22 @@ export default function ClientPortalPage() {
                 <p className="mt-1 text-sm font-semibold text-slate-500">
                   Supplier: {order.supplier} - Payment: {order.paymentStatus}
                 </p>
+                <DeliveryNotice order={order} />
+                {(order.notifications ?? []).length > 0 ? (
+                  <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-950">
+                      <Bell className="h-4 w-4 text-brand-700" />
+                      Notifications
+                    </div>
+                    <div className="space-y-2">
+                      {(order.notifications ?? []).slice(-4).reverse().map((notification) => (
+                        <p className="text-xs font-semibold text-slate-600" key={notification.id}>
+                          {new Date(notification.createdAt).toLocaleString()} - {notification.message}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </article>
             ))}
             {clientOrders.length === 0 ? (
@@ -319,6 +337,47 @@ export default function ClientPortalPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function DeliveryNotice({ order }: { order: ClientPortalOrder }) {
+  const eta = formatEta(order.estimatedArrivalTime, order.estimatedArrivalEndTime);
+  const minutesAway = order.driverMinutesAway && order.status === "Out for Delivery"
+    ? `Driver is ${order.driverMinutesAway} minutes away.`
+    : "";
+
+  return (
+    <div className="mt-4 rounded-lg border border-brand-100 bg-brand-50 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-black uppercase tracking-normal text-brand-800">
+            <Truck className="h-4 w-4" />
+            Delivery Notice
+          </div>
+          <p className="mt-2 text-sm font-bold text-slate-800">
+            Order {order.id} - {order.status}
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            Delivery date: {order.deliveryDate || "Waiting for supplier schedule"}
+          </p>
+          <p className="mt-1 text-lg font-black text-brand-900">
+            {eta ? `Expected ${eta}` : "ETA not assigned yet"}
+          </p>
+          {minutesAway ? (
+            <p className="mt-1 text-sm font-bold text-emerald-700">{minutesAway}</p>
+          ) : null}
+        </div>
+        <div className="rounded-lg bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-brand-700" />
+            {order.deliveryTruck || "Truck pending"}
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            Driver: {order.deliveryDriver || order.deliveryPerson || "Pending"}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
