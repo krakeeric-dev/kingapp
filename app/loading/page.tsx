@@ -19,6 +19,7 @@ import {
   type ProductMaster
 } from "@/lib/products-data";
 import { getPendingOrders, type PendingOrder } from "@/lib/call-center-data";
+import { getClientOrders, type ClientPortalOrder } from "@/lib/client-portal-data";
 
 type LoadingFormState = {
   id: string;
@@ -58,6 +59,7 @@ function LoadingContent({ user }: { user: SessionUser }) {
   const [records, setRecords] = useState<LoadingRecord[]>([]);
   const [products, setProducts] = useState<ProductMaster[]>([]);
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
+  const [clientOrders, setClientOrders] = useState<ClientPortalOrder[]>([]);
   const [form, setForm] = useState<LoadingFormState>(emptyForm);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -85,6 +87,7 @@ function LoadingContent({ user }: { user: SessionUser }) {
     });
     setRecords(getLoadingRecords());
     setPendingOrders(getPendingOrders());
+    setClientOrders(getClientOrders().filter((order) => order.status === "Approved"));
   }, []);
 
   const visibleRecords = useMemo(() => {
@@ -417,6 +420,22 @@ function LoadingContent({ user }: { user: SessionUser }) {
                   <Info label="Reference" value={order.id} />
                 </div>
                 {order.notes ? <p className="mt-3 text-sm text-slate-600">{order.notes}</p> : null}
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {(user.role === "storekeeper" || user.role === "admin") && clientOrders.length > 0 ? (
+        <section className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm">
+          <h3 className="text-lg font-bold text-slate-950">Approved Client Portal Orders for Loading</h3>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {clientOrders.map((order) => (
+              <article className="rounded-lg border border-brand-100 bg-brand-50 p-4" key={order.id}>
+                <h4 className="font-bold text-brand-950">{order.clientName}</h4>
+                <p className="mt-1 text-sm font-semibold text-slate-600">{order.phone} - {order.location}</p>
+                <p className="mt-3 font-bold text-brand-800">{order.totalQuantity} cartons</p>
+                <p className="text-sm text-slate-600">Reference: {order.id}</p>
               </article>
             ))}
           </div>

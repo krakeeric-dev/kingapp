@@ -1,0 +1,260 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ClipboardList, PackageCheck, Truck, WalletCards } from "lucide-react";
+import { AppShell } from "@/components/AppShell";
+import type { SessionUser } from "@/lib/auth";
+import { formatMoney } from "@/lib/sales-data";
+import {
+  getClientOrders,
+  getPortalClients,
+  savePortalClients,
+  updateClientOrderStatus,
+  type ClientOrderStatus,
+  type ClientPortalOrder,
+  type PortalClient
+} from "@/lib/client-portal-data";
+import { getProducts } from "@/lib/products-data";
+
+export default function ClientOrdersPage() {
+  return (
+    <AppShell allowedRoles={["admin", "storekeeper", "accountant", "marketer", "manager", "supervisor"]}>
+      {(user) => <ClientOrdersContent user={user} />}
+    </AppShell>
+  );
+}
+
+function ClientOrdersContent({ user }: { user: SessionUser }) {
+  const [orders, setOrders] = useState<ClientPortalOrder[]>([]);
+  const [clients, setClients] = useState<PortalClient[]>([]);
+  const [editingClientId, setEditingClientId] = useState("");
+
+  useEffect(() => {
+    setOrders(getClientOrders());
+    setClients(getPortalClients());
+  }, []);
+
+  const dashboard = useMemo(
+    () => ({
+      pending: orders.filter((order) => order.status === "Pending").length,
+      approved: orders.filter((order) => order.status === "Approved").length,
+      delivered: orders.filter((order) => order.status === "Delivered").length,
+      unpaid: orders.filter((order) => order.paymentStatus !== "Paid").length
+    }),
+    [orders]
+  );
+
+  function setStatus(order: ClientPortalOrder, status: ClientOrderStatus) {
+    const updates: Partial<ClientPortalOrder> = {};
+
+    if (status === "Out for Delivery") {
+      updates.deliveryPerson = user.displayName;
+    }
+
+    if (status === "Delivered") {
+      updates.deliveryPerson = user.displayName;
+      updates.deliveredAt = new Date().toISOString();
+    }
+
+    setOrders(updateClientOrderStatus(order.id, status, updates));
+  }
+
+  function markPaid(order: ClientPortalOrder) {
+    setOrders(updateClientOrderStatus(order.id, "Paid", { paymentStatus: "Paid" }));
+  }
+
+  function saveClientPricing(event: FormEvent<HTMLFormElement>, client: PortalClient) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const productPrices = { ...client.productPrices };
+
+    getProducts().forEach((product) => {
+      const value = Number(form.get(product.itemCode));
+      if (Number.isFinite(value) && value > 0) {
+        productPrices[product.itemCode] = value;
+      }
+    });
+
+    setClients(
+      savePortalClients(
+        clients.map((item) =>
+          item.id === client.id
+            ? {
+                ...item,
+                supplier: String(form.get("supplier") ?? item.supplier),
+                assignedMarketer: String(form.get("assignedMarketer") ?? item.assignedMarketer),
+                productPrices
+              }
+            : item
+        )
+      )
+    );
+    setEditingClientId("");
+  }
+
+  return (
+    <div className="space-y-6">
+      <section className="app-card-soft p-5 sm:p-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+            <ClipboardList className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-slate-950">Client Orders</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Approve client orders, prepare loading, confirm delivery, and track payment status.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric icon={ClipboardList} label="Pending Orders" value={dashboard.pending} />
+        <Metric icon={PackageCheck} label="Approved for Loading" value={dashboard.approved} />
+        <Metric icon={Truck} label="Delivered" value={dashboard.delivered} />
+        <Metric icon={WalletCards} label="Unpaid / Partial" value={dashboard.unpaid} />
+      </div>
+
+      <section className="app-card p-5">
+        <h3 className="text-lg font-black text-slate-950">Supplier/Admin Order Dashboard</h3>
+        <div className="mt-4 grid gap-3">
+          {orders.map((order) => (
+            <article className="rounded-lg border border-slate-200 p-4" key={order.id}>
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                <div>
+                  <h4 className="text-lg font-black text-slate-950">{order.clientName}</h4>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {order.phone} - {order.location} - {order.supplier}
+                  </p>
+                  <p className="mt-2 font-bold text-brand-800">
+                    {order.totalQuantity} cartons - {formatMoney(order.totalAmount)} RWF
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge label={order.status} />
+                  <Badge label={order.paymentStatus} />
+                </div>
+              </div>
+              <div className="mt-4 overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Qty</th>
+                      <th>Price</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order.lines.map((line) => (
+                      <tr key={`${order.id}-${line.itemCode}`}>
+                        <td className="font-bold text-slate-950">{line.productName}</td>
+                        <td>{line.quantity}</td>
+                        <td>{formatMoney(line.pricePerCarton)} RWF</td>
+                        <td>{formatMoney(line.amount)} RWF</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {user.role === "admin" && order.status === "Pending" ? (
+                  <button className="primary-button" onClick={() => setStatus(order, "Approved")} type="button">Approve</button>
+                ) : null}
+                {user.role === "storekeeper" && order.status === "Approved" ? (
+                  <button className="primary-button" onClick={() => setStatus(order, "Loaded")} type="button">Mark Loaded</button>
+                ) : null}
+                {user.role === "marketer" && order.status === "Loaded" ? (
+                  <button className="primary-button" onClick={() => setStatus(order, "Out for Delivery")} type="button">Out for Delivery</button>
+                ) : null}
+                {user.role === "marketer" && order.status === "Out for Delivery" ? (
+                  <button className="primary-button" onClick={() => setStatus(order, "Delivered")} type="button">Confirm Delivered</button>
+                ) : null}
+                {user.role === "accountant" && order.status === "Delivered" && order.paymentStatus !== "Paid" ? (
+                  <button className="primary-button" onClick={() => markPaid(order)} type="button">Mark Paid</button>
+                ) : null}
+              </div>
+            </article>
+          ))}
+          {orders.length === 0 ? (
+            <p className="text-sm font-semibold text-slate-500">No client portal orders yet.</p>
+          ) : null}
+        </div>
+      </section>
+
+      {user.role === "admin" ? (
+        <section className="app-card p-5">
+          <h3 className="text-lg font-black text-slate-950">Client Supplier & Price Assignment</h3>
+          <div className="mt-4 grid gap-3">
+            {clients.map((client) => (
+              <article className="rounded-lg border border-slate-200 p-4" key={client.id}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h4 className="font-black text-slate-950">{client.clientName}</h4>
+                    <p className="text-sm text-slate-600">{client.supplier} - {client.assignedMarketer}</p>
+                  </div>
+                  <button className="secondary-button" onClick={() => setEditingClientId(client.id)} type="button">Edit assignment</button>
+                </div>
+                {editingClientId === client.id ? (
+                  <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={(event) => saveClientPricing(event, client)}>
+                    <Input defaultValue={client.supplier} label="Supplier" name="supplier" />
+                    <Input defaultValue={client.assignedMarketer} label="Assigned Marketer" name="assignedMarketer" />
+                    {getProducts().map((product) => (
+                      <Input
+                        defaultValue={String(client.productPrices[product.itemCode] ?? product.pricePerCarton)}
+                        key={product.itemCode}
+                        label={`${product.name} Price`}
+                        name={product.itemCode}
+                        type="number"
+                      />
+                    ))}
+                    <button className="primary-button md:col-span-2">Save client setup</button>
+                  </form>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function Metric({ icon: Icon, label, value }: { icon: typeof ClipboardList; label: string; value: number }) {
+  return (
+    <article className="app-card p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-slate-500">{label}</p>
+          <p className="mt-3 text-3xl font-black text-brand-800">{value}</p>
+        </div>
+        <div className="rounded-lg bg-brand-50 p-2 text-brand-700">
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function Badge({ label }: { label: string }) {
+  return <span className="status-badge border-brand-100 bg-brand-50 text-brand-800">{label}</span>;
+}
+
+function Input({
+  defaultValue,
+  label,
+  name,
+  type = "text"
+}: {
+  defaultValue: string;
+  label: string;
+  name: string;
+  type?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-bold uppercase tracking-normal text-slate-500">{label}</span>
+      <input className="form-input" defaultValue={defaultValue} min={type === "number" ? "0" : undefined} name={name} type={type} />
+    </label>
+  );
+}

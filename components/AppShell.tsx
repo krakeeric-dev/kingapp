@@ -8,6 +8,7 @@ import {
   BadgeDollarSign,
   Boxes,
   ClipboardCheck,
+  ClipboardList,
   Download,
   FileText,
   Home,
@@ -63,6 +64,12 @@ const navItems: NavItem[] = [
     label: "Call Center",
     icon: PhoneCall,
     roles: getAllowedRoles("/call-center")
+  },
+  {
+    href: "/client-orders",
+    label: "Client Orders",
+    icon: ClipboardList,
+    roles: getAllowedRoles("/client-orders")
   },
   {
     href: "/inventory",
