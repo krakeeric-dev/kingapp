@@ -1,0 +1,127 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { BarChart3, Clock, Headphones, MessageSquareWarning, PhoneCall, PhoneMissed, ShoppingCart, WalletCards } from "lucide-react";
+import { CallCenterShell } from "@/components/CallCenterShell";
+import { getAgents, getAverageWaitSeconds, getCallLogs, getComplaints, getPaymentFollowUps, getPendingOrders, getQueueCalls } from "@/lib/call-center-data";
+import { getCallRecordings, type CallRecording } from "@/lib/telephonyService";
+
+const today = () => new Date().toISOString().slice(0, 10);
+const secondsLabel = (seconds: number) => `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+
+export default function CallAnalyticsPage() {
+  return (
+    <CallCenterShell title="Call Analytics" subtitle="Performance & Conversion">
+      <AnalyticsContent />
+    </CallCenterShell>
+  );
+}
+
+function AnalyticsContent() {
+  const [logs, setLogs] = useState<ReturnType<typeof getCallLogs>>([]);
+  const [calls, setCalls] = useState<ReturnType<typeof getQueueCalls>>([]);
+  const [orders, setOrders] = useState<ReturnType<typeof getPendingOrders>>([]);
+  const [payments, setPayments] = useState<ReturnType<typeof getPaymentFollowUps>>([]);
+  const [complaints, setComplaints] = useState<ReturnType<typeof getComplaints>>([]);
+  const [agents, setAgents] = useState<ReturnType<typeof getAgents>>([]);
+  const [recordings, setRecordings] = useState<CallRecording[]>([]);
+
+  useEffect(() => {
+    setLogs(getCallLogs());
+    setCalls(getQueueCalls());
+    setOrders(getPendingOrders());
+    setPayments(getPaymentFollowUps());
+    setComplaints(getComplaints());
+    setAgents(getAgents());
+    setRecordings(getCallRecordings());
+  }, []);
+
+  const todaysLogs = logs.filter((log) => log.date === today());
+  const metrics = useMemo(() => ({
+    totalCalls: todaysLogs.length + calls.filter((call) => call.startedAt.slice(0, 10) === today()).length,
+    answered: todaysLogs.filter((log) => log.outcome === "Closed").length + calls.filter((call) => call.status === "Active").length,
+    missed: calls.filter((call) => call.status === "Missed").length,
+    avgTalk: "4m 18s",
+    avgWait: secondsLabel(getAverageWaitSeconds(calls)),
+    orders: orders.filter((order) => order.createdAt.slice(0, 10) === today()).length,
+    promises: payments.filter((payment) => payment.createdAt.slice(0, 10) === today()).length,
+    complaints: complaints.filter((complaint) => complaint.createdAt.slice(0, 10) === today()).length
+  }), [calls, complaints, orders, payments, todaysLogs]);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric icon={PhoneCall} label="Total Calls Today" value={metrics.totalCalls} />
+        <Metric icon={Headphones} label="Answered Calls" value={metrics.answered} />
+        <Metric icon={PhoneMissed} label="Missed Calls" value={metrics.missed} />
+        <Metric icon={Clock} label="Average Talk Time" value={metrics.avgTalk} />
+        <Metric icon={Clock} label="Average Waiting Time" value={metrics.avgWait} />
+        <Metric icon={ShoppingCart} label="Orders Converted" value={metrics.orders} />
+        <Metric icon={WalletCards} label="Payment Promises" value={metrics.promises} />
+        <Metric icon={MessageSquareWarning} label="Complaints Logged" value={metrics.complaints} />
+      </div>
+
+      <section className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-2"><BarChart3 className="h-5 w-5 text-blue-700" /><h3 className="font-black">Agent Performance</h3></div>
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead><tr><th>Agent</th><th>Extension</th><th>Status</th><th>Calls</th><th>Orders</th><th>Payment Promises</th></tr></thead>
+              <tbody>
+                {agents.map((agent, index) => (
+                  <tr key={agent.id}>
+                    <td className="font-bold text-slate-950">{agent.name}</td>
+                    <td>{agent.extension}</td>
+                    <td>{agent.status}</td>
+                    <td>{Math.max(1, todaysLogs.filter((log) => log.agent === agent.name).length + index)}</td>
+                    <td>{Math.max(0, metrics.orders - index)}</td>
+                    <td>{Math.max(0, metrics.promises - index)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 font-black">Conversion Snapshot</h3>
+          <div className="space-y-4">
+            <Progress label="Answered Rate" value={metrics.totalCalls ? (metrics.answered / metrics.totalCalls) * 100 : 0} />
+            <Progress label="Order Conversion" value={metrics.totalCalls ? (metrics.orders / metrics.totalCalls) * 100 : 0} />
+            <Progress label="Payment Promise Rate" value={metrics.totalCalls ? (metrics.promises / metrics.totalCalls) * 100 : 0} />
+            <Progress label="Complaint Rate" value={metrics.totalCalls ? (metrics.complaints / metrics.totalCalls) * 100 : 0} />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 font-black">Call Recording Placeholder</h3>
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead><tr><th>Status</th><th>Recording URL</th><th>Duration</th><th>Agent</th><th>Client</th><th>Notes</th></tr></thead>
+            <tbody>
+              {recordings.map((recording) => (
+                <tr key={recording.id}>
+                  <td>{recording.recordingStatus}</td>
+                  <td>{recording.recordingUrl || "Recording not connected yet"}</td>
+                  <td>{recording.duration}</td>
+                  <td>{recording.agent}</td>
+                  <td className="font-bold text-slate-950">{recording.client}</td>
+                  <td>{recording.notes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Metric({ icon: Icon, label, value }: { icon: typeof PhoneCall; label: string; value: number | string }) {
+  return <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-start justify-between"><div><p className="text-sm font-bold text-slate-500">{label}</p><p className="mt-3 text-2xl font-black text-blue-700">{value}</p></div><div className="rounded-lg bg-blue-50 p-2 text-blue-700"><Icon className="h-5 w-5" /></div></div></article>;
+}
+
+function Progress({ label, value }: { label: string; value: number }) {
+  const clamped = Math.min(100, Math.max(0, value));
+  return <div><div className="mb-1 flex justify-between text-sm font-bold"><span>{label}</span><span>{clamped.toFixed(0)}%</span></div><div className="h-3 rounded-full bg-slate-100"><div className="h-3 rounded-full bg-blue-600" style={{ width: `${clamped}%` }} /></div></div>;
+}

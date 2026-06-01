@@ -92,12 +92,18 @@ export type ScheduledFollowUp = {
 };
 
 export type AgentStatus = "Available" | "Ringing" | "On Call" | "Away" | "Offline";
+export type AgentPhoneType =
+  | "Browser Softphone"
+  | "IP Desk Phone"
+  | "Mobile App"
+  | "Fixed Line";
 
 export type CallCenterAgent = {
   id: string;
   name: string;
   extension: string;
   status: AgentStatus;
+  phoneType?: AgentPhoneType;
 };
 
 export type QueueCallStatus = "Incoming" | "Waiting" | "Active" | "Missed" | "Transferred" | "Closed";
@@ -294,11 +300,11 @@ const defaultClients: CallCenterClient[] = [
 ];
 
 const defaultAgents: CallCenterAgent[] = [
-  { id: "AG-001", name: "Alice Agent", extension: "201", status: "Available" },
-  { id: "AG-002", name: "Bertin Agent", extension: "202", status: "On Call" },
-  { id: "AG-003", name: "Chantal Agent", extension: "203", status: "Available" },
-  { id: "AG-004", name: "David Agent", extension: "204", status: "Away" },
-  { id: "AG-005", name: "Esther Agent", extension: "205", status: "Offline" }
+  { id: "AG-001", name: "Alice Agent", extension: "101", status: "Available", phoneType: "Browser Softphone" },
+  { id: "AG-002", name: "Eric Agent", extension: "102", status: "On Call", phoneType: "IP Desk Phone" },
+  { id: "AG-003", name: "Chantal Agent", extension: "103", status: "Available", phoneType: "Mobile App" },
+  { id: "AG-004", name: "David Agent", extension: "104", status: "Away", phoneType: "Fixed Line" },
+  { id: "AG-005", name: "Esther Agent", extension: "105", status: "Offline", phoneType: "Browser Softphone" }
 ];
 
 const defaultQueueCalls: QueueCall[] = [

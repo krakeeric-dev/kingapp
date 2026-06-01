@@ -33,12 +33,15 @@ type CallCenterShellProps = {
 const menuItems = [
   { label: "Dashboard", href: "/call-center", icon: Home, badge: "" },
   { label: "Incoming Calls", href: "/call-center/queue", icon: PhoneIncoming, badge: "2" },
+  { label: "Softphone", href: "/call-center/softphone", icon: PhoneCall, badge: "" },
+  { label: "Live Monitor", href: "/call-center/live-monitor", icon: Bell, badge: "" },
   { label: "Clients", href: "/call-center#clients", icon: UsersRound, badge: "" },
   { label: "Orders", href: "/call-center#orders", icon: ClipboardList, badge: "" },
   { label: "Follow Ups", href: "/call-center/callbacks", icon: CalendarClock, badge: "" },
   { label: "Complaints", href: "/call-center#complaints", icon: MessageSquareWarning, badge: "" },
   { label: "Payments", href: "/call-center#payments", icon: CreditCard, badge: "" },
-  { label: "Reports", href: "/reports", icon: BookOpen, badge: "" }
+  { label: "Analytics", href: "/call-center/analytics", icon: BookOpen, badge: "" },
+  { label: "Settings", href: "/call-center/settings", icon: UserRound, badge: "" }
 ];
 
 const toolItems = [
@@ -107,7 +110,7 @@ export function CallCenterShell({
 
           <nav className="flex-1 space-y-8 overflow-y-auto p-5">
             <SidebarGroup title="Main">
-              {menuItems.map((item) => (
+              {menuItems.filter((item) => canAccessPage(item.href.split("#")[0], user.role)).map((item) => (
                 <SidebarLink
                   active={pathname === item.href}
                   badge={item.badge}

@@ -74,12 +74,15 @@ const nowTime = () => new Date().toTimeString().slice(0, 5);
 const menuItems = [
   { label: "Dashboard", href: "/call-center", icon: Home, badge: "" },
   { label: "Incoming Calls", href: "/call-center/queue", icon: PhoneIncoming, badge: "2" },
+  { label: "Softphone", href: "/call-center/softphone", icon: PhoneCall, badge: "" },
+  { label: "Live Monitor", href: "/call-center/live-monitor", icon: Bell, badge: "" },
   { label: "Clients", href: "#clients", icon: UsersRound, badge: "" },
   { label: "Orders", href: "#orders", icon: ClipboardList, badge: "" },
   { label: "Follow Ups", href: "/call-center/callbacks", icon: CalendarClock, badge: "" },
   { label: "Complaints", href: "#complaints", icon: MessageSquareWarning, badge: "" },
   { label: "Payments", href: "#payments", icon: CreditCard, badge: "" },
-  { label: "Reports", href: "/reports", icon: BookOpen, badge: "" }
+  { label: "Analytics", href: "/call-center/analytics", icon: BookOpen, badge: "" },
+  { label: "Settings", href: "/call-center/settings", icon: UserRound, badge: "" }
 ];
 
 const toolItems = [
@@ -349,7 +352,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
   return (
     <main className="min-h-screen bg-[#f3f6fb] text-slate-950">
       <div className="flex min-h-screen">
-        <CallCenterSidebar />
+        <CallCenterSidebar user={user} />
         <section className="min-w-0 flex-1">
           <TopBar agentsOnline={agentsOnline} callsInQueue={callsInQueue} user={user} />
           <div className="space-y-4 p-4 lg:p-6">
@@ -487,7 +490,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
   );
 }
 
-function CallCenterSidebar() {
+function CallCenterSidebar({ user }: { user: SessionUser }) {
   return (
     <aside className="hidden w-72 shrink-0 flex-col bg-[#061b33] text-white shadow-2xl lg:flex">
       <div className="border-b border-white/10 p-7">
@@ -502,7 +505,7 @@ function CallCenterSidebar() {
 
       <nav className="flex-1 space-y-8 overflow-y-auto p-5">
         <SidebarGroup title="Main">
-          {menuItems.map((item, index) => (
+          {menuItems.filter((item) => canAccessPage(normalizeMenuHref(item.href), user.role)).map((item, index) => (
             <SidebarLink active={index === 0} href={item.href} icon={item.icon} key={item.label} label={item.label} badge={item.badge} />
           ))}
         </SidebarGroup>
@@ -521,6 +524,10 @@ function CallCenterSidebar() {
       </div>
     </aside>
   );
+}
+
+function normalizeMenuHref(href: string) {
+  return href.startsWith("#") ? "/call-center" : href.split("#")[0];
 }
 
 function TopBar({ agentsOnline, callsInQueue, user }: { agentsOnline: number; callsInQueue: number; user: SessionUser }) {
