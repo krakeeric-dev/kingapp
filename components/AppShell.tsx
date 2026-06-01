@@ -66,6 +66,30 @@ const navItems: NavItem[] = [
     roles: getAllowedRoles("/call-center")
   },
   {
+    href: "/call-center/queue",
+    label: "Call Queue",
+    icon: PhoneCall,
+    roles: getAllowedRoles("/call-center/queue")
+  },
+  {
+    href: "/call-center/agents",
+    label: "Agents",
+    icon: UserRound,
+    roles: getAllowedRoles("/call-center/agents")
+  },
+  {
+    href: "/call-center/missed-calls",
+    label: "Missed Calls",
+    icon: PhoneCall,
+    roles: getAllowedRoles("/call-center/missed-calls")
+  },
+  {
+    href: "/call-center/callbacks",
+    label: "Callbacks",
+    icon: ClipboardList,
+    roles: getAllowedRoles("/call-center/callbacks")
+  },
+  {
     href: "/client-orders",
     label: "Client Orders",
     icon: ClipboardList,

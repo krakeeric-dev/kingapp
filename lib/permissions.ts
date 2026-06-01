@@ -2,7 +2,11 @@ import type { UserRole } from "@/lib/auth";
 
 export const pagePermissions: Record<string, UserRole[]> = {
   "/dashboard": ["admin", "manager", "supervisor", "storekeeper", "marketer", "accountant"],
-  "/call-center": ["admin", "callcenter"],
+  "/call-center": ["admin", "manager", "callcenter"],
+  "/call-center/queue": ["admin", "manager", "callcenter"],
+  "/call-center/agents": ["admin", "manager", "callcenter"],
+  "/call-center/missed-calls": ["admin", "manager", "callcenter"],
+  "/call-center/callbacks": ["admin", "manager", "callcenter"],
   "/client-orders": ["admin", "storekeeper", "accountant", "marketer", "manager", "supervisor"],
   "/loading": ["admin", "supervisor", "storekeeper"],
   "/inventory": ["admin", "manager", "supervisor", "storekeeper"],

@@ -1,13 +1,17 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   CalendarClock,
   ClipboardList,
+  Headphones,
   MessageSquareWarning,
   PhoneCall,
+  PhoneMissed,
   Search,
   ShoppingCart,
+  UserCheck,
   WalletCards
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -285,6 +289,13 @@ function CallCenterContent({ user }: { user: SessionUser }) {
         <Kpi icon={ClipboardList} label="New Clients Contacted" value={dashboard.newClientsContacted} />
       </div>
 
+      <div className="grid gap-4 md:grid-cols-4">
+        <ModuleLink href="/call-center/queue" icon={Headphones} title="Call Queue" text="Incoming, waiting, active, missed, and callbacks." />
+        <ModuleLink href="/call-center/agents" icon={UserCheck} title="Agents" text="Control available, ringing, on-call, away, and offline states." />
+        <ModuleLink href="/call-center/missed-calls" icon={PhoneMissed} title="Missed Calls" text="Call back missed callers and update outcomes." />
+        <ModuleLink href="/call-center/callbacks" icon={CalendarClock} title="Callbacks" text="Prioritize follow-ups and track completion." />
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
         <section className="app-card p-4">
           <label className="block">
@@ -321,6 +332,39 @@ function CallCenterContent({ user }: { user: SessionUser }) {
         {selectedClient ? (
           <section className="space-y-4">
             <ClientProfile client={selectedClient} />
+            <Panel title="Client Call History">
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Time</th>
+                      <th>Agent</th>
+                      <th>Call Type</th>
+                      <th>Duration</th>
+                      <th>Outcome</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {callLogs.filter((record) => record.clientId === selectedClient.id).map((record) => (
+                      <tr key={record.id}>
+                        <td>{record.date}</td>
+                        <td>{record.time}</td>
+                        <td>{record.agent}</td>
+                        <td>{record.callType}</td>
+                        <td>{record.duration}</td>
+                        <td>{record.outcome}</td>
+                        <td>{record.nextAction}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {callLogs.filter((record) => record.clientId === selectedClient.id).length === 0 ? (
+                <p className="mt-3 text-sm font-semibold text-slate-500">No previous call history for this client.</p>
+              ) : null}
+            </Panel>
             <div className="grid gap-4 xl:grid-cols-2">
               <Panel title="+ New Order">
                 <form className="grid gap-3" onSubmit={handleOrderSubmit}>
@@ -486,6 +530,32 @@ function Kpi({ icon: Icon, label, value }: { icon: typeof PhoneCall; label: stri
         </div>
       </div>
     </article>
+  );
+}
+
+function ModuleLink({
+  href,
+  icon: Icon,
+  text,
+  title
+}: {
+  href: string;
+  icon: typeof PhoneCall;
+  text: string;
+  title: string;
+}) {
+  return (
+    <Link className="app-card p-4 transition hover:border-brand-200 hover:bg-brand-50" href={href}>
+      <div className="flex items-start gap-3">
+        <div className="rounded-lg bg-brand-50 p-2 text-brand-700">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <h3 className="font-black text-slate-950">{title}</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-500">{text}</p>
+        </div>
+      </div>
+    </Link>
   );
 }
 
