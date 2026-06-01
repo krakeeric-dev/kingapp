@@ -48,7 +48,8 @@ const roleOptions: UserRole[] = [
   "supervisor",
   "storekeeper",
   "marketer",
-  "accountant"
+  "accountant",
+  "callcenter"
 ];
 
 const emptyAddForm: AddFormState = {

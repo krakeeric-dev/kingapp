@@ -45,7 +45,7 @@ export default function LoginPage() {
       }
 
       saveSession(user);
-      window.location.assign("/dashboard");
+      window.location.assign(user.role === "callcenter" ? "/call-center" : "/dashboard");
     } catch {
       setError(
         "Sign in could not be completed. Check your details and try again."

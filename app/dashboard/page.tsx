@@ -40,6 +40,8 @@ import {
 } from "@/lib/inventory-data";
 import type { InventoryMovement, MinimumStock } from "@/lib/inventory-data";
 import { getSyncSummary } from "@/lib/offline-sync";
+import { getComplaints } from "@/lib/call-center-data";
+import type { ComplaintRecord } from "@/lib/call-center-data";
 
 type DashboardStat = {
   label: string;
@@ -56,7 +58,7 @@ type Activity = {
   status: string;
 };
 
-const roleSummaries: Record<UserRole, string> = {
+const roleSummaries: Partial<Record<UserRole, string>> = {
   admin: "Executive overview of stock movement, cash performance, variances, and operational activity.",
   supervisor: "Review performance, variances, and correction priorities from one clean control room.",
   storekeeper: "Monitor loaded stock, warehouse position, returns, and items needing attention.",
@@ -79,6 +81,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
     InventoryMovement[]
   >([]);
   const [minimumStocks, setMinimumStocks] = useState<MinimumStock[]>([]);
+  const [complaints, setComplaints] = useState<ComplaintRecord[]>([]);
   const [syncSummary, setSyncSummary] = useState({
     conflicts: 0,
     failed: 0,
@@ -95,6 +98,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
     setExpenseRecords(getExpenseRecords());
     setInventoryMovements(getInventoryMovements());
     setMinimumStocks(getMinimumStocks());
+    setComplaints(getComplaints());
     void getSyncSummary().then((summary) =>
       setSyncSummary({
         conflicts: summary.conflicts,
@@ -218,6 +222,9 @@ function DashboardContent({ user }: { user: SessionUser }) {
       .length;
     const confirmed = roleRecords.filter((record) => record.status === "confirmed")
       .length;
+    const openComplaints = complaints.filter(
+      (record) => record.status !== "Closed"
+    ).length;
     const syncStats: DashboardStat[] =
       user.role === "admin"
         ? [
@@ -389,6 +396,11 @@ function DashboardContent({ user }: { user: SessionUser }) {
         label: "Rejected loads",
         value: rejected.toLocaleString(),
         tone: rejected > 0 ? "danger" : "success"
+      },
+      {
+        label: "Open complaints",
+        value: openComplaints.toLocaleString(),
+        tone: openComplaints > 0 ? "warning" : "success"
       }
     ] as const;
 
@@ -415,6 +427,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
     };
   }, [
     cashRecords,
+    complaints,
     expenseRecords,
     inventoryMovements,
     minimumStocks,
@@ -441,7 +454,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
               Executive Overview
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              {roleSummaries[user.role]}
+              {roleSummaries[user.role] ?? "Manage your KingApp workspace."}
             </p>
           </div>
           <div className="rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-bold text-brand-900">

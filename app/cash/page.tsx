@@ -16,6 +16,7 @@ import {
   unlockCashRecord
 } from "@/lib/cash-data";
 import type { CashRecord } from "@/lib/cash-data";
+import { getPaymentFollowUps, type PaymentFollowUp } from "@/lib/call-center-data";
 
 type DraftCash = Record<string, string>;
 
@@ -30,6 +31,7 @@ export default function CashPage() {
 function CashContent({ user }: { user: SessionUser }) {
   const [salesRecords, setSalesRecords] = useState<SalesRecord[]>([]);
   const [cashRecords, setCashRecords] = useState<CashRecord[]>([]);
+  const [paymentFollowUps, setPaymentFollowUps] = useState<PaymentFollowUp[]>([]);
   const [draftCash, setDraftCash] = useState<DraftCash>({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -49,6 +51,7 @@ function CashContent({ user }: { user: SessionUser }) {
     const cash = getCashRecords();
     setSalesRecords(sales);
     setCashRecords(cash);
+    setPaymentFollowUps(getPaymentFollowUps());
     setDraftCash(
       cash.reduce<DraftCash>((drafts, record) => {
         drafts[record.salesRecordId] = String(record.cashReceived);
@@ -268,6 +271,40 @@ function CashContent({ user }: { user: SessionUser }) {
         <div className="rounded-lg border border-dashed border-brand-200 bg-white px-5 py-8 text-center text-sm font-semibold text-slate-500">
           No sales submitted records are ready for cash collection.
         </div>
+      ) : null}
+
+      {paymentFollowUps.length > 0 ? (
+        <section className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm">
+          <h3 className="text-lg font-bold text-slate-950">Payment Follow-ups from Call Center</h3>
+          <div className="mt-4 overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Amount Due</th>
+                  <th>Days Outstanding</th>
+                  <th>Promise Date</th>
+                  <th>Status</th>
+                  <th>Agent</th>
+                  <th>Comment</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paymentFollowUps.map((record) => (
+                  <tr key={record.id}>
+                    <td className="font-bold text-slate-950">{record.clientName}</td>
+                    <td>{formatMoney(record.amountDue)} RWF</td>
+                    <td>{record.daysOutstanding}</td>
+                    <td>{record.promiseToPayDate}</td>
+                    <td>{record.status}</td>
+                    <td>{record.agent}</td>
+                    <td>{record.comment}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       ) : null}
 
       {unlockRecordId ? (

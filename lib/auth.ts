@@ -7,7 +7,8 @@ export type UserRole =
   | "storekeeper"
   | "accountant"
   | "manager"
-  | "marketer";
+  | "marketer"
+  | "callcenter";
 
 export type MockUser = PlatformUser;
 
@@ -21,7 +22,8 @@ export const roleLabels: Record<UserRole, string> = {
   storekeeper: "Storekeeper",
   accountant: "Accountant",
   manager: "Manager",
-  marketer: "Marketer"
+  marketer: "Marketer",
+  callcenter: "Call Center Agent"
 };
 
 function getAvailableUsers() {

@@ -85,6 +85,17 @@ export const defaultUsers: PlatformUser[] = [
     status: "active",
     createdAt: DEFAULT_CREATED_AT,
     updatedAt: DEFAULT_CREATED_AT
+  },
+  {
+    username: "callcenter",
+    password: "call123",
+    displayName: "Call Center Agent",
+    role: "callcenter",
+    phone: "",
+    email: "",
+    status: "active",
+    createdAt: DEFAULT_CREATED_AT,
+    updatedAt: DEFAULT_CREATED_AT
   }
 ];
 

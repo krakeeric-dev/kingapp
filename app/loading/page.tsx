@@ -18,6 +18,7 @@ import {
   getProducts,
   type ProductMaster
 } from "@/lib/products-data";
+import { getPendingOrders, type PendingOrder } from "@/lib/call-center-data";
 
 type LoadingFormState = {
   id: string;
@@ -56,6 +57,7 @@ export default function LoadingPage() {
 function LoadingContent({ user }: { user: SessionUser }) {
   const [records, setRecords] = useState<LoadingRecord[]>([]);
   const [products, setProducts] = useState<ProductMaster[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
   const [form, setForm] = useState<LoadingFormState>(emptyForm);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -82,6 +84,7 @@ function LoadingContent({ user }: { user: SessionUser }) {
       };
     });
     setRecords(getLoadingRecords());
+    setPendingOrders(getPendingOrders());
   }, []);
 
   const visibleRecords = useMemo(() => {
@@ -399,6 +402,27 @@ function LoadingContent({ user }: { user: SessionUser }) {
         </form>
       ) : null}
 
+      {(user.role === "storekeeper" || user.role === "admin") && pendingOrders.length > 0 ? (
+        <section className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm">
+          <h3 className="text-lg font-bold text-slate-950">Pending Orders from Call Center</h3>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {pendingOrders.map((order) => (
+              <article className="rounded-lg border border-brand-100 bg-brand-50 p-4" key={order.id}>
+                <h4 className="font-bold text-brand-950">{order.clientName}</h4>
+                <p className="mt-1 text-sm font-semibold text-slate-600">{order.phone} - {order.area}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  <Info label="Product" value={order.product} />
+                  <Info label="Quantity" value={order.quantity.toLocaleString()} />
+                  <Info label="Delivery" value={order.deliveryDate} />
+                  <Info label="Reference" value={order.id} />
+                </div>
+                {order.notes ? <p className="mt-3 text-sm text-slate-600">{order.notes}</p> : null}
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {(user.role === "storekeeper" || user.role === "admin") &&
       rejectedRecords.length > 0 ? (
         <div className="rounded-lg border border-red-100 bg-white p-5 shadow-sm">
@@ -453,5 +477,16 @@ function Field({
       </span>
       {children}
     </label>
+  );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span className="block text-xs font-semibold uppercase tracking-normal text-brand-700">
+        {label}
+      </span>
+      <span className="font-bold text-slate-950">{value}</span>
+    </div>
   );
 }

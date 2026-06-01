@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   PackageCheck,
+  PhoneCall,
   ReceiptText,
   RefreshCw,
   ScrollText,
@@ -56,6 +57,12 @@ const navItems: NavItem[] = [
     label: "Loading",
     icon: Boxes,
     roles: getAllowedRoles("/loading")
+  },
+  {
+    href: "/call-center",
+    label: "Call Center",
+    icon: PhoneCall,
+    roles: getAllowedRoles("/call-center")
   },
   {
     href: "/inventory",
@@ -166,7 +173,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
           "kingapp.permissionMessage",
           "You do not have permission to access this page."
         );
-        router.replace("/dashboard");
+        router.replace(session.role === "callcenter" ? "/call-center" : "/dashboard");
         return;
       }
 
