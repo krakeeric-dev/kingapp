@@ -37,8 +37,8 @@ function AnnouncementsContent({ user }: { user: SessionUser }) {
   });
 
   useEffect(() => {
-    setAnnouncements(getAnnouncementCenterItems());
-  }, []);
+    setAnnouncements(getAnnouncementCenterItems(user));
+  }, [user]);
 
   const filteredAnnouncements = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -52,13 +52,14 @@ function AnnouncementsContent({ user }: { user: SessionUser }) {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!form.title.trim() || !form.body.trim()) return;
-    setAnnouncements(createAnnouncementCenterItem({
+    createAnnouncementCenterItem({
       audience: form.audience,
       body: form.body,
       companyName: form.audience === "Specific company" ? form.companyName : undefined,
       priority: form.priority,
       title: form.title
-    }, user));
+    }, user);
+    setAnnouncements(getAnnouncementCenterItems(user));
     setForm((current) => ({ ...current, body: "", priority: "Normal", title: "" }));
   }
 

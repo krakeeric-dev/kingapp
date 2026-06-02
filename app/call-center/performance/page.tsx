@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Headphones, MessageSquareWarning, ShoppingCart, Trophy, WalletCards } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
+import type { SessionUser } from "@/lib/auth";
 import {
-  callCenterCompanies,
-  getActiveCallCenterCompany,
+  getActiveCallCenterCompanyForUser,
+  getAssignableCallCenterCompanies,
   getCallCenterSummary,
   getPerformanceRows,
   setActiveCallCenterCompany
@@ -15,26 +16,27 @@ import { formatMoney } from "@/lib/sales-data";
 export default function CallCenterPerformancePage() {
   return (
     <CallCenterShell title="Agent Performance" subtitle="Outsourcing Operations Scoreboard">
-      <PerformanceContent />
+      {(user) => <PerformanceContent user={user} />}
     </CallCenterShell>
   );
 }
 
-function PerformanceContent() {
+function PerformanceContent({ user }: { user: SessionUser }) {
   const [companyId, setCompanyId] = useState("all");
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
-    setCompanyId(getActiveCallCenterCompany());
-  }, []);
+    setCompanyId(getActiveCallCenterCompanyForUser(user));
+  }, [user]);
 
   function changeCompany(value: string) {
     setCompanyId(setActiveCallCenterCompany(value));
     setVersion((current) => current + 1);
   }
 
-  const rows = useMemo(() => getPerformanceRows(), [version]);
-  const summary = useMemo(() => getCallCenterSummary(), [version]);
+  const rows = useMemo(() => getPerformanceRows(user), [user, version]);
+  const summary = useMemo(() => getCallCenterSummary(user), [user, version]);
+  const companies = getAssignableCallCenterCompanies(user);
 
   return (
     <div className="space-y-6">
@@ -45,8 +47,8 @@ function PerformanceContent() {
             <p className="mt-1 text-sm font-semibold text-slate-500">Track outsourcing productivity by calls, orders, complaints, payment follow-ups, and revenue.</p>
           </div>
           <select className="form-input max-w-xs" onChange={(event) => changeCompany(event.target.value)} value={companyId}>
-            <option value="all">All Companies</option>
-            {callCenterCompanies.map((company) => (
+            {user.role === "admin" ? <option value="all">All Companies</option> : null}
+            {companies.map((company) => (
               <option key={company.id} value={company.id}>{company.name}</option>
             ))}
           </select>

@@ -37,7 +37,13 @@ import {
   type CallCenterClient,
   type QueueCall
 } from "@/lib/call-center-data";
-import { createOneClickOrder } from "@/lib/call-center-operations";
+import {
+  createOneClickOrder,
+  getCompanyAgents,
+  getCompanyCallbacks,
+  getCompanyClients,
+  getCompanyQueueCalls
+} from "@/lib/call-center-operations";
 import { sendWhatsAppNotification } from "@/lib/notificationService";
 import { getProducts, type ProductMaster } from "@/lib/products-data";
 
@@ -68,12 +74,12 @@ function QueueContent({ user }: { user: SessionUser }) {
   }, []);
 
   function refresh() {
-    const loadedCalls = getQueueCalls();
+    const loadedCalls = getCompanyQueueCalls(user);
     setCalls(loadedCalls);
-    setAgents(getAgents());
-    setClients(getCallCenterClients());
-    setMissedCalls(getMissedCalls());
-    setCallbacks(getCallbacks());
+    setAgents(getCompanyAgents(user));
+    setClients(getCompanyClients(user));
+    setMissedCalls(getMissedCalls().filter((call) => !call.clientId || getCompanyClients(user).some((client) => client.id === call.clientId)));
+    setCallbacks(getCompanyCallbacks(user));
     setProducts(getProducts());
     setSelectedCallId((current) => current || loadedCalls.find((call) => call.status === "Active")?.id || "");
   }
@@ -105,32 +111,37 @@ function QueueContent({ user }: { user: SessionUser }) {
       return;
     }
     const agentName = agent?.name ?? user.displayName;
-    setCalls(acceptQueueCall(call.id, agentName));
+    acceptQueueCall(call.id, agentName);
+    setCalls(getCompanyQueueCalls(user));
     setSelectedCallId(call.id);
     setMessage(`${call.clientName} accepted by ${agentName}.`);
-    setAgents(getAgents());
+    setAgents(getCompanyAgents(user));
   }
 
   function queueCall(call: QueueCall) {
-    setCalls(sendCallToQueue(call.id));
+    sendCallToQueue(call.id);
+    setCalls(getCompanyQueueCalls(user));
     setMessage("Call sent to waiting queue.");
   }
 
   function missCall(call: QueueCall) {
-    setCalls(markCallMissed(call.id, "Rejected or missed by call center"));
-    setMissedCalls(getMissedCalls());
+    markCallMissed(call.id, "Rejected or missed by call center");
+    setCalls(getCompanyQueueCalls(user));
+    setMissedCalls(getMissedCalls().filter((item) => !item.clientId || clients.some((client) => client.id === item.clientId)));
     setMessage("Call moved to missed calls.");
   }
 
   function closeCall(call: QueueCall) {
-    setCalls(closeActiveCall(call.id, call.assignedAgent ?? user.displayName));
+    closeActiveCall(call.id, call.assignedAgent ?? user.displayName);
+    setCalls(getCompanyQueueCalls(user));
     setMessage("Call closed and added to call history.");
-    setAgents(getAgents());
+    setAgents(getCompanyAgents(user));
   }
 
   function handleTransfer(call: QueueCall, team: QueueCall["transferTo"]) {
     if (!team) return;
-    setCalls(transferCall(call.id, team, user.displayName));
+    transferCall(call.id, team, user.displayName);
+    setCalls(getCompanyQueueCalls(user));
     setMessage(`Call transferred to ${team}.`);
   }
 

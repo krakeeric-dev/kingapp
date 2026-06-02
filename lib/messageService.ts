@@ -8,6 +8,7 @@ import {
   type CallCenterClient
 } from "@/lib/call-center-data";
 import { getClientOrders } from "@/lib/client-portal-data";
+import { canAccessCompany, getCompanyWorkspaceId } from "@/lib/companies-data";
 
 export type MessageStatus = "delivered" | "read";
 export type MessageType = "Text" | "Image" | "File" | "Voice note" | "System notification";
@@ -16,6 +17,7 @@ export type NotificationChannel = "Internal" | "SMS" | "WhatsApp" | "Email";
 
 export type Conversation = {
   id: string;
+  companyId?: string;
   title: string;
   company: string;
   clientName: string;
@@ -226,6 +228,7 @@ export function getConversations(): Conversation[] {
   const fallback: Conversation[] = [
     {
       id: "CONV-001",
+      companyId: "COMP-AGAHOZO",
       title: "Kigali Mart",
       company: "Agahozo Water",
       clientName: "Kigali Mart",
@@ -237,6 +240,7 @@ export function getConversations(): Conversation[] {
     },
     {
       id: "CONV-002",
+      companyId: "COMP-AGAHOZO",
       title: "Manager Desk",
       company: "Agahozo Water",
       clientName: "Internal",
@@ -248,6 +252,7 @@ export function getConversations(): Conversation[] {
     },
     {
       id: "CONV-003",
+      companyId: "COMP-TEJU",
       title: "Teju Juice Orders",
       company: "Teju Juice",
       clientName: "Green Valley Bar",
@@ -265,6 +270,7 @@ export function getConversations(): Conversation[] {
     const existing = derived.get(id);
     derived.set(id, {
       id,
+      companyId: existing?.companyId ?? companyIdFromName(message.companyName),
       title: existing?.title ?? message.subject,
       company: message.companyName ?? existing?.company ?? "Agahozo Water",
       clientName: existing?.clientName ?? message.toUser,
@@ -277,6 +283,52 @@ export function getConversations(): Conversation[] {
   });
 
   return Array.from(derived.values()).sort((first, second) => Number(second.pinned) - Number(first.pinned) || second.updatedAt.localeCompare(first.updatedAt));
+}
+
+function companyIdFromName(companyName?: string) {
+  if (!companyName) return undefined;
+  return {
+    "Agahozo Water": "COMP-AGAHOZO",
+    "Teju Juice": "COMP-TEJU",
+    "King Honey": "COMP-KING-HONEY",
+    "King Eggs": "COMP-KING-EGGS"
+  }[companyName];
+}
+
+export function getConversationsForUser(user: SessionUser) {
+  const workspaceId = getCompanyWorkspaceId(user);
+  return getConversations().filter((conversation) => {
+    if (workspaceId !== "all") return conversation.companyId === workspaceId;
+    return canAccessCompany(user, conversation.companyId);
+  });
+}
+
+export function getMessagesForUser(user: SessionUser) {
+  const allowedConversationIds = new Set(getConversationsForUser(user).map((conversation) => conversation.id));
+  return getMessages().filter((message) => {
+    if (message.conversationId && allowedConversationIds.has(message.conversationId)) return true;
+    const companyId = companyIdFromName(message.companyName);
+    return canAccessCompany(user, companyId);
+  });
+}
+
+export function getNotificationsForUser(user: SessionUser) {
+  return getInternalNotifications().filter((notification) => {
+    const companyId = companyIdFromName((notification as { companyName?: string }).companyName);
+    if (!companyId) return user.role === "admin";
+    return canAccessCompany(user, companyId);
+  });
+}
+
+export function getAnnouncementsForUser(user: SessionUser) {
+  const workspaceId = getCompanyWorkspaceId(user);
+  return getAnnouncements().filter((announcement) => {
+    if (announcement.audience === "All" || announcement.audience === "All users" || announcement.audience === "Call Center" || announcement.audience === "Agents") return true;
+    const companyId = companyIdFromName(announcement.companyName);
+    if (!companyId) return user.role === "admin" || announcement.audience === "Managers";
+    if (workspaceId !== "all") return companyId === workspaceId;
+    return canAccessCompany(user, companyId);
+  });
 }
 
 export function markMessageRead(messageId: string) {
@@ -340,9 +392,9 @@ export function createInternalNotification(input: Omit<InternalNotification, "ch
 
 export function getMessagingDashboardStats(user: SessionUser) {
   const today = new Date().toISOString().slice(0, 10);
-  const messages = getMessages();
-  const notifications = getInternalNotifications();
-  const announcements = getAnnouncements();
+  const messages = getMessagesForUser(user);
+  const notifications = getNotificationsForUser(user);
+  const announcements = getAnnouncementsForUser(user);
   const visibleMessages = user.role === "callcenter"
     ? messages.filter((message) => message.toUser === user.displayName || message.fromUser === user.displayName || message.toRole === "callcenter")
     : messages;
@@ -355,7 +407,7 @@ export function getMessagingDashboardStats(user: SessionUser) {
     unreadMessages: visibleMessages.filter((message) => message.status !== "read").length,
     announcements: announcements.length,
     urgentAlerts: visibleNotifications.filter((notification) => notification.priority === "Urgent" || notification.priority === "High").length,
-    activeChats: getConversations().filter((conversation) => conversation.updatedAt.slice(0, 10) === today || conversation.unreadCount > 0).length,
+    activeChats: getConversationsForUser(user).filter((conversation) => conversation.updatedAt.slice(0, 10) === today || conversation.unreadCount > 0).length,
     responseTime: "4m"
   };
 }

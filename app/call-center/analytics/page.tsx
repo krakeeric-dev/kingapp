@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, Clock, Headphones, MessageSquareWarning, PhoneCall, PhoneMissed, ShoppingCart, WalletCards } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
+import type { SessionUser } from "@/lib/auth";
 import { getAgents, getAverageWaitSeconds, getCallLogs, getComplaints, getPaymentFollowUps, getPendingOrders, getQueueCalls } from "@/lib/call-center-data";
+import { getCompanyAgents, getCompanyClients, getCompanyComplaints, getCompanyOrders, getCompanyPayments, getCompanyQueueCalls } from "@/lib/call-center-operations";
 import { getCallRecordings, type CallRecording } from "@/lib/telephonyService";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -12,12 +14,12 @@ const secondsLabel = (seconds: number) => `${Math.floor(seconds / 60)}m ${second
 export default function CallAnalyticsPage() {
   return (
     <CallCenterShell title="Call Analytics" subtitle="Performance & Conversion">
-      <AnalyticsContent />
+      {(user) => <AnalyticsContent user={user} />}
     </CallCenterShell>
   );
 }
 
-function AnalyticsContent() {
+function AnalyticsContent({ user }: { user: SessionUser }) {
   const [logs, setLogs] = useState<ReturnType<typeof getCallLogs>>([]);
   const [calls, setCalls] = useState<ReturnType<typeof getQueueCalls>>([]);
   const [orders, setOrders] = useState<ReturnType<typeof getPendingOrders>>([]);
@@ -27,14 +29,15 @@ function AnalyticsContent() {
   const [recordings, setRecordings] = useState<CallRecording[]>([]);
 
   useEffect(() => {
-    setLogs(getCallLogs());
-    setCalls(getQueueCalls());
-    setOrders(getPendingOrders());
-    setPayments(getPaymentFollowUps());
-    setComplaints(getComplaints());
-    setAgents(getAgents());
+    const clients = getCompanyClients(user);
+    setLogs(getCallLogs().filter((log) => clients.some((client) => client.id === log.clientId)));
+    setCalls(getCompanyQueueCalls(user));
+    setOrders(getCompanyOrders(user));
+    setPayments(getCompanyPayments(user));
+    setComplaints(getCompanyComplaints(user));
+    setAgents(getCompanyAgents(user));
     setRecordings(getCallRecordings());
-  }, []);
+  }, [user]);
 
   const todaysLogs = logs.filter((log) => log.date === today());
   const metrics = useMemo(() => ({

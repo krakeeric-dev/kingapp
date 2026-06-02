@@ -30,10 +30,11 @@ import {
   useIsMobileScreen
 } from "@/components/CallCenterDesktopOnly";
 import type { SessionUser } from "@/lib/auth";
-import { getAgents, getQueueCalls } from "@/lib/call-center-data";
 import {
-  callCenterCompanies,
-  getActiveCallCenterCompany,
+  getActiveCallCenterCompanyForUser,
+  getAssignableCallCenterCompanies,
+  getCompanyAgents,
+  getCompanyQueueCalls,
   setActiveCallCenterCompany
 } from "@/lib/call-center-operations";
 import { canAccessPage } from "@/lib/permissions";
@@ -104,13 +105,13 @@ export function CallCenterShell({
     }
 
     setUser(session);
-    setActiveCompany(getActiveCallCenterCompany());
+    setActiveCompany(getActiveCallCenterCompanyForUser(session));
     setCallsInQueue(
-      getQueueCalls().filter(
+      getCompanyQueueCalls(session).filter(
         (call) => call.status === "Waiting" || call.status === "Incoming"
       ).length
     );
-    setAgentsOnline(getAgents().filter((agent) => agent.status !== "Offline").length);
+    setAgentsOnline(getCompanyAgents(session).filter((agent) => agent.status !== "Offline").length);
   }, [pathname, router]);
 
   function changeCompany(companyId: string) {
@@ -124,6 +125,13 @@ export function CallCenterShell({
   if (isMobileScreen) {
     return <CallCenterMobileBlock />;
   }
+
+  const allowedCompanies = getAssignableCallCenterCompanies(user);
+  const canSwitchCompanies = user.role === "admin" || allowedCompanies.length > 1;
+  const activeCompanyName =
+    activeCompany === "all"
+      ? "All Companies"
+      : allowedCompanies.find((company) => company.id === activeCompany)?.name ?? user.companyName;
 
   return (
     <main className="min-h-screen bg-[#f3f6fb] text-slate-950">
@@ -185,18 +193,23 @@ export function CallCenterShell({
                 <TopMetric icon={PhoneCall} label="Connected" tone="green" value="00:03:12" />
                 <TopMetric label="Calls in Queue" value={callsInQueue.toLocaleString()} />
                 <TopMetric dot label="Agents Online" value={agentsOnline.toLocaleString()} />
-                {user.role === "admin" || user.role === "manager" ? (
-                  <select
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-slate-700 outline-none"
-                    onChange={(event) => changeCompany(event.target.value)}
-                    value={activeCompany}
-                  >
-                    <option value="all">All Companies</option>
-                    {callCenterCompanies.map((company) => (
-                      <option key={company.id} value={company.id}>{company.name}</option>
-                    ))}
-                  </select>
-                ) : null}
+                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                  <p className="text-[11px] font-black uppercase text-slate-400">Working For</p>
+                  {canSwitchCompanies ? (
+                    <select
+                      className="mt-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-black text-slate-700 outline-none"
+                      onChange={(event) => changeCompany(event.target.value)}
+                      value={activeCompany}
+                    >
+                      {user.role === "admin" ? <option value="all">All Companies</option> : null}
+                      {allowedCompanies.map((company) => (
+                        <option key={company.id} value={company.id}>{company.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="mt-1 text-sm font-black text-slate-950">{activeCompanyName}</p>
+                  )}
+                </div>
                 <button className="relative rounded-lg p-2 text-slate-700 hover:bg-slate-100" type="button">
                   <Bell className="h-5 w-5" />
                   <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white">

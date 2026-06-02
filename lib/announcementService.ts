@@ -1,7 +1,7 @@
 import type { SessionUser } from "@/lib/auth";
 import {
   createAnnouncement,
-  getAnnouncements,
+  getAnnouncementsForUser,
   type AnnouncementPriority,
   type TeamAnnouncement
 } from "@/lib/messageService";
@@ -41,8 +41,9 @@ function normalizeAudience(audience: TeamAnnouncement["audience"]): Announcement
   return audience;
 }
 
-export function getAnnouncementCenterItems(): AnnouncementCenterItem[] {
-  return getAnnouncements().map((announcement, index) => ({
+export function getAnnouncementCenterItems(user?: SessionUser): AnnouncementCenterItem[] {
+  const announcements = user ? getAnnouncementsForUser(user) : getAnnouncementsForUser({ role: "admin", companyId: "all", assignedCompanies: ["all"] } as SessionUser);
+  return announcements.map((announcement, index) => ({
     ...announcement,
     audience: normalizeAudience(announcement.audience),
     readCount: announcement.readCount ?? Math.max(8, 42 - index * 5)

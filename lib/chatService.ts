@@ -1,4 +1,5 @@
 import type { SessionUser } from "@/lib/auth";
+import { canAccessCompany, getCompanyWorkspaceId } from "@/lib/companies-data";
 
 export type ChatMessage = {
   id: string;
@@ -19,6 +20,7 @@ export type ChatMessage = {
 export type ChatChannel = {
   id: string;
   name: string;
+  companyId?: string;
   companyName?: string;
   onlineCount: number;
   unreadCount: number;
@@ -33,10 +35,10 @@ export const chatChannels: ChatChannel[] = [
   { id: "storekeepers", name: "#storekeepers", onlineCount: 3, unreadCount: 1 },
   { id: "accounting", name: "#accounting", onlineCount: 2, unreadCount: 0 },
   { id: "call-center", name: "#call-center", onlineCount: 8, unreadCount: 4 },
-  { id: "agahozo-water", name: "#agahozo-water", companyName: "Agahozo Water", onlineCount: 7, unreadCount: 3 },
-  { id: "teju-juice", name: "#teju-juice", companyName: "Teju Juice", onlineCount: 4, unreadCount: 1 },
-  { id: "king-honey", name: "#king-honey", companyName: "King Honey", onlineCount: 3, unreadCount: 0 },
-  { id: "king-eggs", name: "#king-eggs", companyName: "King Eggs", onlineCount: 3, unreadCount: 2 }
+  { id: "agahozo-water", name: "#agahozo-water", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", onlineCount: 7, unreadCount: 3 },
+  { id: "teju-juice", name: "#teju-juice", companyId: "COMP-TEJU", companyName: "Teju Juice", onlineCount: 4, unreadCount: 1 },
+  { id: "king-honey", name: "#king-honey", companyId: "COMP-KING-HONEY", companyName: "King Honey", onlineCount: 3, unreadCount: 0 },
+  { id: "king-eggs", name: "#king-eggs", companyId: "COMP-KING-EGGS", companyName: "King Eggs", onlineCount: 3, unreadCount: 2 }
 ];
 
 const seedMessages: ChatMessage[] = [
@@ -92,6 +94,20 @@ export function getChatMessages() {
   const messages = readJson<ChatMessage[]>(CHAT_KEY, seedMessages);
   writeJson(CHAT_KEY, messages);
   return messages;
+}
+
+export function getChatChannelsForUser(user: SessionUser) {
+  const workspaceId = getCompanyWorkspaceId(user);
+  return chatChannels.filter((channel) => {
+    if (!channel.companyId) return true;
+    if (workspaceId !== "all") return channel.companyId === workspaceId;
+    return canAccessCompany(user, channel.companyId);
+  });
+}
+
+export function getChatMessagesForUser(user: SessionUser) {
+  const allowedChannels = new Set(getChatChannelsForUser(user).map((channel) => channel.id));
+  return getChatMessages().filter((message) => allowedChannels.has(message.channelId));
 }
 
 export function sendChatMessage(input: Pick<ChatMessage, "attachmentName" | "body" | "channelId" | "mention" | "replyToId">, user: SessionUser) {

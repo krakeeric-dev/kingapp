@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PhoneCall, PhoneMissed, RefreshCw } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
+import type { SessionUser } from "@/lib/auth";
 import {
   addCallback,
   getMissedCalls,
@@ -10,24 +11,26 @@ import {
   type MissedCall,
   type MissedCallStatus
 } from "@/lib/call-center-data";
+import { getCompanyClients } from "@/lib/call-center-operations";
 
 const statuses: MissedCallStatus[] = ["Not Called Back", "Called Back", "No Answer", "Converted to Order"];
 
 export default function MissedCallsPage() {
   return (
     <CallCenterShell title="Missed Calls" subtitle="Callback Recovery Desk">
-      {() => <MissedCallsContent />}
+      {(user) => <MissedCallsContent user={user} />}
     </CallCenterShell>
   );
 }
 
-function MissedCallsContent() {
+function MissedCallsContent({ user }: { user: SessionUser }) {
   const [calls, setCalls] = useState<MissedCall[]>([]);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    setCalls(getMissedCalls());
-  }, []);
+    const clients = getCompanyClients(user);
+    setCalls(getMissedCalls().filter((call) => !call.clientId || clients.some((client) => client.id === call.clientId)));
+  }, [user]);
 
   const summary = useMemo(
     () => ({
@@ -39,7 +42,9 @@ function MissedCallsContent() {
   );
 
   function setStatus(callId: string, status: MissedCallStatus) {
-    setCalls(updateMissedCallStatus(callId, status));
+    updateMissedCallStatus(callId, status);
+    const clients = getCompanyClients(user);
+    setCalls(getMissedCalls().filter((call) => !call.clientId || clients.some((client) => client.id === call.clientId)));
   }
 
   function createCallback(call: MissedCall) {
@@ -54,7 +59,9 @@ function MissedCallsContent() {
       priority: "High",
       status: "Pending"
     });
-    setCalls(updateMissedCallStatus(call.id, "Called Back"));
+    updateMissedCallStatus(call.id, "Called Back");
+    const clients = getCompanyClients(user);
+    setCalls(getMissedCalls().filter((item) => !item.clientId || clients.some((client) => client.id === item.clientId)));
     setMessage("Callback created and missed call marked Called Back.");
   }
 

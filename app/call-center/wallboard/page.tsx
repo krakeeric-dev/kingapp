@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Activity, Headphones, MessageSquareWarning, PhoneOff, ShoppingCart, UsersRound, WalletCards } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
+import type { SessionUser } from "@/lib/auth";
 import { getCallCenterSummary } from "@/lib/call-center-operations";
 import { formatMoney } from "@/lib/sales-data";
 
@@ -11,12 +12,12 @@ type Summary = ReturnType<typeof getCallCenterSummary>;
 export default function CallCenterWallboardPage() {
   return (
     <CallCenterShell title="Call Center Wallboard" subtitle="Live TV Operations Display">
-      <WallboardContent />
+      {(user) => <WallboardContent user={user} />}
     </CallCenterShell>
   );
 }
 
-function WallboardContent() {
+function WallboardContent({ user }: { user: SessionUser }) {
   const [summary, setSummary] = useState<Summary>(() => ({
     totalCalls: 0,
     totalOrders: 0,
@@ -34,13 +35,13 @@ function WallboardContent() {
 
   useEffect(() => {
     function refresh() {
-      setSummary(getCallCenterSummary());
+      setSummary(getCallCenterSummary(user));
       setUpdatedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
     }
     refresh();
     const interval = window.setInterval(refresh, 10_000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [user]);
 
   return (
     <div className="min-h-[calc(100vh-150px)] rounded-2xl bg-[#061b33] p-6 text-white shadow-2xl">

@@ -225,6 +225,7 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
         role: "callcenter",
         companyId: existingCall.companyId ?? "COMP-AGAHOZO",
         companyName: existingCall.companyName ?? "Agahozo Water",
+        assignedCompanies: [existingCall.companyId ?? "COMP-AGAHOZO"],
         phone: "",
         email: "",
         status: "active",

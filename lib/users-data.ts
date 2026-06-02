@@ -17,6 +17,7 @@ export type PlatformUser = {
   role: UserRole;
   companyId: string;
   companyName: string;
+  assignedCompanies: string[];
   phone: string;
   email: string;
   status: UserStatus;
@@ -38,6 +39,7 @@ export const defaultUsers: PlatformUser[] = [
     role: "admin",
     companyId: "all",
     companyName: "All Companies",
+    assignedCompanies: ["all"],
     phone: "",
     email: "admin@kingapp.local",
     status: "active",
@@ -53,6 +55,7 @@ export const defaultUsers: PlatformUser[] = [
     role: "supervisor",
     companyId: defaultCompanyId,
     companyName: defaultCompanyName,
+    assignedCompanies: [defaultCompanyId],
     phone: "",
     email: "supervisor@kingapp.local",
     status: "active",
@@ -68,6 +71,7 @@ export const defaultUsers: PlatformUser[] = [
     role: "storekeeper",
     companyId: defaultCompanyId,
     companyName: defaultCompanyName,
+    assignedCompanies: [defaultCompanyId],
     phone: "",
     email: "storekeeper@kingapp.local",
     status: "active",
@@ -83,6 +87,7 @@ export const defaultUsers: PlatformUser[] = [
     role: "accountant",
     companyId: defaultCompanyId,
     companyName: defaultCompanyName,
+    assignedCompanies: [defaultCompanyId],
     phone: "",
     email: "accountant@kingapp.local",
     status: "active",
@@ -98,6 +103,7 @@ export const defaultUsers: PlatformUser[] = [
     role: "manager",
     companyId: defaultCompanyId,
     companyName: defaultCompanyName,
+    assignedCompanies: [defaultCompanyId, "COMP-TEJU"],
     phone: "",
     email: "manager@kingapp.local",
     status: "active",
@@ -113,6 +119,7 @@ export const defaultUsers: PlatformUser[] = [
     role: "marketer",
     companyId: defaultCompanyId,
     companyName: defaultCompanyName,
+    assignedCompanies: [defaultCompanyId],
     phone: "",
     email: "marketer1@kingapp.local",
     status: "active",
@@ -128,8 +135,57 @@ export const defaultUsers: PlatformUser[] = [
     role: "callcenter",
     companyId: defaultCompanyId,
     companyName: defaultCompanyName,
+    assignedCompanies: [defaultCompanyId],
     phone: "",
     email: "callcenter@kingapp.local",
+    status: "active",
+    createdAt: DEFAULT_CREATED_AT,
+    updatedAt: DEFAULT_CREATED_AT
+  },
+  {
+    id: "USER-AGAHOZO-AGENT",
+    username: "agahozo_agent",
+    password: "agahozo123",
+    name: "Agahozo Agent",
+    displayName: "Agahozo Agent",
+    role: "callcenter",
+    companyId: defaultCompanyId,
+    companyName: defaultCompanyName,
+    assignedCompanies: [defaultCompanyId],
+    phone: "",
+    email: "agahozo.agent@kingapp.local",
+    status: "active",
+    createdAt: DEFAULT_CREATED_AT,
+    updatedAt: DEFAULT_CREATED_AT
+  },
+  {
+    id: "USER-TEJU-AGENT",
+    username: "teju_agent",
+    password: "teju123",
+    name: "Teju Agent",
+    displayName: "Teju Agent",
+    role: "callcenter",
+    companyId: "COMP-TEJU",
+    companyName: "Teju Juice",
+    assignedCompanies: ["COMP-TEJU"],
+    phone: "",
+    email: "teju.agent@kingapp.local",
+    status: "active",
+    createdAt: DEFAULT_CREATED_AT,
+    updatedAt: DEFAULT_CREATED_AT
+  },
+  {
+    id: "USER-MULTI-AGENT",
+    username: "multi_agent",
+    password: "multi123",
+    name: "Multi Company Agent",
+    displayName: "Multi Company Agent",
+    role: "callcenter",
+    companyId: defaultCompanyId,
+    companyName: defaultCompanyName,
+    assignedCompanies: [defaultCompanyId, "COMP-TEJU"],
+    phone: "",
+    email: "multi.agent@kingapp.local",
     status: "active",
     createdAt: DEFAULT_CREATED_AT,
     updatedAt: DEFAULT_CREATED_AT
@@ -206,6 +262,7 @@ function normalizeUser(user: LegacyUser): PlatformUser {
       user.companyName ??
       defaultUser?.companyName ??
       getCompanyName(user.companyId ?? defaultCompanyId),
+    assignedCompanies: user.assignedCompanies ?? defaultUser?.assignedCompanies ?? [user.companyId ?? defaultCompanyId],
     phone: user.phone ?? "",
     email: user.email ?? "",
     status: user.status ?? "active",
@@ -228,6 +285,7 @@ function ensureDefaultUsers(users: PlatformUser[]) {
         ...defaultUser,
         ...mergedUsers[existingIndex],
         password: mergedUsers[existingIndex].password || defaultUser.password,
+        assignedCompanies: mergedUsers[existingIndex].assignedCompanies?.length ? mergedUsers[existingIndex].assignedCompanies : defaultUser.assignedCompanies,
         status: mergedUsers[existingIndex].status || "active"
       };
     } else {
@@ -321,7 +379,7 @@ export function createUser(
 
 export function updateUser(
   username: string,
-  input: Pick<PlatformUser, "displayName" | "role" | "phone" | "email" | "status" | "companyId">,
+  input: Pick<PlatformUser, "assignedCompanies" | "displayName" | "role" | "phone" | "email" | "status" | "companyId">,
   admin: SessionUser
 ) {
   const users = getUsers();

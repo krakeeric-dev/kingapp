@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { ArrowRightLeft, Delete, MicOff, Pause, Phone, PhoneCall, PhoneOff, Play, UserRound } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
-import { getAgents } from "@/lib/call-center-data";
+import type { SessionUser } from "@/lib/auth";
+import { getCompanyAgents } from "@/lib/call-center-operations";
 import { handleMockPhoneWebhook } from "@/lib/callWebhookHandler";
 import { defaultSoftphoneState, mockSoftphoneAction, type SoftphoneState } from "@/lib/softphoneService";
 import { appendTelephonyAudit } from "@/lib/telephonyAudit";
@@ -14,12 +15,12 @@ const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "+", "0", "#"];
 export default function SoftphonePage() {
   return (
     <CallCenterShell title="Browser Softphone" subtitle="Mock Calling Panel">
-      <SoftphoneContent />
+      {(user) => <SoftphoneContent user={user} />}
     </CallCenterShell>
   );
 }
 
-function SoftphoneContent() {
+function SoftphoneContent({ user }: { user: SessionUser }) {
   const [state, setState] = useState<SoftphoneState>(defaultSoftphoneState);
   const [message, setMessage] = useState("");
   const [recognized, setRecognized] = useState<ReturnType<typeof recognizeClientByPhone>>(null);
@@ -30,11 +31,11 @@ function SoftphoneContent() {
   useEffect(() => {
     setState((current) => ({
       ...current,
-      agentStatus: getAgents().find((agent) => agent.status !== "Offline")?.status ?? "Available"
+      agentStatus: getCompanyAgents(user).find((agent) => agent.status !== "Offline")?.status ?? "Available"
     }));
     const settings = getTelephonySettings();
     setProviderStatus(`${settings.provider} - ${settings.recordingEnabled ? "recording enabled" : "recording off"}`);
-  }, []);
+  }, [user]);
 
   function append(value: string) {
     setState((current) => ({ ...current, callerId: `${current.callerId}${value}` }));

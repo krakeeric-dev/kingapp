@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRightLeft, Clock, Headphones, Pause, PhoneCall, PhoneMissed, Server, Siren, UserCheck } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
-import { getAgents, getAverageWaitSeconds, getCallDuration, getCallCenterClients, getMissedCalls, getQueueCalls, transferCall, type QueueCall } from "@/lib/call-center-data";
+import type { SessionUser } from "@/lib/auth";
+import { getAgents, getAverageWaitSeconds, getCallDuration, getMissedCalls, transferCall, type QueueCall } from "@/lib/call-center-data";
+import { getCompanyAgents, getCompanyClients, getCompanyQueueCalls } from "@/lib/call-center-operations";
 import { getTelephonyAudit } from "@/lib/telephonyAudit";
 import { getTelephonySettings } from "@/lib/telephonyService";
 
@@ -12,12 +14,12 @@ const secondsLabel = (seconds: number) => `${Math.floor(seconds / 60)}m ${second
 export default function LiveMonitorPage() {
   return (
     <CallCenterShell title="Live Call Monitor" subtitle="Manager Monitoring View">
-      <LiveMonitorContent />
+      {(user) => <LiveMonitorContent user={user} />}
     </CallCenterShell>
   );
 }
 
-function LiveMonitorContent() {
+function LiveMonitorContent({ user }: { user: SessionUser }) {
   const [calls, setCalls] = useState<QueueCall[]>([]);
   const [agents, setAgents] = useState<ReturnType<typeof getAgents>>([]);
   const [priority, setPriority] = useState<Record<string, boolean>>({});
@@ -30,11 +32,11 @@ function LiveMonitorContent() {
     refresh();
     const interval = window.setInterval(refresh, 5000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [user]);
 
   function refresh() {
-    setCalls(getQueueCalls());
-    setAgents(getAgents());
+    setCalls(getCompanyQueueCalls(user));
+    setAgents(getCompanyAgents(user));
     const settings = getTelephonySettings();
     setProviderStatus(`${settings.provider} - ${settings.webhookUrl || "/api/telephony/webhook"}`);
     setWebhookEvents(getTelephonyAudit().filter((entry) => entry.action === "webhook_received" || entry.action === "provider_action"));
@@ -48,12 +50,13 @@ function LiveMonitorContent() {
     available: agents.filter((agent) => agent.status === "Available").length,
     waiting: waiting.length,
     hold: calls.filter((call) => call.notes.some((note) => note.toLowerCase().includes("hold"))).length,
-    missed: getMissedCalls().length,
+    missed: getMissedCalls().filter((call) => !call.clientId || getCompanyClients(user).some((client) => client.id === call.clientId)).length,
     averageWait: secondsLabel(getAverageWaitSeconds(calls))
   }), [active.length, agents, calls, waiting.length]);
 
   function transfer(call: QueueCall) {
-    setCalls(transferCall(call.id, "Supervisor", "Manager Monitor"));
+    transferCall(call.id, "Supervisor", "Manager Monitor");
+    setCalls(getCompanyQueueCalls(user));
     setMessage(`${call.clientName} transferred to Supervisor.`);
   }
 

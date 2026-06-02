@@ -3,15 +3,15 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { CalendarClock, CheckCircle2, Clock, Siren } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
+import type { SessionUser } from "@/lib/auth";
 import {
   addCallback,
-  getCallbacks,
-  getCallCenterClients,
   updateCallbackStatus,
   type CallbackItem,
   type CallbackPriority,
   type CallCenterClient
 } from "@/lib/call-center-data";
+import { getCompanyCallbacks, getCompanyClients } from "@/lib/call-center-operations";
 
 const priorities: CallbackPriority[] = ["Low", "Medium", "High", "Urgent"];
 const statuses: CallbackItem["status"][] = ["Pending", "Done", "No Answer", "Converted to Order"];
@@ -19,20 +19,20 @@ const statuses: CallbackItem["status"][] = ["Pending", "Done", "No Answer", "Con
 export default function CallbacksPage() {
   return (
     <CallCenterShell title="Callback List" subtitle="Follow-up Scheduler">
-      {() => <CallbacksContent />}
+      {(user) => <CallbacksContent user={user} />}
     </CallCenterShell>
   );
 }
 
-function CallbacksContent() {
+function CallbacksContent({ user }: { user: SessionUser }) {
   const [callbacks, setCallbacks] = useState<CallbackItem[]>([]);
   const [clients, setClients] = useState<CallCenterClient[]>([]);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    setCallbacks(getCallbacks());
-    setClients(getCallCenterClients());
-  }, []);
+    setCallbacks(getCompanyCallbacks(user));
+    setClients(getCompanyClients(user));
+  }, [user]);
 
   const summary = useMemo(
     () => ({
@@ -45,7 +45,8 @@ function CallbacksContent() {
   );
 
   function setStatus(callbackId: string, status: CallbackItem["status"]) {
-    setCallbacks(updateCallbackStatus(callbackId, status));
+    updateCallbackStatus(callbackId, status);
+    setCallbacks(getCompanyCallbacks(user));
   }
 
   function createCallback(event: FormEvent<HTMLFormElement>) {
@@ -54,8 +55,7 @@ function CallbacksContent() {
     const client = clients.find((item) => item.id === String(form.get("clientId")));
     if (!client) return;
 
-    setCallbacks(
-      addCallback({
+    addCallback({
         clientId: client.id,
         clientName: client.clientName,
         phone: client.phone,
@@ -65,8 +65,8 @@ function CallbacksContent() {
         assignedAgent: String(form.get("assignedAgent") ?? ""),
         priority: String(form.get("priority") ?? "Medium") as CallbackPriority,
         status: "Pending"
-      })
-    );
+      });
+    setCallbacks(getCompanyCallbacks(user));
     event.currentTarget.reset();
     setMessage("Callback scheduled.");
   }

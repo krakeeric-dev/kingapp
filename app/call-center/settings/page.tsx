@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { KeyRound, PhoneCall, Save, Server, ShieldCheck } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
 import { getAgents, type AgentPhoneType } from "@/lib/call-center-data";
+import type { SessionUser } from "@/lib/auth";
+import { getCompanyAgents } from "@/lib/call-center-operations";
 import type { TelephonyProvider } from "@/lib/providerAdapters";
 import {
   getDeviceMappings,
@@ -20,12 +22,12 @@ const phoneTypes: AgentPhoneType[] = ["Browser Softphone", "IP Desk Phone", "Mob
 export default function CallCenterSettingsPage() {
   return (
     <CallCenterShell title="Telephony Settings" subtitle="Provider Integration Setup">
-      <SettingsContent />
+      {(user) => <SettingsContent user={user} />}
     </CallCenterShell>
   );
 }
 
-function SettingsContent() {
+function SettingsContent({ user }: { user: SessionUser }) {
   const [settings, setSettings] = useState<TelephonySettings>({
     provider: "Manual Mode",
     providerName: "Manual Mode",
@@ -43,9 +45,9 @@ function SettingsContent() {
 
   useEffect(() => {
     setSettings(getTelephonySettings());
-    setAgents(getAgents());
+    setAgents(getCompanyAgents(user));
     setDevices(getDeviceMappings());
-  }, []);
+  }, [user]);
 
   function update(field: keyof TelephonySettings, value: string | boolean) {
     setSettings((current) => ({ ...current, [field]: value }));

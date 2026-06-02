@@ -18,17 +18,19 @@ import {
 import { CallCenterShell } from "@/components/CallCenterShell";
 import type { SessionUser } from "@/lib/auth";
 import {
-  getCallCenterClients,
   getCallLogs,
-  getComplaints,
-  getPendingOrders,
   type CallCenterClient
 } from "@/lib/call-center-data";
 import {
+  getCompanyClients,
+  getCompanyComplaints,
+  getCompanyOrders
+} from "@/lib/call-center-operations";
+import {
   getClientTimeline,
-  getConversations,
-  getInternalNotifications,
-  getMessages,
+  getConversationsForUser,
+  getMessagesForUser,
+  getNotificationsForUser,
   sendConversationMessage,
   type Conversation,
   type InternalMessage,
@@ -58,11 +60,11 @@ function MessagesContent({ user }: { user: SessionUser }) {
   });
 
   useEffect(() => {
-    const loadedConversations = getConversations();
+    const loadedConversations = getConversationsForUser(user);
     setConversations(loadedConversations);
-    setMessages(getMessages());
+    setMessages(getMessagesForUser(user));
     setSelectedId(loadedConversations[0]?.id ?? "");
-  }, []);
+  }, [user]);
 
   const filteredConversations = useMemo(() => {
     const userSearch = query.trim().toLowerCase();
@@ -75,15 +77,15 @@ function MessagesContent({ user }: { user: SessionUser }) {
   }, [companyQuery, conversations, query]);
 
   const selectedConversation = conversations.find((conversation) => conversation.id === selectedId) ?? filteredConversations[0];
-  const clients = getCallCenterClients();
+  const clients = getCompanyClients(user);
   const selectedClient = findConversationClient(selectedConversation, clients);
   const threadMessages = messages
     .filter((message) => message.conversationId === selectedConversation?.id)
     .sort((first, second) => first.createdAt.localeCompare(second.createdAt));
-  const notifications = getInternalNotifications();
+  const notifications = getNotificationsForUser(user);
   const timeline = selectedClient ? getClientTimeline(selectedClient) : [];
-  const orders = selectedClient ? getPendingOrders().filter((order) => order.clientId === selectedClient.id) : [];
-  const complaints = selectedClient ? getComplaints().filter((complaint) => complaint.clientId === selectedClient.id) : [];
+  const orders = selectedClient ? getCompanyOrders(user).filter((order) => order.clientId === selectedClient.id) : [];
+  const complaints = selectedClient ? getCompanyComplaints(user).filter((complaint) => complaint.clientId === selectedClient.id) : [];
   const callHistory = selectedClient ? getCallLogs().filter((call) => call.clientId === selectedClient.id) : [];
   const pinnedConversations = filteredConversations.filter((conversation) => conversation.pinned);
   const unreadCount = filteredConversations.reduce((sum, conversation) => sum + conversation.unreadCount, 0);
@@ -105,7 +107,7 @@ function MessagesContent({ user }: { user: SessionUser }) {
       user
     );
     setMessages(nextMessages);
-    setConversations(getConversations());
+    setConversations(getConversationsForUser(user));
     setDraft({ attachmentName: "", body: "", messageType: "Text" });
   }
 

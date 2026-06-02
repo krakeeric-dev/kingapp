@@ -33,6 +33,7 @@ type AddFormState = {
   phone: string;
   email: string;
   companyId: string;
+  assignedCompanies: string[];
   status: UserStatus;
 };
 
@@ -42,6 +43,7 @@ type EditFormState = {
   phone: string;
   email: string;
   companyId: string;
+  assignedCompanies: string[];
   status: UserStatus;
 };
 
@@ -66,6 +68,7 @@ const emptyAddForm: AddFormState = {
   phone: "",
   email: "",
   companyId: "COMP-AGAHOZO",
+  assignedCompanies: ["COMP-AGAHOZO"],
   status: "active"
 };
 
@@ -101,6 +104,33 @@ function UsersContent({ admin }: { admin: SessionUser }) {
 
   function updateAddForm(field: keyof AddFormState, value: string) {
     setAddForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function toggleAddAssignedCompany(companyId: string) {
+    setAddForm((current) => {
+      const next = current.assignedCompanies.includes(companyId)
+        ? current.assignedCompanies.filter((id) => id !== companyId)
+        : [...current.assignedCompanies, companyId];
+      return {
+        ...current,
+        assignedCompanies: next.length ? next : [current.companyId],
+        companyId: next[0] ?? current.companyId
+      };
+    });
+  }
+
+  function toggleEditAssignedCompany(companyId: string) {
+    setEditForm((current) => {
+      if (!current) return current;
+      const next = current.assignedCompanies.includes(companyId)
+        ? current.assignedCompanies.filter((id) => id !== companyId)
+        : [...current.assignedCompanies, companyId];
+      return {
+        ...current,
+        assignedCompanies: next.length ? next : [current.companyId],
+        companyId: next[0] ?? current.companyId
+      };
+    });
   }
 
   function validateAddForm() {
@@ -155,8 +185,9 @@ function UsersContent({ admin }: { admin: SessionUser }) {
         password: addForm.password,
         role: addForm.role as UserRole,
         name: addForm.displayName,
-        companyId: addForm.companyId,
-        companyName: companies.find((company) => company.id === addForm.companyId)?.name ?? "",
+        companyId: addForm.role === "admin" ? "all" : addForm.companyId,
+        companyName: addForm.role === "admin" ? "All Companies" : companies.find((company) => company.id === addForm.companyId)?.name ?? "",
+        assignedCompanies: addForm.role === "admin" ? ["all"] : addForm.role === "callcenter" ? addForm.assignedCompanies : [addForm.companyId],
         phone: addForm.phone,
         email: addForm.email,
         status: addForm.status
@@ -178,6 +209,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
       phone: user.phone,
       email: user.email,
       companyId: user.companyId,
+      assignedCompanies: user.assignedCompanies?.length ? user.assignedCompanies : [user.companyId],
       status: user.status
     });
   }
@@ -212,6 +244,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
         phone: user.phone,
         email: user.email,
         companyId: user.companyId,
+        assignedCompanies: user.assignedCompanies?.length ? user.assignedCompanies : [user.companyId],
         status: user.status === "active" ? "inactive" : "active"
       },
       admin
@@ -376,6 +409,16 @@ function UsersContent({ admin }: { admin: SessionUser }) {
               <option value="inactive">Inactive</option>
             </select>
           </Field>
+          {addForm.role === "callcenter" ? (
+            <div className="lg:col-span-4">
+              <span className="mb-2 block text-sm font-bold text-slate-700">Assigned Companies</span>
+              <CompanyCheckboxes
+                companies={companies}
+                selected={addForm.assignedCompanies}
+                toggle={toggleAddAssignedCompany}
+              />
+            </div>
+          ) : null}
           <div className="lg:col-span-4">
             <button className="primary-button" type="submit">
               <Plus className="h-4 w-4" />
@@ -399,6 +442,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
                 <th>Phone</th>
                 <th>Email</th>
                 <th>Company</th>
+                <th>Assigned Companies</th>
                 <th>Status</th>
                 <th>Created date</th>
                 <th>Actions</th>
@@ -413,6 +457,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
                   <td>{user.phone || "-"}</td>
                   <td>{user.email || "-"}</td>
                   <td>{user.companyName || "-"}</td>
+                  <td>{formatAssignedCompanies(user.assignedCompanies, companies)}</td>
                   <td>
                     <StatusBadge status={user.status} />
                   </td>
@@ -447,6 +492,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
                 <Info label="Phone" value={user.phone || "-"} />
                 <Info label="Email" value={user.email || "-"} />
                 <Info label="Company" value={user.companyName || "-"} />
+                <Info label="Assigned" value={formatAssignedCompanies(user.assignedCompanies, companies)} />
                 <Info label="Created" value={formatDate(user.createdAt.slice(0, 10))} />
               </div>
               <div className="mt-4">
@@ -540,7 +586,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
                 value={editForm.email}
               />
             </Field>
-            <Field label="Status">
+          <Field label="Status">
               <select
                 className="form-input"
                 onChange={(event) =>
@@ -554,8 +600,18 @@ function UsersContent({ admin }: { admin: SessionUser }) {
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
-              </select>
-            </Field>
+            </select>
+          </Field>
+            {editForm.role === "callcenter" ? (
+              <div className="lg:col-span-6">
+                <span className="mb-2 block text-sm font-bold text-slate-700">Assigned Companies</span>
+                <CompanyCheckboxes
+                  companies={companies}
+                  selected={editForm.assignedCompanies}
+                  toggle={toggleEditAssignedCompany}
+                />
+              </div>
+            ) : null}
             <div className="flex flex-col gap-2 sm:flex-row lg:col-span-6">
               <button className="primary-button" type="submit">
                 Save changes
@@ -690,4 +746,38 @@ function Info({ label, value }: { label: string; value: string }) {
       <span className="font-semibold text-slate-900">{value}</span>
     </div>
   );
+}
+
+function CompanyCheckboxes({
+  companies,
+  selected,
+  toggle
+}: {
+  companies: Company[];
+  selected: string[];
+  toggle: (companyId: string) => void;
+}) {
+  return (
+    <div className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-4">
+      {companies.map((company) => (
+        <label className="flex items-center gap-2 text-sm font-bold text-slate-700" key={company.id}>
+          <input
+            checked={selected.includes(company.id)}
+            className="h-4 w-4 rounded border-slate-300 text-brand-700"
+            onChange={() => toggle(company.id)}
+            type="checkbox"
+          />
+          {company.name}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function formatAssignedCompanies(companyIds: string[] | undefined, companies: Company[]) {
+  if (!companyIds?.length) return "-";
+  if (companyIds.includes("all")) return "All Companies";
+  return companyIds
+    .map((companyId) => companies.find((company) => company.id === companyId)?.name ?? companyId)
+    .join(", ");
 }

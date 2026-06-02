@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { MessageSquareWarning } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
+import type { SessionUser } from "@/lib/auth";
 import { getCallCenterSummary, getComplaintCenterRows } from "@/lib/call-center-operations";
 
 type ComplaintRow = ReturnType<typeof getComplaintCenterRows>[number];
@@ -12,19 +13,19 @@ const statuses = ["Open", "Investigating", "Resolved", "Closed"];
 export default function CallCenterComplaintsPage() {
   return (
     <CallCenterShell title="Complaint Center" subtitle="Client Issue Resolution Desk">
-      <ComplaintsContent />
+      {(user) => <ComplaintsContent user={user} />}
     </CallCenterShell>
   );
 }
 
-function ComplaintsContent() {
+function ComplaintsContent({ user }: { user: SessionUser }) {
   const [rows, setRows] = useState<ComplaintRow[]>([]);
 
   useEffect(() => {
-    setRows(getComplaintCenterRows());
-  }, []);
+    setRows(getComplaintCenterRows(user));
+  }, [user]);
 
-  const summary = useMemo(() => getCallCenterSummary(), []);
+  const summary = useMemo(() => getCallCenterSummary(user), [user]);
 
   return (
     <div className="space-y-6">

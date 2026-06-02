@@ -3,29 +3,30 @@
 import { useEffect, useMemo, useState } from "react";
 import { Headphones, PhoneCall, UserCheck, UserRound } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
+import type { SessionUser } from "@/lib/auth";
 import {
-  getAgents,
   updateAgentStatus,
   type AgentStatus,
   type CallCenterAgent
 } from "@/lib/call-center-data";
+import { getCompanyAgents } from "@/lib/call-center-operations";
 
 const statuses: AgentStatus[] = ["Available", "Ringing", "On Call", "Away", "Offline"];
 
 export default function CallCenterAgentsPage() {
   return (
     <CallCenterShell title="Agent Control" subtitle="Availability & Extension Monitor">
-      {() => <AgentsContent />}
+      {(user) => <AgentsContent user={user} />}
     </CallCenterShell>
   );
 }
 
-function AgentsContent() {
+function AgentsContent({ user }: { user: SessionUser }) {
   const [agents, setAgents] = useState<CallCenterAgent[]>([]);
 
   useEffect(() => {
-    setAgents(getAgents());
-  }, []);
+    setAgents(getCompanyAgents(user));
+  }, [user]);
 
   const summary = useMemo(
     () => ({
@@ -38,7 +39,8 @@ function AgentsContent() {
   );
 
   function setStatus(agentId: string, status: AgentStatus) {
-    setAgents(updateAgentStatus(agentId, status));
+    updateAgentStatus(agentId, status);
+    setAgents(getCompanyAgents(user));
   }
 
   return (

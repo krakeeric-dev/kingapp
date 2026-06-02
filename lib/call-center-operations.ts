@@ -22,7 +22,13 @@ import {
 } from "@/lib/client-portal-data";
 import { getActivePrice, getProducts, type ProductMaster } from "@/lib/products-data";
 import { getCallRecordings, type CallRecording } from "@/lib/telephonyService";
-import { getActiveCompanyId, setActiveCompanyId } from "@/lib/companies-data";
+import {
+  filterByAssignedCompanies,
+  getActiveCompanyId,
+  getAssignedCompanyIds,
+  getCompanyWorkspaceId,
+  setActiveCompanyId
+} from "@/lib/companies-data";
 
 export type CallCenterCompany = {
   id: string;
@@ -53,7 +59,7 @@ function companyForIndex(index: number) {
   return callCenterCompanies[index % callCenterCompanies.length];
 }
 
-function companyForClient(client: Pick<CallCenterClient, "id" | "companyId" | "companyName">) {
+export function companyForClient(client: Pick<CallCenterClient, "id" | "companyId" | "companyName">) {
   if (client.companyId && client.companyName) {
     return { id: client.companyId, name: client.companyName };
   }
@@ -62,7 +68,7 @@ function companyForClient(client: Pick<CallCenterClient, "id" | "companyId" | "c
   return { id: company.id, name: company.name };
 }
 
-function companyForAgent(agent: Pick<CallCenterAgent, "id" | "companyId" | "companyName">) {
+export function companyForAgent(agent: Pick<CallCenterAgent, "id" | "companyId" | "companyName">) {
   if (agent.companyId && agent.companyName) {
     return { id: agent.companyId, name: agent.companyName };
   }
@@ -77,6 +83,16 @@ function readCompanyId() {
 
 export function getActiveCallCenterCompany() {
   return readCompanyId();
+}
+
+export function getActiveCallCenterCompanyForUser(user: SessionUser) {
+  return getCompanyWorkspaceId(user);
+}
+
+export function getAssignableCallCenterCompanies(user: SessionUser) {
+  const assigned = getAssignedCompanyIds(user);
+  if (assigned.includes("all")) return callCenterCompanies;
+  return callCenterCompanies.filter((company) => assigned.includes(company.id));
 }
 
 export function setActiveCallCenterCompany(companyId: string) {
@@ -101,53 +117,65 @@ export function filterByActiveCompany<T extends { companyId?: string; companyNam
   });
 }
 
-export function getCompanyClients() {
-  return filterByActiveCompany(
+export function filterCallCenterRecordsForUser<T extends { companyId?: string; companyName?: string; clientId?: string }>(
+  records: T[],
+  user: SessionUser
+) {
+  return filterByAssignedCompanies(records, user, (record) => {
+    if (record.companyId) return record.companyId;
+    if (!record.clientId) return undefined;
+    const client = getCallCenterClients().find((item) => item.id === record.clientId);
+    return client ? companyForClient(client).id : undefined;
+  });
+}
+
+export function getCompanyClients(user?: SessionUser) {
+  const records =
     getCallCenterClients().map((client) => {
       const company = companyForClient(client);
       return { ...client, companyId: company.id, companyName: company.name };
-    })
-  );
+    });
+  return user ? filterCallCenterRecordsForUser(records, user) : filterByActiveCompany(records);
 }
 
-export function getCompanyAgents() {
-  return filterByActiveCompany(
+export function getCompanyAgents(user?: SessionUser) {
+  const records =
     getAgents().map((agent) => {
       const company = companyForAgent(agent);
       return { ...agent, companyId: company.id, companyName: company.name };
-    })
-  );
+    });
+  return user ? filterCallCenterRecordsForUser(records, user) : filterByActiveCompany(records);
 }
 
-export function getCompanyQueueCalls() {
+export function getCompanyQueueCalls(user?: SessionUser) {
   const clients = getCallCenterClients();
-  return filterByActiveCompany(
+  const records =
     getQueueCalls().map((call) => {
       const client = clients.find((item) => item.id === call.clientId);
       const company = client ? companyForClient(client) : companyForIndex(0);
       return { ...call, companyId: call.companyId ?? company.id, companyName: call.companyName ?? company.name };
-    })
-  );
+    });
+  return user ? filterCallCenterRecordsForUser(records, user) : filterByActiveCompany(records);
 }
 
-export function getCompanyOrders() {
-  return filterByActiveCompany(getPendingOrders());
+export function getCompanyOrders(user?: SessionUser) {
+  return user ? filterCallCenterRecordsForUser(getPendingOrders(), user) : filterByActiveCompany(getPendingOrders());
 }
 
-export function getCompanyComplaints() {
-  return filterByActiveCompany(getComplaints());
+export function getCompanyComplaints(user?: SessionUser) {
+  return user ? filterCallCenterRecordsForUser(getComplaints(), user) : filterByActiveCompany(getComplaints());
 }
 
-export function getCompanyPayments() {
-  return filterByActiveCompany(getPaymentFollowUps());
+export function getCompanyPayments(user?: SessionUser) {
+  return user ? filterCallCenterRecordsForUser(getPaymentFollowUps(), user) : filterByActiveCompany(getPaymentFollowUps());
 }
 
-export function getCompanyCallbacks() {
-  return filterByActiveCompany(getCallbacks());
+export function getCompanyCallbacks(user?: SessionUser) {
+  return user ? filterCallCenterRecordsForUser(getCallbacks(), user) : filterByActiveCompany(getCallbacks());
 }
 
-export function getCompanyRecordings(): Array<CallRecording & { date: string; outcome: string }> {
-  const calls = getCompanyQueueCalls();
+export function getCompanyRecordings(user?: SessionUser): Array<CallRecording & { date: string; outcome: string }> {
+  const calls = getCompanyQueueCalls(user);
   const callIds = new Set(calls.map((call) => call.id));
   return getCallRecordings()
     .filter((recording) => callIds.size === 0 || callIds.has(recording.callId))
@@ -158,12 +186,12 @@ export function getCompanyRecordings(): Array<CallRecording & { date: string; ou
     }));
 }
 
-export function getPerformanceRows() {
+export function getPerformanceRows(user?: SessionUser) {
   const logs = getCallLogs();
-  const orders = getCompanyOrders();
-  const complaints = getCompanyComplaints();
-  const payments = getCompanyPayments();
-  const agents = getCompanyAgents();
+  const orders = getCompanyOrders(user);
+  const complaints = getCompanyComplaints(user);
+  const payments = getCompanyPayments(user);
+  const agents = getCompanyAgents(user);
   const todayDate = today();
   const weekStart = Date.now() - 6 * 86_400_000;
 
@@ -191,13 +219,13 @@ export function getPerformanceRows() {
   });
 }
 
-export function getCallCenterSummary() {
-  const queueCalls = getCompanyQueueCalls();
-  const orders = getCompanyOrders();
-  const complaints = getCompanyComplaints();
-  const callbacks = getCompanyCallbacks();
+export function getCallCenterSummary(user?: SessionUser) {
+  const queueCalls = getCompanyQueueCalls(user);
+  const orders = getCompanyOrders(user);
+  const complaints = getCompanyComplaints(user);
+  const callbacks = getCompanyCallbacks(user);
   const missed = getMissedCalls();
-  const performance = getPerformanceRows();
+  const performance = getPerformanceRows(user);
   const revenue = orders.reduce((sum, order) => {
     const product = getProducts().find((item) => item.name === order.product);
     return sum + order.quantity * (product?.pricePerCarton ?? 2000);
@@ -212,7 +240,7 @@ export function getCallCenterSummary() {
     openComplaints: complaints.filter((complaint) => !["Resolved", "Closed"].includes(complaint.status)).length,
     waiting: queueCalls.filter((call) => call.status === "Waiting" || call.status === "Incoming").length,
     active: queueCalls.filter((call) => call.status === "Active").length,
-    agentsOnline: getCompanyAgents().filter((agent) => agent.status !== "Offline").length,
+    agentsOnline: getCompanyAgents(user).filter((agent) => agent.status !== "Offline").length,
     missedToday: missed.filter((call) => call.date === today()).length,
     callbacksDue: callbacks.filter((callback) => callback.status === "Pending" && callback.callbackDate <= today()).length
   };
@@ -284,8 +312,8 @@ export function createOneClickOrder(
   return { pendingOrders, portalOrder };
 }
 
-export function getComplaintCenterRows() {
-  return getCompanyComplaints().map((complaint: ComplaintRecord, index) => ({
+export function getComplaintCenterRows(user?: SessionUser) {
+  return getCompanyComplaints(user).map((complaint: ComplaintRecord, index) => ({
     ...complaint,
     complaintNumber: complaint.complaintNumber ?? complaint.id.replace("COMP", "CMP"),
     assignedTo: complaint.assignedTo ?? ["Supervisor", "Manager", "Storekeeper"][index % 3],

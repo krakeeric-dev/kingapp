@@ -128,6 +128,47 @@ export function setActiveCompanyId(companyId: string) {
   return companyId;
 }
 
+export function getAssignedCompanyIds(user?: Pick<SessionUser, "assignedCompanies" | "companyId" | "role"> | null) {
+  if (!user) return [];
+  if (user.role === "admin" || user.assignedCompanies?.includes("all") || user.companyId === "all") {
+    return ["all"];
+  }
+  const assigned = user.assignedCompanies?.length ? user.assignedCompanies : [user.companyId];
+  return Array.from(new Set(assigned.filter(Boolean)));
+}
+
+export function canAccessCompany(
+  user: Pick<SessionUser, "assignedCompanies" | "companyId" | "role">,
+  companyId?: string | null
+) {
+  const assigned = getAssignedCompanyIds(user);
+  if (assigned.includes("all")) return true;
+  if (!companyId) return false;
+  return assigned.includes(companyId);
+}
+
+export function getCompanyWorkspaceId(user: Pick<SessionUser, "assignedCompanies" | "companyId" | "role">) {
+  const assigned = getAssignedCompanyIds(user);
+  if (typeof window === "undefined") return assigned[0] ?? user.companyId;
+  const active = window.localStorage.getItem(ACTIVE_COMPANY_KEY) ?? user.companyId;
+  if (assigned.includes("all")) return active || "all";
+  if (active && assigned.includes(active)) return active;
+  return assigned[0] ?? user.companyId;
+}
+
+export function filterByAssignedCompanies<T extends object>(
+  records: T[],
+  user: Pick<SessionUser, "assignedCompanies" | "companyId" | "role">,
+  getRecordCompanyId?: (record: T) => string | undefined
+) {
+  const workspaceId = getCompanyWorkspaceId(user);
+  return records.filter((record) => {
+    const companyId = getRecordCompanyId ? getRecordCompanyId(record) : (record as { companyId?: string }).companyId;
+    if (workspaceId !== "all") return companyId === workspaceId;
+    return canAccessCompany(user, companyId);
+  });
+}
+
 export function createCompany(input: Pick<Company, "name" | "type" | "status">) {
   const now = new Date().toISOString();
   const company: Company = {

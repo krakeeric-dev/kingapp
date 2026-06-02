@@ -738,6 +738,7 @@ export function closeActiveCall(callId: string, agentName: string, outcome: Call
         role: "callcenter",
         companyId: call.companyId ?? "COMP-AGAHOZO",
         companyName: call.companyName ?? "Agahozo Water",
+        assignedCompanies: [call.companyId ?? "COMP-AGAHOZO"],
         phone: "",
         email: "",
         status: "active",

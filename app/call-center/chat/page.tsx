@@ -16,12 +16,13 @@ import {
 import { CallCenterShell } from "@/components/CallCenterShell";
 import type { SessionUser } from "@/lib/auth";
 import {
-  chatChannels,
   deleteChatMessage,
   editChatMessage,
-  getChatMessages,
+  getChatChannelsForUser,
+  getChatMessagesForUser,
   pinChatMessage,
   sendChatMessage,
+  type ChatChannel,
   type ChatMessage
 } from "@/lib/chatService";
 
@@ -35,6 +36,7 @@ export default function CallCenterChatPage() {
 
 function ChatContent({ user }: { user: SessionUser }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [channels, setChannels] = useState<ChatChannel[]>([]);
   const [selectedChannel, setSelectedChannel] = useState("call-center");
   const [query, setQuery] = useState("");
   const [replyToId, setReplyToId] = useState<string | undefined>();
@@ -45,10 +47,13 @@ function ChatContent({ user }: { user: SessionUser }) {
   });
 
   useEffect(() => {
-    setMessages(getChatMessages());
-  }, []);
+    const loadedChannels = getChatChannelsForUser(user);
+    setChannels(loadedChannels);
+    setMessages(getChatMessagesForUser(user));
+    setSelectedChannel((current) => loadedChannels.some((channel) => channel.id === current) ? current : loadedChannels[0]?.id ?? "call-center");
+  }, [user]);
 
-  const selected = chatChannels.find((channel) => channel.id === selectedChannel) ?? chatChannels[0];
+  const selected = channels.find((channel) => channel.id === selectedChannel) ?? channels[0];
   const channelMessages = useMemo(() => {
     const search = query.trim().toLowerCase();
     return messages
@@ -63,13 +68,14 @@ function ChatContent({ user }: { user: SessionUser }) {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.body.trim() && !draft.attachmentName.trim()) return;
-    setMessages(sendChatMessage({
+    sendChatMessage({
       attachmentName: draft.attachmentName || undefined,
       body: draft.body,
       channelId: selectedChannel,
       mention: draft.mention || undefined,
       replyToId
-    }, user));
+    }, user);
+    setMessages(getChatMessagesForUser(user));
     setDraft({ attachmentName: "", body: "", mention: "" });
     setReplyToId(undefined);
   }
@@ -77,7 +83,8 @@ function ChatContent({ user }: { user: SessionUser }) {
   function editMessage(message: ChatMessage) {
     const nextBody = window.prompt("Edit message", message.body);
     if (!nextBody?.trim()) return;
-    setMessages(editChatMessage(message.id, nextBody));
+    editChatMessage(message.id, nextBody);
+    setMessages(getChatMessagesForUser(user));
   }
 
   return (
@@ -88,8 +95,8 @@ function ChatContent({ user }: { user: SessionUser }) {
           <p className="mt-1 text-sm font-semibold text-slate-500">Internal and multi-company rooms</p>
         </div>
         <div className="max-h-[690px] overflow-y-auto p-4">
-          <ChannelGroup label="Company Operations" selectedChannel={selectedChannel} setSelectedChannel={setSelectedChannel} ids={["management", "dispatch", "loading", "storekeepers", "accounting", "call-center"]} />
-          <ChannelGroup label="Multi-company Channels" selectedChannel={selectedChannel} setSelectedChannel={setSelectedChannel} ids={["agahozo-water", "teju-juice", "king-honey", "king-eggs"]} />
+          <ChannelGroup channels={channels.filter((channel) => !channel.companyId)} label="Company Operations" selectedChannel={selectedChannel} setSelectedChannel={setSelectedChannel} />
+          <ChannelGroup channels={channels.filter((channel) => channel.companyId)} label="Multi-company Channels" selectedChannel={selectedChannel} setSelectedChannel={setSelectedChannel} />
         </div>
       </aside>
 
@@ -144,9 +151,9 @@ function ChatContent({ user }: { user: SessionUser }) {
                   <div className={`mt-3 flex flex-wrap items-center gap-2 text-xs font-bold ${mine ? "text-blue-100" : "text-slate-500"}`}>
                     <span>{message.createdAt.slice(11, 16)}{message.edited ? " - edited" : ""}</span>
                     <button onClick={() => setReplyToId(message.id)} type="button"><Reply className="h-4 w-4" /></button>
-                    <button onClick={() => setMessages(pinChatMessage(message.id))} type="button"><Pin className="h-4 w-4" /></button>
+                    <button onClick={() => { pinChatMessage(message.id); setMessages(getChatMessagesForUser(user)); }} type="button"><Pin className="h-4 w-4" /></button>
                     <button onClick={() => editMessage(message)} type="button"><Edit3 className="h-4 w-4" /></button>
-                    <button onClick={() => setMessages(deleteChatMessage(message.id))} type="button"><Trash2 className="h-4 w-4" /></button>
+                    <button onClick={() => { deleteChatMessage(message.id); setMessages(getChatMessagesForUser(user)); }} type="button"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </div>
               </article>
@@ -166,7 +173,7 @@ function ChatContent({ user }: { user: SessionUser }) {
               <AtSign className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
               <input className="form-input pl-9" onChange={(event) => setDraft((current) => ({ ...current, mention: event.target.value }))} placeholder="@mention" value={draft.mention} />
             </label>
-            <input className="form-input" onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))} placeholder={`Message ${selected.name}`} value={draft.body} />
+              <input className="form-input" onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))} placeholder={`Message ${selected?.name ?? "channel"}`} value={draft.body} />
             <label className="relative block">
               <Paperclip className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
               <input className="form-input pl-9" onChange={(event) => setDraft((current) => ({ ...current, attachmentName: event.target.value }))} placeholder="Attach file" value={draft.attachmentName} />
@@ -179,14 +186,12 @@ function ChatContent({ user }: { user: SessionUser }) {
   );
 }
 
-function ChannelGroup({ ids, label, selectedChannel, setSelectedChannel }: { ids: string[]; label: string; selectedChannel: string; setSelectedChannel: (id: string) => void }) {
+function ChannelGroup({ channels, label, selectedChannel, setSelectedChannel }: { channels: ChatChannel[]; label: string; selectedChannel: string; setSelectedChannel: (id: string) => void }) {
   return (
     <div className="mb-5">
       <p className="mb-2 text-xs font-black uppercase text-slate-400">{label}</p>
       <div className="space-y-2">
-        {ids.map((id) => {
-          const channel = chatChannels.find((item) => item.id === id);
-          if (!channel) return null;
+        {channels.map((channel) => {
           return (
             <button
               className={`w-full rounded-xl border p-3 text-left transition ${selectedChannel === channel.id ? "border-blue-300 bg-blue-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}

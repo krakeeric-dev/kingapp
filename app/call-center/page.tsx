@@ -72,15 +72,20 @@ import {
 import {
   callCenterCompanies,
   createOneClickOrder,
-  getActiveCallCenterCompany,
+  getActiveCallCenterCompanyForUser,
   getCompanyClients,
+  getCompanyAgents,
+  getCompanyCallbacks,
+  getCompanyComplaints,
+  getCompanyOrders,
+  getCompanyPayments,
   getCompanyQueueCalls,
   setActiveCallCenterCompany
 } from "@/lib/call-center-operations";
 import { sendWhatsAppNotification } from "@/lib/notificationService";
 import { getProducts, type ProductMaster } from "@/lib/products-data";
 import {
-  getAnnouncements,
+  getAnnouncementsForUser,
   getClientTimeline,
   getMessagingDashboardStats,
   type TeamAnnouncement
@@ -203,20 +208,20 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
   });
 
   useEffect(() => {
-    const loadedClients = getCompanyClients();
+    const loadedClients = getCompanyClients(user);
     setClients(loadedClients);
     setSelectedClientId(loadedClients[0]?.id ?? "");
-    setCallLogs(getCallLogs());
-    setOrders(getPendingOrders());
-    setPayments(getPaymentFollowUps());
-    setComplaints(getComplaints());
-    setCallbacks(getCallbacks());
-    setQueueCalls(getCompanyQueueCalls());
-    setAgents(getAgents());
+    setCallLogs(getCallLogs().filter((log) => loadedClients.some((client) => client.id === log.clientId)));
+    setOrders(getCompanyOrders(user));
+    setPayments(getCompanyPayments(user));
+    setComplaints(getCompanyComplaints(user));
+    setCallbacks(getCompanyCallbacks(user));
+    setQueueCalls(getCompanyQueueCalls(user));
+    setAgents(getCompanyAgents(user));
     setProducts(getProducts());
-    setAnnouncements(getAnnouncements());
-    setActiveCompany(getActiveCallCenterCompany());
-  }, []);
+    setAnnouncements(getAnnouncementsForUser(user));
+    setActiveCompany(getActiveCallCenterCompanyForUser(user));
+  }, [user]);
 
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
   const currentCall = queueCalls.find((call) => call.status === "Active") ?? queueCalls.find((call) => call.status === "Incoming");

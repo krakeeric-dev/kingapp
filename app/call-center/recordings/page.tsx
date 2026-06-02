@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Radio } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
+import type { SessionUser } from "@/lib/auth";
 import { getCompanyQueueCalls, getCompanyRecordings } from "@/lib/call-center-operations";
 import { getTelephonySettings } from "@/lib/telephonyService";
 
@@ -11,21 +12,21 @@ type RecordingRow = ReturnType<typeof getCompanyRecordings>[number];
 export default function CallCenterRecordingsPage() {
   return (
     <CallCenterShell title="Call Recording Center" subtitle="Recording Review & Provider Readiness">
-      <RecordingsContent />
+      {(user) => <RecordingsContent user={user} />}
     </CallCenterShell>
   );
 }
 
-function RecordingsContent() {
+function RecordingsContent({ user }: { user: SessionUser }) {
   const [rows, setRows] = useState<RecordingRow[]>([]);
   const [provider, setProvider] = useState("Mock");
   const [phones, setPhones] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    setRows(getCompanyRecordings());
+    setRows(getCompanyRecordings(user));
     setProvider(getTelephonySettings().provider);
-    setPhones(Object.fromEntries(getCompanyQueueCalls().map((call) => [call.id, call.phone])));
-  }, []);
+    setPhones(Object.fromEntries(getCompanyQueueCalls(user).map((call) => [call.id, call.phone])));
+  }, [user]);
 
   return (
     <div className="space-y-6">
