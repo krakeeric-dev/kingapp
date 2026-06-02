@@ -4,6 +4,7 @@ export type TelephonyProvider =
   | "3CX"
   | "Twilio"
   | "Asterisk / FreePBX"
+  | "Asterisk / SIP"
   | "SIP Provider"
   | "Manual Mode";
 
@@ -21,7 +22,8 @@ export type TelephonyWebhookEvent =
   | "call_missed"
   | "call_transferred"
   | "call_recording_ready"
-  | "recording_ready";
+  | "recording_ready"
+  | "recording_available";
 
 export type WebhookPayload = {
   event: TelephonyWebhookEvent;
@@ -30,6 +32,8 @@ export type WebhookPayload = {
   callId?: string;
   transferTo?: QueueCall["transferTo"];
   recordingUrl?: string;
+  provider?: string;
+  duration?: string;
 };
 
 export interface TelephonyAdapter {
@@ -38,9 +42,12 @@ export interface TelephonyAdapter {
   answerCall(callId: string): Promise<TelephonyActionResult>;
   endCall(callId: string): Promise<TelephonyActionResult>;
   holdCall(callId: string): Promise<TelephonyActionResult>;
+  resumeCall(callId: string): Promise<TelephonyActionResult>;
   transferCall(callId: string, target: string): Promise<TelephonyActionResult>;
   getCallStatus(callId: string): Promise<TelephonyActionResult>;
+  listRecordings(): Promise<TelephonyActionResult & { recordings?: unknown[] }>;
   handleWebhookEvent(payload: WebhookPayload): Promise<TelephonyActionResult>;
+  handleWebhook(payload: WebhookPayload): Promise<TelephonyActionResult>;
 }
 
 function createMockAdapter(provider: TelephonyProvider): TelephonyAdapter {
@@ -63,69 +70,98 @@ function createMockAdapter(provider: TelephonyProvider): TelephonyAdapter {
     async holdCall(callId) {
       return result(`Mock holdCall ${callId}`);
     },
+    async resumeCall(callId) {
+      return result(`Mock resumeCall ${callId}`);
+    },
     async transferCall(callId, target) {
       return result(`Mock transferCall ${callId} to ${target}`);
     },
     async getCallStatus(callId) {
       return result(`Mock getCallStatus ${callId}`);
     },
+    async listRecordings() {
+      return { ...result("Mock listRecordings"), recordings: [] };
+    },
     async handleWebhookEvent(payload) {
       return result(`Mock handleWebhookEvent ${payload.event}`);
+    },
+    async handleWebhook(payload) {
+      return result(`Mock handleWebhook ${payload.event}`);
     }
   };
 }
 
-export class ManualAdapter implements TelephonyAdapter {
+export class MockProviderAdapter implements TelephonyAdapter {
   private adapter = createMockAdapter("Manual Mode");
   provider = this.adapter.provider;
   makeCall = this.adapter.makeCall;
   answerCall = this.adapter.answerCall;
   endCall = this.adapter.endCall;
   holdCall = this.adapter.holdCall;
+  resumeCall = this.adapter.resumeCall;
   transferCall = this.adapter.transferCall;
   getCallStatus = this.adapter.getCallStatus;
+  listRecordings = this.adapter.listRecordings;
   handleWebhookEvent = this.adapter.handleWebhookEvent;
+  handleWebhook = this.adapter.handleWebhook;
 }
 
-export class TwilioAdapter implements TelephonyAdapter {
+export class ManualAdapter extends MockProviderAdapter {}
+
+export class TwilioProviderAdapter implements TelephonyAdapter {
   private adapter = createMockAdapter("Twilio");
   provider = this.adapter.provider;
   makeCall = this.adapter.makeCall;
   answerCall = this.adapter.answerCall;
   endCall = this.adapter.endCall;
   holdCall = this.adapter.holdCall;
+  resumeCall = this.adapter.resumeCall;
   transferCall = this.adapter.transferCall;
   getCallStatus = this.adapter.getCallStatus;
+  listRecordings = this.adapter.listRecordings;
   handleWebhookEvent = this.adapter.handleWebhookEvent;
+  handleWebhook = this.adapter.handleWebhook;
 }
 
-export class ThreeCXAdapter implements TelephonyAdapter {
+export class TwilioAdapter extends TwilioProviderAdapter {}
+
+export class ThreeCXProviderAdapter implements TelephonyAdapter {
   private adapter = createMockAdapter("3CX");
   provider = this.adapter.provider;
   makeCall = this.adapter.makeCall;
   answerCall = this.adapter.answerCall;
   endCall = this.adapter.endCall;
   holdCall = this.adapter.holdCall;
+  resumeCall = this.adapter.resumeCall;
   transferCall = this.adapter.transferCall;
   getCallStatus = this.adapter.getCallStatus;
+  listRecordings = this.adapter.listRecordings;
   handleWebhookEvent = this.adapter.handleWebhookEvent;
+  handleWebhook = this.adapter.handleWebhook;
 }
 
-export class AsteriskAdapter implements TelephonyAdapter {
+export class ThreeCXAdapter extends ThreeCXProviderAdapter {}
+
+export class AsteriskProviderAdapter implements TelephonyAdapter {
   private adapter = createMockAdapter("Asterisk / FreePBX");
   provider = this.adapter.provider;
   makeCall = this.adapter.makeCall;
   answerCall = this.adapter.answerCall;
   endCall = this.adapter.endCall;
   holdCall = this.adapter.holdCall;
+  resumeCall = this.adapter.resumeCall;
   transferCall = this.adapter.transferCall;
   getCallStatus = this.adapter.getCallStatus;
+  listRecordings = this.adapter.listRecordings;
   handleWebhookEvent = this.adapter.handleWebhookEvent;
+  handleWebhook = this.adapter.handleWebhook;
 }
 
+export class AsteriskAdapter extends AsteriskProviderAdapter {}
+
 export function getProviderAdapter(provider: TelephonyProvider): TelephonyAdapter {
-  if (provider === "Twilio") return new TwilioAdapter();
-  if (provider === "3CX") return new ThreeCXAdapter();
-  if (provider === "Asterisk / FreePBX") return new AsteriskAdapter();
-  return new ManualAdapter();
+  if (provider === "Twilio") return new TwilioProviderAdapter();
+  if (provider === "3CX") return new ThreeCXProviderAdapter();
+  if (provider === "Asterisk / FreePBX" || provider === "Asterisk / SIP") return new AsteriskProviderAdapter();
+  return new MockProviderAdapter();
 }

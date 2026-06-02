@@ -5,7 +5,11 @@ export function signTelephonyPayload(body: string, secret: string) {
 }
 
 export function verifyTelephonySignature(body: string, signature: string | null) {
-  const secret = process.env.TELEPHONY_WEBHOOK_SECRET;
+  const secret =
+    process.env.TELEPHONY_WEBHOOK_SECRET ||
+    process.env.TWILIO_WEBHOOK_SECRET ||
+    process.env.THREE_CX_WEBHOOK_SECRET ||
+    process.env.ASTERISK_WEBHOOK_SECRET;
 
   if (!secret) {
     return {
@@ -23,7 +27,7 @@ export function verifyTelephonySignature(body: string, signature: string | null)
   const expectedBuffer = Buffer.from(expected, "hex");
   const receivedBuffer = Buffer.from(signature.replace(/^sha256=/, ""), "hex");
 
-  if (expectedBuffer.length !== receivedBuffer.length) {
+  if (receivedBuffer.length === 0 || expectedBuffer.length !== receivedBuffer.length) {
     return { ok: false, mode: "real", message: "Invalid webhook signature." };
   }
 

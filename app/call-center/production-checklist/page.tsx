@@ -4,15 +4,19 @@ import { CheckCircle2, Circle, ClipboardCheck, ShieldCheck } from "lucide-react"
 import { CallCenterShell } from "@/components/CallCenterShell";
 
 const checklist = [
-  { label: "Provider connected", done: false },
-  { label: "Company number active", done: false },
-  { label: "Webhook verified", done: Boolean(process.env.NEXT_PUBLIC_TELEPHONY_WEBHOOK_CONFIGURED) },
-  { label: "Agents configured", done: true },
-  { label: "Extensions mapped", done: true },
-  { label: "Test inbound call passed", done: false },
-  { label: "Test outbound call passed", done: false },
-  { label: "Recording test passed", done: false },
-  { label: "Permissions checked", done: true }
+  { label: "Provider selected", done: false },
+  { label: "Webhook URL copied", done: Boolean(process.env.NEXT_PUBLIC_TELEPHONY_WEBHOOK_CONFIGURED) },
+  { label: "Env variables configured", done: false },
+  { label: "Agents assigned extensions", done: true },
+  { label: "Test inbound call", done: false },
+  { label: "Test outbound call", done: false },
+  { label: "Test hold/resume", done: false },
+  { label: "Test transfer", done: false },
+  { label: "Test missed call", done: false },
+  { label: "Test recording link", done: false },
+  { label: "Test client auto-popup", done: true },
+  { label: "Test audit log", done: false },
+  { label: "Test Vercel env variables", done: false }
 ];
 
 export default function ProductionChecklistPage() {

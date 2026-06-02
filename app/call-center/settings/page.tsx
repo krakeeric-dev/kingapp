@@ -14,7 +14,7 @@ import {
   type TelephonySettings
 } from "@/lib/telephonyService";
 
-const providers: TelephonyProvider[] = ["3CX", "Twilio", "Asterisk / FreePBX", "SIP Provider", "Manual Mode"];
+const providers: TelephonyProvider[] = ["Manual Mode", "Twilio", "3CX", "Asterisk / SIP"];
 const phoneTypes: AgentPhoneType[] = ["Browser Softphone", "IP Desk Phone", "Mobile App", "Fixed Line"];
 
 export default function CallCenterSettingsPage() {
@@ -80,10 +80,10 @@ function SettingsContent() {
             </select>
           </label>
           <Field label="Provider Name" onChange={(value) => update("providerName", value)} value={settings.providerName} />
-          <Field label="SIP Server" onChange={(value) => update("sipServer", value)} value={settings.sipServer} />
+          <Field label={providerServerLabel(settings.provider)} onChange={(value) => update("sipServer", value)} value={settings.sipServer} />
           <Field label="Webhook URL" onChange={(value) => update("webhookUrl", value)} value={settings.webhookUrl} />
-          <Field label="Company Phone Number" onChange={(value) => update("companyPhoneNumber", value)} value={settings.companyPhoneNumber} />
-          <Field label="Default Queue" onChange={(value) => update("defaultQueue", value)} value={settings.defaultQueue} />
+          <Field label={settings.provider === "Twilio" ? "Twilio Phone Number" : "Company Phone Number"} onChange={(value) => update("companyPhoneNumber", value)} value={settings.companyPhoneNumber} />
+          <Field label={settings.provider === "Asterisk / SIP" || settings.provider === "3CX" ? "Extension Range" : "Default Queue"} onChange={(value) => update("defaultQueue", value)} value={settings.defaultQueue} />
           <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black">
             <input checked={settings.recordingEnabled} onChange={(event) => update("recordingEnabled", event.target.checked)} type="checkbox" />
             Recording Enabled
@@ -97,14 +97,9 @@ function SettingsContent() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <SecretCard
-          label="Provider API Key"
-          value="TELEPHONY_API_KEY"
-        />
-        <SecretCard
-          label="Webhook Secret"
-          value="TELEPHONY_WEBHOOK_SECRET"
-        />
+        {secretCards(settings.provider).map((secret) => (
+          <SecretCard key={secret.value} label={secret.label} value={secret.value} />
+        ))}
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
@@ -149,6 +144,40 @@ function SettingsContent() {
       </section>
     </div>
   );
+}
+
+function providerServerLabel(provider: TelephonyProvider) {
+  if (provider === "Twilio") return "Account SID";
+  if (provider === "3CX") return "PBX URL";
+  if (provider === "Asterisk / SIP") return "PBX Host / SIP Trunk";
+  return "SIP Server / Mock Provider";
+}
+
+function secretCards(provider: TelephonyProvider) {
+  if (provider === "Twilio") {
+    return [
+      { label: "Twilio Auth Token", value: "TWILIO_AUTH_TOKEN" },
+      { label: "Twilio Webhook Secret", value: "TWILIO_WEBHOOK_SECRET" }
+    ];
+  }
+  if (provider === "3CX") {
+    return [
+      { label: "3CX Client ID / API Key", value: "THREE_CX_CLIENT_ID" },
+      { label: "3CX Client Secret", value: "THREE_CX_CLIENT_SECRET" },
+      { label: "3CX Webhook Secret", value: "THREE_CX_WEBHOOK_SECRET" }
+    ];
+  }
+  if (provider === "Asterisk / SIP") {
+    return [
+      { label: "Asterisk AMI Username", value: "ASTERISK_AMI_USERNAME" },
+      { label: "Asterisk AMI Password", value: "ASTERISK_AMI_PASSWORD" },
+      { label: "Asterisk Webhook Secret", value: "ASTERISK_WEBHOOK_SECRET" }
+    ];
+  }
+  return [
+    { label: "Provider API Key", value: "TELEPHONY_API_KEY" },
+    { label: "Webhook Secret", value: "TELEPHONY_WEBHOOK_SECRET" }
+  ];
 }
 
 function Panel({ children, icon: Icon, title }: { children: React.ReactNode; icon: typeof Server; title: string }) {

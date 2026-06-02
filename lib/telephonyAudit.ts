@@ -8,7 +8,8 @@ export type TelephonyAuditAction =
   | "complaint_logged"
   | "note_edited"
   | "recording_accessed"
-  | "provider_action";
+  | "provider_action"
+  | "webhook_received";
 
 export type TelephonyAuditEntry = {
   id: string;

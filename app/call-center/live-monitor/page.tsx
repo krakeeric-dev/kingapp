@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRightLeft, Clock, Headphones, PhoneCall, PhoneMissed, Siren, UserCheck } from "lucide-react";
+import { ArrowRightLeft, Clock, Headphones, Pause, PhoneCall, PhoneMissed, Server, Siren, UserCheck } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
 import { getAgents, getAverageWaitSeconds, getCallDuration, getCallCenterClients, getMissedCalls, getQueueCalls, transferCall, type QueueCall } from "@/lib/call-center-data";
+import { getTelephonyAudit } from "@/lib/telephonyAudit";
+import { getTelephonySettings } from "@/lib/telephonyService";
 
 const secondsLabel = (seconds: number) => `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 
@@ -20,6 +22,9 @@ function LiveMonitorContent() {
   const [agents, setAgents] = useState<ReturnType<typeof getAgents>>([]);
   const [priority, setPriority] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState("");
+  const [providerStatus, setProviderStatus] = useState("Mock provider ready");
+  const [lastSync, setLastSync] = useState("");
+  const [webhookEvents, setWebhookEvents] = useState<ReturnType<typeof getTelephonyAudit>>([]);
 
   useEffect(() => {
     refresh();
@@ -30,6 +35,10 @@ function LiveMonitorContent() {
   function refresh() {
     setCalls(getQueueCalls());
     setAgents(getAgents());
+    const settings = getTelephonySettings();
+    setProviderStatus(`${settings.provider} - ${settings.webhookUrl || "/api/telephony/webhook"}`);
+    setWebhookEvents(getTelephonyAudit().filter((entry) => entry.action === "webhook_received" || entry.action === "provider_action"));
+    setLastSync(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
   }
 
   const active = calls.filter((call) => call.status === "Active" || call.status === "Transferred");
@@ -38,6 +47,7 @@ function LiveMonitorContent() {
     active: active.length,
     available: agents.filter((agent) => agent.status === "Available").length,
     waiting: waiting.length,
+    hold: calls.filter((call) => call.notes.some((note) => note.toLowerCase().includes("hold"))).length,
     missed: getMissedCalls().length,
     averageWait: secondsLabel(getAverageWaitSeconds(calls))
   }), [active.length, agents, calls, waiting.length]);
@@ -50,12 +60,17 @@ function LiveMonitorContent() {
   return (
     <div className="space-y-6">
       {message ? <Notice message={message} /> : null}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-7">
+        <Metric icon={Server} label="Provider" value={providerStatus} />
         <Metric icon={PhoneCall} label="On Call" value={summary.active} />
         <Metric icon={UserCheck} label="Available" value={summary.available} />
         <Metric icon={Clock} label="Waiting" value={summary.waiting} />
+        <Metric icon={Pause} label="On Hold" value={summary.hold} />
         <Metric icon={PhoneMissed} label="Missed" value={summary.missed} />
         <Metric icon={Headphones} label="Avg Wait" value={summary.averageWait} />
+      </div>
+      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-black text-blue-700">
+        Last sync time: {lastSync || "Waiting for monitor refresh"}
       </div>
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -91,6 +106,12 @@ function LiveMonitorContent() {
           {agents.map((agent) => (
             <Row key={agent.id} left={agent.name} middle={`Ext ${agent.extension} · ${agent.phoneType ?? "Browser Softphone"}`} right={agent.status} />
           ))}
+        </Panel>
+        <Panel title="Webhook Events">
+          {webhookEvents.slice(0, 6).map((event) => (
+            <Row key={event.id} left={event.action} middle={event.actor} right={event.createdAt.slice(11, 19)} />
+          ))}
+          {webhookEvents.length === 0 ? <p className="text-sm font-semibold text-slate-500">No webhook events yet.</p> : null}
         </Panel>
       </section>
     </div>

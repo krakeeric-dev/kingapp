@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Radio } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
-import { getCompanyRecordings } from "@/lib/call-center-operations";
+import { getCompanyQueueCalls, getCompanyRecordings } from "@/lib/call-center-operations";
+import { getTelephonySettings } from "@/lib/telephonyService";
 
 type RecordingRow = ReturnType<typeof getCompanyRecordings>[number];
 
@@ -17,9 +18,13 @@ export default function CallCenterRecordingsPage() {
 
 function RecordingsContent() {
   const [rows, setRows] = useState<RecordingRow[]>([]);
+  const [provider, setProvider] = useState("Mock");
+  const [phones, setPhones] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setRows(getCompanyRecordings());
+    setProvider(getTelephonySettings().provider);
+    setPhones(Object.fromEntries(getCompanyQueueCalls().map((call) => [call.id, call.phone])));
   }, []);
 
   return (
@@ -41,7 +46,7 @@ function RecordingsContent() {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs font-black uppercase text-slate-500">
               <tr>
-                {["Date", "Agent", "Client", "Duration", "Outcome", "Recording Link", "Notes"].map((heading) => (
+                {["Date", "Time", "Agent", "Client", "Phone", "Duration", "Provider", "Recording URL / Placeholder", "Status", "Notes"].map((heading) => (
                   <th className="px-4 py-3" key={heading}>{heading}</th>
                 ))}
               </tr>
@@ -50,18 +55,15 @@ function RecordingsContent() {
               {rows.map((row) => (
                 <tr className="border-t border-slate-100" key={row.id}>
                   <td className="px-4 py-3">{row.date}</td>
+                  <td className="px-4 py-3">10:{String(rows.indexOf(row) + 12).padStart(2, "0")}</td>
                   <td className="px-4 py-3 font-bold">{row.agent}</td>
                   <td className="px-4 py-3 font-black text-slate-950">{row.client}</td>
+                  <td className="px-4 py-3">{phones[row.callId] ?? "Pending provider"}</td>
                   <td className="px-4 py-3">{row.duration}</td>
+                  <td className="px-4 py-3">{provider}</td>
+                  <td className="px-4 py-3">{row.recordingUrl || "Recording URL will appear after provider connection"}</td>
                   <td className="px-4 py-3">
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">{row.outcome}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {row.recordingUrl ? (
-                      <a className="font-black text-blue-700" href={row.recordingUrl}>Open Recording</a>
-                    ) : (
-                      <span className="text-slate-500">Provider not connected</span>
-                    )}
                   </td>
                   <td className="px-4 py-3">{row.notes}</td>
                 </tr>

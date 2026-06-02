@@ -5,6 +5,9 @@ type CallAction =
   | "answer-call"
   | "end-call"
   | "hold-call"
+  | "resume-call"
+  | "status"
+  | "recordings"
   | "transfer-call";
 
 export type CallActionBody = {
@@ -15,7 +18,9 @@ export type CallActionBody = {
 };
 
 function getProvider(provider?: TelephonyProvider) {
-  return provider ?? (process.env.TELEPHONY_PROVIDER as TelephonyProvider | undefined) ?? "Manual Mode";
+  const envProvider = process.env.TELEPHONY_PROVIDER;
+  if (envProvider === "mock") return "Manual Mode";
+  return provider ?? (envProvider as TelephonyProvider | undefined) ?? "Manual Mode";
 }
 
 export async function runServerCallAction(action: CallAction, body: CallActionBody) {
@@ -29,6 +34,10 @@ export async function runServerCallAction(action: CallAction, body: CallActionBo
       return { status: 200, data: await adapter.makeCall(body.phone) };
     }
 
+    if (action === "recordings") {
+      return { status: 200, data: await adapter.listRecordings() };
+    }
+
     if (!body.callId) {
       return { status: 400, data: { ok: false, message: "Missing call ID." } };
     }
@@ -36,6 +45,8 @@ export async function runServerCallAction(action: CallAction, body: CallActionBo
     if (action === "answer-call") return { status: 200, data: await adapter.answerCall(body.callId) };
     if (action === "end-call") return { status: 200, data: await adapter.endCall(body.callId) };
     if (action === "hold-call") return { status: 200, data: await adapter.holdCall(body.callId) };
+    if (action === "resume-call") return { status: 200, data: await adapter.resumeCall(body.callId) };
+    if (action === "status") return { status: 200, data: await adapter.getCallStatus(body.callId) };
     if (action === "transfer-call") {
       if (!body.target) {
         return { status: 400, data: { ok: false, message: "Select transfer target." } };
