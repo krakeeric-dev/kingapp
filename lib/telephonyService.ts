@@ -149,6 +149,8 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
     const call: QueueCall = {
       id: payload.callId ?? createId("QCALL"),
       clientId: client?.id ?? "UNKNOWN",
+      companyId: client?.companyId,
+      companyName: client?.companyName,
       clientName: client?.clientName ?? "Unknown Caller",
       phone: payload.phone,
       location: client?.area ?? "Unknown",

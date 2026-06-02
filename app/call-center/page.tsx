@@ -14,6 +14,7 @@ import {
   ChevronRight,
   ClipboardList,
   CreditCard,
+  Gauge,
   Headphones,
   Home,
   MessageSquare,
@@ -25,8 +26,10 @@ import {
   PhoneCall,
   PhoneIncoming,
   PhoneOff,
+  Radio,
   Search,
   ShoppingCart,
+  Trophy,
   Truck,
   UserRound,
   UsersRound,
@@ -36,6 +39,7 @@ import {
   CallCenterMobileBlock,
   useIsMobileScreen
 } from "@/components/CallCenterDesktopOnly";
+import { ClientAutoPopup } from "@/components/ClientAutoPopup";
 import type { SessionUser } from "@/lib/auth";
 import { canAccessPage } from "@/lib/permissions";
 import { formatMoney } from "@/lib/sales-data";
@@ -45,7 +49,6 @@ import {
   addCallback,
   addComplaint,
   addPaymentFollowUp,
-  addPendingOrder,
   getAgents,
   getCallbacks,
   getCallCenterClients,
@@ -63,6 +66,13 @@ import {
   type PendingOrder,
   type QueueCall
 } from "@/lib/call-center-data";
+import {
+  callCenterCompanies,
+  createOneClickOrder,
+  getActiveCallCenterCompany,
+  setActiveCallCenterCompany
+} from "@/lib/call-center-operations";
+import { sendWhatsAppNotification } from "@/lib/notificationService";
 import { getProducts, type ProductMaster } from "@/lib/products-data";
 
 type ActionMode = "order" | "payment" | "complaint" | "delivery" | "callback";
@@ -80,11 +90,14 @@ const menuItems = [
   { label: "Incoming Calls", href: "/call-center/queue", icon: PhoneIncoming, badge: "2" },
   { label: "Softphone", href: "/call-center/softphone", icon: PhoneCall, badge: "" },
   { label: "Live Monitor", href: "/call-center/live-monitor", icon: Bell, badge: "" },
+  { label: "Performance", href: "/call-center/performance", icon: Trophy, badge: "" },
   { label: "Clients", href: "#clients", icon: UsersRound, badge: "" },
   { label: "Orders", href: "#orders", icon: ClipboardList, badge: "" },
   { label: "Follow Ups", href: "/call-center/callbacks", icon: CalendarClock, badge: "" },
-  { label: "Complaints", href: "#complaints", icon: MessageSquareWarning, badge: "" },
+  { label: "Complaints", href: "/call-center/complaints", icon: MessageSquareWarning, badge: "" },
   { label: "Payments", href: "#payments", icon: CreditCard, badge: "" },
+  { label: "Recordings", href: "/call-center/recordings", icon: Radio, badge: "" },
+  { label: "Wallboard", href: "/call-center/wallboard", icon: Gauge, badge: "" },
   { label: "Analytics", href: "/call-center/analytics", icon: BookOpen, badge: "" },
   { label: "Settings", href: "/call-center/settings", icon: UserRound, badge: "" },
   { label: "Go-Live Checklist", href: "/call-center/production-checklist", icon: ClipboardList, badge: "" }
@@ -140,6 +153,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
   const [queueCalls, setQueueCalls] = useState<QueueCall[]>([]);
   const [agents, setAgents] = useState<CallCenterAgent[]>([]);
   const [products, setProducts] = useState<ProductMaster[]>([]);
+  const [activeCompany, setActiveCompany] = useState("all");
   const [selectedClientId, setSelectedClientId] = useState("");
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState("");
@@ -185,6 +199,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
     setQueueCalls(getQueueCalls());
     setAgents(getAgents());
     setProducts(getProducts());
+    setActiveCompany(getActiveCallCenterCompany());
   }, []);
 
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
@@ -242,19 +257,23 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
       return;
     }
 
-    setOrders(
-      addPendingOrder(
-        client,
-        {
-          product: orderForm.product,
-          quantity,
-          deliveryDate: orderForm.deliveryDate,
-          notes: `${orderForm.notes} Delivery time: ${orderForm.deliveryTime}`.trim()
-        },
-        user
-      )
+    const result = createOneClickOrder(
+      client,
+      {
+        productName: orderForm.product,
+        quantity,
+        deliveryDate: orderForm.deliveryDate,
+        notes: `${orderForm.notes} Delivery time: ${orderForm.deliveryTime}`.trim()
+      },
+      user
     );
-    setMessage("Order sent to Pending Orders for Storekeeper.");
+    setOrders(result.pendingOrders);
+    sendWhatsAppNotification("Order Received", {
+      clientName: client.clientName,
+      phone: client.phone,
+      orderNumber: result.portalOrder.id
+    });
+    setMessage("Order sent to Client Orders and Storekeeper Loading Queue.");
   }
 
   function savePaymentReminder(event: FormEvent<HTMLFormElement>) {
@@ -364,12 +383,25 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
       <div className="flex min-h-screen">
         <CallCenterSidebar user={user} />
         <section className="min-w-0 flex-1">
-          <TopBar agentsOnline={agentsOnline} callsInQueue={callsInQueue} user={user} />
+          <TopBar
+            activeCompany={activeCompany}
+            agentsOnline={agentsOnline}
+            callsInQueue={callsInQueue}
+            onCompanyChange={(companyId) => setActiveCompany(setActiveCallCenterCompany(companyId))}
+            user={user}
+          />
           <div className="space-y-4 p-4 lg:p-6">
             {message ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
                 {message}
               </div>
+            ) : null}
+
+            {currentCall ? (
+              <ClientAutoPopup
+                call={currentCall}
+                client={clients.find((client) => client.id === currentCall.clientId) ?? selectedClient}
+              />
             ) : null}
 
             <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
@@ -540,7 +572,19 @@ function normalizeMenuHref(href: string) {
   return href.startsWith("#") ? "/call-center" : href.split("#")[0];
 }
 
-function TopBar({ agentsOnline, callsInQueue, user }: { agentsOnline: number; callsInQueue: number; user: SessionUser }) {
+function TopBar({
+  activeCompany,
+  agentsOnline,
+  callsInQueue,
+  onCompanyChange,
+  user
+}: {
+  activeCompany: string;
+  agentsOnline: number;
+  callsInQueue: number;
+  onCompanyChange: (companyId: string) => void;
+  user: SessionUser;
+}) {
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-4 shadow-sm backdrop-blur lg:px-7">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -552,6 +596,18 @@ function TopBar({ agentsOnline, callsInQueue, user }: { agentsOnline: number; ca
           <TopMetric icon={PhoneCall} label="Connected" value="00:03:12" tone="green" />
           <TopMetric label="Calls in Queue" value={callsInQueue.toLocaleString()} />
           <TopMetric label="Agents Online" value={agentsOnline.toLocaleString()} dot />
+          {user.role === "admin" || user.role === "manager" ? (
+            <select
+              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-slate-700 outline-none"
+              onChange={(event) => onCompanyChange(event.target.value)}
+              value={activeCompany}
+            >
+              <option value="all">All Companies</option>
+              {callCenterCompanies.map((company) => (
+                <option key={company.id} value={company.id}>{company.name}</option>
+              ))}
+            </select>
+          ) : null}
           <button className="relative rounded-lg p-2 text-slate-700 hover:bg-slate-100" type="button">
             <Bell className="h-5 w-5" />
             <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white">5</span>

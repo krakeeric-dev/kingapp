@@ -10,11 +10,14 @@ import {
   CalendarClock,
   ChevronDown,
   ClipboardList,
+  Gauge,
   CreditCard,
   Home,
   MessageSquareWarning,
   PhoneCall,
   PhoneIncoming,
+  Radio,
+  Trophy,
   Search,
   UserRound,
   UsersRound
@@ -25,6 +28,11 @@ import {
 } from "@/components/CallCenterDesktopOnly";
 import type { SessionUser } from "@/lib/auth";
 import { getAgents, getQueueCalls } from "@/lib/call-center-data";
+import {
+  callCenterCompanies,
+  getActiveCallCenterCompany,
+  setActiveCallCenterCompany
+} from "@/lib/call-center-operations";
 import { canAccessPage } from "@/lib/permissions";
 import { getSession } from "@/lib/storage";
 
@@ -39,11 +47,14 @@ const menuItems = [
   { label: "Incoming Calls", href: "/call-center/queue", icon: PhoneIncoming, badge: "2" },
   { label: "Softphone", href: "/call-center/softphone", icon: PhoneCall, badge: "" },
   { label: "Live Monitor", href: "/call-center/live-monitor", icon: Bell, badge: "" },
+  { label: "Performance", href: "/call-center/performance", icon: Trophy, badge: "" },
   { label: "Clients", href: "/call-center#clients", icon: UsersRound, badge: "" },
   { label: "Orders", href: "/call-center#orders", icon: ClipboardList, badge: "" },
   { label: "Follow Ups", href: "/call-center/callbacks", icon: CalendarClock, badge: "" },
-  { label: "Complaints", href: "/call-center#complaints", icon: MessageSquareWarning, badge: "" },
+  { label: "Complaints", href: "/call-center/complaints", icon: MessageSquareWarning, badge: "" },
   { label: "Payments", href: "/call-center#payments", icon: CreditCard, badge: "" },
+  { label: "Recordings", href: "/call-center/recordings", icon: Radio, badge: "" },
+  { label: "Wallboard", href: "/call-center/wallboard", icon: Gauge, badge: "" },
   { label: "Analytics", href: "/call-center/analytics", icon: BookOpen, badge: "" },
   { label: "Settings", href: "/call-center/settings", icon: UserRound, badge: "" },
   { label: "Go-Live Checklist", href: "/call-center/production-checklist", icon: ClipboardList, badge: "" }
@@ -66,6 +77,7 @@ export function CallCenterShell({
   const [user, setUser] = useState<SessionUser | null>(null);
   const [callsInQueue, setCallsInQueue] = useState(0);
   const [agentsOnline, setAgentsOnline] = useState(0);
+  const [activeCompany, setActiveCompany] = useState("all");
   const isMobileScreen = useIsMobileScreen();
 
   useEffect(() => {
@@ -86,6 +98,7 @@ export function CallCenterShell({
     }
 
     setUser(session);
+    setActiveCompany(getActiveCallCenterCompany());
     setCallsInQueue(
       getQueueCalls().filter(
         (call) => call.status === "Waiting" || call.status === "Incoming"
@@ -93,6 +106,10 @@ export function CallCenterShell({
     );
     setAgentsOnline(getAgents().filter((agent) => agent.status !== "Offline").length);
   }, [pathname, router]);
+
+  function changeCompany(companyId: string) {
+    setActiveCompany(setActiveCallCenterCompany(companyId));
+  }
 
   if (!user) {
     return <main className="min-h-screen bg-[#061b33]" />;
@@ -162,6 +179,18 @@ export function CallCenterShell({
                 <TopMetric icon={PhoneCall} label="Connected" tone="green" value="00:03:12" />
                 <TopMetric label="Calls in Queue" value={callsInQueue.toLocaleString()} />
                 <TopMetric dot label="Agents Online" value={agentsOnline.toLocaleString()} />
+                {user.role === "admin" || user.role === "manager" ? (
+                  <select
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-slate-700 outline-none"
+                    onChange={(event) => changeCompany(event.target.value)}
+                    value={activeCompany}
+                  >
+                    <option value="all">All Companies</option>
+                    {callCenterCompanies.map((company) => (
+                      <option key={company.id} value={company.id}>{company.name}</option>
+                    ))}
+                  </select>
+                ) : null}
                 <button className="relative rounded-lg p-2 text-slate-700 hover:bg-slate-100" type="button">
                   <Bell className="h-5 w-5" />
                   <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white">

@@ -12,6 +12,7 @@ import {
   UserCheck,
   UsersRound
 } from "lucide-react";
+import { ClientAutoPopup } from "@/components/ClientAutoPopup";
 import { CallCenterShell } from "@/components/CallCenterShell";
 import type { SessionUser } from "@/lib/auth";
 import { formatMoney } from "@/lib/sales-data";
@@ -21,7 +22,6 @@ import {
   addCallback,
   addComplaint,
   addPaymentFollowUp,
-  addPendingOrder,
   closeActiveCall,
   getAgents,
   getAverageWaitSeconds,
@@ -37,6 +37,8 @@ import {
   type CallCenterClient,
   type QueueCall
 } from "@/lib/call-center-data";
+import { createOneClickOrder } from "@/lib/call-center-operations";
+import { sendWhatsAppNotification } from "@/lib/notificationService";
 import { getProducts, type ProductMaster } from "@/lib/products-data";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -157,11 +159,11 @@ function QueueContent({ user }: { user: SessionUser }) {
       ) : null}
 
       {incoming[0] ? (
-        <IncomingPopup
+        <ClientAutoPopup
           call={incoming[0]}
-          onAccept={acceptCall}
-          onMissed={missCall}
-          onQueue={queueCall}
+          client={clients.find((client) => client.id === incoming[0].clientId)}
+          onAccept={() => acceptCall(incoming[0])}
+          onQueue={() => queueCall(incoming[0])}
         />
       ) : null}
 
@@ -262,6 +264,7 @@ function ActiveCallPanel({
   user: SessionUser;
 }) {
   const [note, setNote] = useState("");
+  const [orderOpen, setOrderOpen] = useState(false);
 
   function saveOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -269,8 +272,23 @@ function ActiveCallPanel({
     const quantity = Number(form.get("quantity"));
     const product = String(form.get("product") ?? "");
     if (!product || !Number.isFinite(quantity) || quantity <= 0) return;
-    addPendingOrder(client, { product, quantity, deliveryDate: String(form.get("deliveryDate") ?? today()), notes: String(form.get("notes") ?? "") }, user);
-    onMessage("Order created and sent to Pending Orders.");
+    const result = createOneClickOrder(
+      client,
+      {
+        productName: product,
+        quantity,
+        deliveryDate: String(form.get("deliveryDate") ?? today()),
+        notes: String(form.get("notes") ?? "")
+      },
+      user
+    );
+    sendWhatsAppNotification("Order Received", {
+      clientName: client.clientName,
+      phone: client.phone,
+      orderNumber: result.portalOrder.id
+    });
+    onMessage("Order created for Client Orders and Storekeeper Loading Queue.");
+    setOrderOpen(false);
     event.currentTarget.reset();
   }
 
@@ -348,6 +366,7 @@ function ActiveCallPanel({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
+        <button className="primary-button" onClick={() => setOrderOpen(true)} type="button">Create Order</button>
         {["Supervisor", "Accountant", "Storekeeper", "Manager"].map((team) => (
           <button className="secondary-button" key={team} onClick={() => onTransfer(call, team as QueueCall["transferTo"])} type="button">
             <ArrowRightLeft className="h-4 w-4" />
@@ -358,15 +377,14 @@ function ActiveCallPanel({
       </div>
 
       <div className="mt-4 grid gap-4">
-        <MiniForm title="Create New Order" onSubmit={saveOrder}>
-          <Select name="product">
-            <option value="">Select product</option>
-            {products.map((product) => <option key={product.itemCode}>{product.name}</option>)}
-          </Select>
-          <Input name="quantity" placeholder="Quantity" type="number" />
-          <Input defaultValue={today()} name="deliveryDate" type="date" />
-          <Input name="notes" placeholder="Notes" />
-        </MiniForm>
+        {orderOpen ? (
+          <QuickOrderModal
+            client={client}
+            onClose={() => setOrderOpen(false)}
+            onSubmit={saveOrder}
+            products={products}
+          />
+        ) : null}
 
         <MiniForm title="Log Payment Promise" onSubmit={savePromise}>
           <Input defaultValue={String(client.currentBalance)} name="amountDue" type="number" />
@@ -454,6 +472,49 @@ function QueueSection({
         {calls.length === 0 ? <p className="text-sm font-semibold text-slate-500">{empty}</p> : null}
       </div>
     </Panel>
+  );
+}
+
+function QuickOrderModal({
+  client,
+  onClose,
+  onSubmit,
+  products
+}: {
+  client: CallCenterClient;
+  onClose: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  products: ProductMaster[];
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+      <form className="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl" onSubmit={onSubmit}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase text-blue-700">One Click Order</p>
+            <h3 className="mt-1 text-2xl font-black text-slate-950">{client.clientName}</h3>
+            <p className="text-sm font-semibold text-slate-500">{client.phone} - {client.area}</p>
+          </div>
+          <button className="secondary-button" onClick={onClose} type="button">Close</button>
+        </div>
+        <div className="mt-5 grid gap-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-black uppercase text-slate-500">Product</span>
+            <select className="form-input" name="product" required>
+              <option value="">Select product</option>
+              {products.map((product) => <option key={product.itemCode}>{product.name}</option>)}
+            </select>
+          </label>
+          <Input name="quantity" placeholder="Quantity" type="number" />
+          <Input defaultValue={today()} name="deliveryDate" type="date" />
+          <Input name="notes" placeholder="Notes" />
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button className="secondary-button" onClick={onClose} type="button">Cancel</button>
+          <button className="primary-button">Submit Order</button>
+        </div>
+      </form>
+    </div>
   );
 }
 

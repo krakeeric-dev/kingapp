@@ -12,6 +12,8 @@ export type CallStatus = "Open" | "Closed" | "Pending Callback" | "Scheduled";
 
 export type CallCenterClient = {
   id: string;
+  companyId?: string;
+  companyName?: string;
   clientName: string;
   ownerName: string;
   phone: string;
@@ -40,6 +42,8 @@ export type CallLog = {
 
 export type PendingOrder = {
   id: string;
+  companyId?: string;
+  companyName?: string;
   clientId: string;
   clientName: string;
   phone: string;
@@ -55,6 +59,8 @@ export type PendingOrder = {
 
 export type PaymentFollowUp = {
   id: string;
+  companyId?: string;
+  companyName?: string;
   clientId: string;
   clientName: string;
   amountDue: number;
@@ -68,13 +74,17 @@ export type PaymentFollowUp = {
 
 export type ComplaintRecord = {
   id: string;
+  companyId?: string;
+  companyName?: string;
   clientId: string;
   clientName: string;
+  complaintNumber?: string;
   complaintType: string;
   product: string;
   quantity: number;
   description: string;
   priority: string;
+  assignedTo?: string;
   status: string;
   agent: string;
   createdAt: string;
@@ -100,6 +110,8 @@ export type AgentPhoneType =
 
 export type CallCenterAgent = {
   id: string;
+  companyId?: string;
+  companyName?: string;
   name: string;
   extension: string;
   status: AgentStatus;
@@ -110,6 +122,8 @@ export type QueueCallStatus = "Incoming" | "Waiting" | "Active" | "Missed" | "Tr
 
 export type QueueCall = {
   id: string;
+  companyId?: string;
+  companyName?: string;
   clientId: string;
   clientName: string;
   phone: string;
@@ -480,6 +494,8 @@ export function addPendingOrder(
   const record: PendingOrder = {
     ...input,
     id: createId("ORD"),
+    companyId: client.companyId,
+    companyName: client.companyName,
     clientId: client.id,
     clientName: client.clientName,
     phone: client.phone,
@@ -505,6 +521,8 @@ export function addPaymentFollowUp(
   const record: PaymentFollowUp = {
     ...input,
     id: createId("PAY"),
+    companyId: client.companyId,
+    companyName: client.companyName,
     clientId: client.id,
     clientName: client.clientName,
     agent: user.displayName,
@@ -527,8 +545,11 @@ export function addComplaint(
   const record: ComplaintRecord = {
     ...input,
     id: createId("COMP"),
+    companyId: client.companyId,
+    companyName: client.companyName,
     clientId: client.id,
     clientName: client.clientName,
+    complaintNumber: createId("CMP"),
     agent: user.displayName,
     createdAt: new Date().toISOString()
   };
