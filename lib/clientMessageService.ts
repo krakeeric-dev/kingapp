@@ -45,6 +45,15 @@ export type ClientMessage = {
   createdAt: string;
 };
 
+export type ClientMessageCompanyDisplay = {
+  id: string;
+  logo: string;
+  name: string;
+  supportStatus: string;
+  supportTeam: string;
+  badgeClass: string;
+};
+
 const CLIENT_MESSAGES_KEY = "kingapp.clientPortal.messages";
 
 const companyBySupplierId: Record<string, { id: string; name: string }> = {
@@ -56,6 +65,54 @@ const clientCompanyFallback: Record<string, { id: string; name: string }> = {
   "PORTAL-CL-001": { id: "COMP-AGAHOZO", name: "Agahozo Water" },
   "PORTAL-CL-002": { id: "COMP-TEJU", name: "Teju Juice" }
 };
+
+export const clientMessageCompanyDisplays: Record<string, ClientMessageCompanyDisplay> = {
+  "COMP-AGAHOZO": {
+    id: "COMP-AGAHOZO",
+    logo: "AW",
+    name: "Agahozo Water",
+    supportStatus: "Online",
+    supportTeam: "Customer Support",
+    badgeClass: "bg-blue-50 text-blue-700 border-blue-200"
+  },
+  "COMP-TEJU": {
+    id: "COMP-TEJU",
+    logo: "TJ",
+    name: "Teju Juice",
+    supportStatus: "Online",
+    supportTeam: "Sales & Customer Care",
+    badgeClass: "bg-orange-50 text-orange-700 border-orange-200"
+  },
+  "COMP-KING-HONEY": {
+    id: "COMP-KING-HONEY",
+    logo: "KH",
+    name: "King Honey",
+    supportStatus: "Online",
+    supportTeam: "Customer Support",
+    badgeClass: "bg-yellow-50 text-yellow-700 border-yellow-200"
+  },
+  "COMP-KING-EGGS": {
+    id: "COMP-KING-EGGS",
+    logo: "KE",
+    name: "King Eggs",
+    supportStatus: "Online",
+    supportTeam: "Sales & Customer Care",
+    badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200"
+  }
+};
+
+export function getClientMessageCompanyDisplay(companyId?: string, companyName?: string) {
+  if (companyId && clientMessageCompanyDisplays[companyId]) return clientMessageCompanyDisplays[companyId];
+  const match = Object.values(clientMessageCompanyDisplays).find((company) => company.name === companyName);
+  return match ?? {
+    id: companyId ?? "COMP-AGAHOZO",
+    logo: (companyName ?? "KA").slice(0, 2).toUpperCase(),
+    name: companyName ?? "Agahozo Water",
+    supportStatus: "Online",
+    supportTeam: "Customer Support",
+    badgeClass: "bg-blue-50 text-blue-700 border-blue-200"
+  };
+}
 
 const seedMessages: ClientMessage[] = [
   {
@@ -125,6 +182,25 @@ function makeId(prefix: string) {
 export function getCompanyForClientMessage(client: PortalClient, supplierId?: string) {
   if (supplierId && companyBySupplierId[supplierId]) return companyBySupplierId[supplierId];
   return clientCompanyFallback[client.id] ?? { id: "COMP-AGAHOZO", name: "Agahozo Water" };
+}
+
+export function getLinkedMessageCompaniesForClient(client: PortalClient) {
+  const linkedSupplierIds = getSupplierClientLinks()
+    .filter((link) => link.clientId === client.id && link.active)
+    .map((link) => link.supplierId);
+  const companies = linkedSupplierIds.map((supplierId) => {
+    const company = getCompanyForClientMessage(client, supplierId);
+    return {
+      ...getClientMessageCompanyDisplay(company.id, company.name),
+      supplierId
+    };
+  });
+  const seen = new Set<string>();
+  return companies.filter((company) => {
+    if (seen.has(company.id)) return false;
+    seen.add(company.id);
+    return true;
+  });
 }
 
 export function getClientMessages() {

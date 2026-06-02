@@ -22,6 +22,7 @@ import {
 import { getProducts } from "@/lib/products-data";
 import { formatMoney } from "@/lib/sales-data";
 import {
+  getClientMessageCompanyDisplay,
   getClientMessageStats,
   getClientMessageThreads,
   getMessagesForSupplier,
@@ -243,12 +244,25 @@ function SupplierDashboard({
                 <div className="grid gap-4 xl:grid-cols-[1fr_260px]">
                   <div>
                     <div className="flex flex-wrap gap-2">
+                      <span className={`rounded-full border px-3 py-1 text-xs font-black ${getClientMessageCompanyDisplay(thread.companyId, thread.companyName).badgeClass}`}>
+                        {thread.companyName}
+                      </span>
                       <Badge label={thread.messageType} />
                       <Badge label={thread.status} />
                       {thread.orderId ? <Badge label={thread.orderId} /> : null}
                     </div>
                     <h3 className="mt-3 font-black text-slate-950">{thread.clientName}</h3>
-                    <p className="text-sm font-semibold text-slate-500">{thread.companyName} - {thread.phone}</p>
+                    <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+                      <p><span className="font-black text-slate-500">Client:</span> {thread.clientName}</p>
+                      <p><span className="font-black text-slate-500">Company:</span> {thread.companyName}</p>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-500">{thread.phone}</p>
+                    {thread.orderId ? (
+                      <div className="mt-3 rounded-lg border border-brand-100 bg-brand-50 p-3 text-sm">
+                        <p className="font-black text-slate-950">Order #{thread.orderId}</p>
+                        <p className="font-semibold text-slate-600">Company: {thread.companyName}</p>
+                      </div>
+                    ) : null}
                     <p className="mt-2 text-sm text-slate-700">{thread.body}</p>
                   </div>
                   <form className="grid gap-2" onSubmit={submitReply}>

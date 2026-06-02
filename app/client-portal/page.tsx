@@ -18,7 +18,12 @@ import {
   type PortalSupplier
 } from "@/lib/client-portal-data";
 import { formatMoney } from "@/lib/sales-data";
-import { getClientMessageStats, getMessagesForPortalClient } from "@/lib/clientMessageService";
+import {
+  getClientMessageStats,
+  getClientMessageThreads,
+  getLinkedMessageCompaniesForClient,
+  getMessagesForPortalClient
+} from "@/lib/clientMessageService";
 
 export default function ClientPortalPage() {
   const [client, setClient] = useState<PortalClient | null>(null);
@@ -62,6 +67,8 @@ export default function ClientPortalPage() {
     [client, ordersVersion]
   );
   const messageStats = getClientMessageStats(clientMessages);
+  const messageThreads = getClientMessageThreads(clientMessages);
+  const linkedMessageCompanies = client ? getLinkedMessageCompaniesForClient(client) : [];
   const total = catalog.reduce((sum, product) => {
     const quantity = Number(quantities[product.itemCode]) || 0;
     return sum + quantity * product.clientPrice;
@@ -224,6 +231,26 @@ export default function ClientPortalPage() {
         </section>
 
         <section className="app-card p-5">
+          <h2 className="text-xl font-black text-slate-950">Client Profile</h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <p className="text-xs font-black uppercase text-slate-500">Preferred Supplier</p>
+              <p className="mt-2 text-lg font-black text-slate-950">{selectedSupplier?.name ?? "No supplier selected"}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <p className="text-xs font-black uppercase text-slate-500">Linked Suppliers</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {linkedMessageCompanies.map((company) => (
+                  <span className={`rounded-full border px-3 py-1 text-xs font-black ${company.badgeClass}`} key={company.id}>
+                    ✓ {company.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="app-card p-5">
           <div className="mb-4 flex items-center gap-2">
             <Building2 className="h-5 w-5 text-brand-700" />
             <h2 className="text-xl font-black text-slate-950">Connected Suppliers</h2>
@@ -247,6 +274,29 @@ export default function ClientPortalPage() {
                 No active suppliers are assigned to this client.
               </p>
             ) : null}
+          </div>
+        </section>
+
+        <section className="app-card p-5">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-black text-slate-950">Recent Messages</h2>
+              <p className="text-sm font-semibold text-slate-500">Unread Messages: {clientMessages.filter((item) => !item.readByClient).length}</p>
+            </div>
+            <Link className="secondary-button" href="/client-portal/messages">
+              <MessageSquare className="h-4 w-4" />
+              View All
+            </Link>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {messageThreads.slice(0, 4).map((thread) => (
+              <article className="rounded-lg border border-slate-200 bg-white p-4" key={thread.threadId}>
+                <p className="font-black text-slate-950">{thread.companyName}</p>
+                <p className="mt-1 text-sm font-semibold text-slate-500">Last reply: {new Date(thread.createdAt).toLocaleString()}</p>
+                <p className="mt-2 text-sm text-slate-600">{thread.subject}</p>
+              </article>
+            ))}
+            {!messageThreads.length ? <p className="text-sm font-semibold text-slate-500">No recent messages yet.</p> : null}
           </div>
         </section>
 

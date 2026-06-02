@@ -170,7 +170,17 @@ function MessagesContent({ user }: { user: SessionUser }) {
                     {thread.orderId ? <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">{thread.orderId}</span> : null}
                   </div>
                   <h4 className="mt-3 font-black text-slate-950">{thread.clientName}</h4>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">{thread.companyName} - {thread.phone}</p>
+                  <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+                    <p><span className="font-black text-slate-500">Client:</span> {thread.clientName}</p>
+                    <p><span className="font-black text-slate-500">Company:</span> {thread.companyName}</p>
+                  </div>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">{thread.phone}</p>
+                  {thread.orderId ? (
+                    <div className="mt-3 rounded-lg border border-brand-100 bg-brand-50 p-3 text-sm">
+                      <p className="font-black text-slate-950">Order #{thread.orderId}</p>
+                      <p className="font-semibold text-slate-600">Company: {thread.companyName}</p>
+                    </div>
+                  ) : null}
                   <p className="mt-2 text-sm text-slate-700">{thread.body}</p>
                   <p className="mt-2 text-xs font-bold text-slate-400">{new Date(thread.createdAt).toLocaleString()}</p>
                 </div>

@@ -11,8 +11,10 @@ import {
 } from "@/lib/client-portal-data";
 import {
   createClientMessage,
+  getClientMessageCompanyDisplay,
   getClientMessageStats,
   getClientMessageThreads,
+  getLinkedMessageCompaniesForClient,
   getMessagesForPortalClient,
   type ClientMessage,
   type ClientMessageType
@@ -31,6 +33,7 @@ export default function ClientPortalMessagesPage() {
   const [client, setClient] = useState<PortalClient | null>(null);
   const [messages, setMessages] = useState<ClientMessage[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [form, setForm] = useState({
     attachmentName: "",
     body: "",
@@ -47,6 +50,7 @@ export default function ClientPortalMessagesPage() {
       const requestedOrderId = new URLSearchParams(window.location.search).get("orderId") ?? "";
       setMessages(loadedMessages);
       setSelectedThreadId(requestedOrderId ? `ORDER-${requestedOrderId}` : getClientMessageThreads(loadedMessages)[0]?.threadId ?? "");
+      setSelectedCompanyId(getLinkedMessageCompaniesForClient(session)[0]?.id ?? "");
       setForm((current) => ({
         ...current,
         messageType: requestedOrderId ? "Order question" : current.messageType,
@@ -65,6 +69,15 @@ export default function ClientPortalMessagesPage() {
     .filter((message) => message.threadId === selectedThreadId)
     .sort((first, second) => first.createdAt.localeCompare(second.createdAt));
   const stats = getClientMessageStats(messages);
+  const linkedCompanies = client ? getLinkedMessageCompaniesForClient(client) : [];
+  const selectedOrder = orders.find((order) => order.id === form.orderId);
+  const selectedCompany =
+    selectedOrder
+      ? getClientMessageCompanyDisplay(selectedOrder.companyId, selectedOrder.companyName)
+      : linkedCompanies.find((company) => company.id === selectedCompanyId) ?? linkedCompanies[0];
+  const selectedSupplierId =
+    selectedOrder?.supplierId ??
+    linkedCompanies.find((company) => company.id === selectedCompany?.id)?.supplierId;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -77,6 +90,7 @@ export default function ClientPortalMessagesPage() {
       orderId: form.orderId || undefined,
       subject: form.subject || undefined,
       supplierId: orders.find((order) => order.id === form.orderId)?.supplierId
+        ?? selectedSupplierId
     });
     const clientMessages = next.filter((message) => message.clientId === client.id);
     setMessages(clientMessages);
@@ -124,6 +138,25 @@ export default function ClientPortalMessagesPage() {
           </div>
         </section>
 
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`flex h-14 w-14 items-center justify-center rounded-xl border text-lg font-black ${selectedCompany?.badgeClass ?? "border-blue-200 bg-blue-50 text-blue-700"}`}>
+                {selectedCompany?.logo ?? "KA"}
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase text-slate-400">Company</p>
+                <h2 className="text-2xl font-black uppercase text-slate-950">{selectedCompany?.name ?? "Company"}</h2>
+                <p className="text-sm font-bold text-slate-500">{selectedCompany?.supportTeam ?? "Customer Support"}</p>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              {selectedCompany?.supportStatus ?? "Online"}
+            </span>
+          </div>
+        </section>
+
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Kpi label="New Messages" value={stats.newMessages} />
           <Kpi label="Unread Messages" value={messages.filter((message) => !message.readByClient).length} />
@@ -143,7 +176,10 @@ export default function ClientPortalMessagesPage() {
                   type="button"
                 >
                   <p className="font-black text-slate-950">{thread.subject}</p>
-                  <p className="mt-1 text-xs font-semibold text-slate-500">{thread.messageType} - {thread.status}</p>
+                  <span className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[11px] font-black ${getClientMessageCompanyDisplay(thread.companyId, thread.companyName).badgeClass}`}>
+                    {thread.companyName}
+                  </span>
+                  <p className="mt-2 text-xs font-semibold text-slate-500">{thread.messageType} - {thread.status}</p>
                   <p className="mt-2 line-clamp-2 text-xs text-slate-500">{thread.body}</p>
                 </button>
               ))}
@@ -177,6 +213,22 @@ export default function ClientPortalMessagesPage() {
           <form className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" onSubmit={submit}>
             <h2 className="text-lg font-black text-slate-950">Send Message</h2>
             <div className="mt-4 grid gap-3">
+              <Field label="Message Company">
+                {linkedCompanies.length > 1 && !form.orderId ? (
+                  <select className="form-input" onChange={(event) => setSelectedCompanyId(event.target.value)} value={selectedCompanyId}>
+                    {linkedCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
+                  </select>
+                ) : (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-black text-slate-900">
+                    {selectedCompany?.name ?? "No linked company"}
+                  </div>
+                )}
+              </Field>
+              <Field label="Sending Message To">
+                <div className={`rounded-lg border px-3 py-3 text-sm font-black ${selectedCompany?.badgeClass ?? "border-blue-200 bg-blue-50 text-blue-700"}`}>
+                  {selectedCompany?.name ?? "Company"}
+                </div>
+              </Field>
               <Field label="Message Type">
                 <select className="form-input" onChange={(event) => setForm((current) => ({ ...current, messageType: event.target.value as ClientMessageType }))} value={form.messageType}>
                   {messageTypes.map((type) => <option key={type}>{type}</option>)}
@@ -188,6 +240,12 @@ export default function ClientPortalMessagesPage() {
                   {orders.map((order) => <option key={order.id} value={order.id}>{order.id} - {order.status}</option>)}
                 </select>
               </Field>
+              {form.orderId ? (
+                <div className="rounded-lg border border-brand-100 bg-brand-50 p-3">
+                  <p className="text-sm font-black text-slate-950">Order #{form.orderId}</p>
+                  <p className="text-sm font-semibold text-slate-600">Company: {selectedCompany?.name ?? "Company"}</p>
+                </div>
+              ) : null}
               <Field label="Subject">
                 <input className="form-input" onChange={(event) => setForm((current) => ({ ...current, subject: event.target.value }))} placeholder={form.orderId ? `I want to ask about order ${form.orderId}.` : "Message subject"} value={form.subject} />
               </Field>
