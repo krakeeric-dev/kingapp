@@ -1,9 +1,12 @@
 export type NotificationTemplate =
   | "Order Received"
   | "Order Approved"
+  | "Loading Started"
   | "Out For Delivery"
   | "Delivered"
-  | "Payment Reminder";
+  | "Payment Reminder"
+  | "Complaint Logged"
+  | "Callback Reminder";
 
 export type NotificationChannel = "Internal" | "SMS" | "WhatsApp" | "Email";
 
@@ -52,11 +55,20 @@ export function buildNotificationMessage(template: NotificationTemplate, payload
   if (template === "Order Approved") {
     return `Hello ${payload.clientName}, your order ${payload.orderNumber ?? ""} has been approved.`;
   }
+  if (template === "Loading Started") {
+    return `Hello ${payload.clientName}, loading has started for order ${payload.orderNumber ?? ""}.`;
+  }
   if (template === "Out For Delivery") {
     return `Hello ${payload.clientName}, your order ${payload.orderNumber ?? ""} is out for delivery${payload.eta ? `, ETA ${payload.eta}` : ""}.`;
   }
   if (template === "Delivered") {
     return `Hello ${payload.clientName}, your order ${payload.orderNumber ?? ""} has been delivered. Thank you.`;
+  }
+  if (template === "Complaint Logged") {
+    return `Hello ${payload.clientName}, your complaint has been logged. ${payload.notes ?? ""}`.trim();
+  }
+  if (template === "Callback Reminder") {
+    return `Reminder: call ${payload.clientName}${payload.eta ? ` at ${payload.eta}` : ""}. ${payload.notes ?? ""}`.trim();
   }
   return `Hello ${payload.clientName}, payment reminder${payload.amount ? ` for ${payload.amount.toLocaleString()} RWF` : ""}. ${payload.notes ?? ""}`.trim();
 }

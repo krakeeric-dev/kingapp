@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
+  Clock,
   CreditCard,
   Gauge,
   Headphones,
@@ -444,6 +445,8 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
                   <KpiCard accent="red" icon={MessageSquareWarning} label="Unread Messages" subtext="Need attention" value={messagingStats.unreadMessages.toLocaleString()} />
                   <KpiCard accent="amber" icon={Megaphone} label="Announcements" subtext="Team broadcasts" value={messagingStats.announcements.toLocaleString()} />
                   <KpiCard accent="red" icon={Bell} label="Urgent Alerts" subtext="Orders, complaints, callbacks" value={messagingStats.urgentAlerts.toLocaleString()} />
+                  <KpiCard accent="blue" icon={MessageCircle} label="Active Chats" subtext="Live team rooms" value={messagingStats.activeChats.toLocaleString()} />
+                  <KpiCard accent="green" icon={Clock} label="Response Time" subtext="Average today" value={messagingStats.responseTime} />
                 </div>
 
                 <Panel id="orders" title="Pending Orders (Real Time)" action={<Link className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-black text-blue-700" href="/loading">View All Orders</Link>}>

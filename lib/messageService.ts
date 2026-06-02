@@ -10,8 +10,21 @@ import {
 import { getClientOrders } from "@/lib/client-portal-data";
 
 export type MessageStatus = "delivered" | "read";
-export type AnnouncementPriority = "Normal" | "Important" | "Urgent";
+export type MessageType = "Text" | "Image" | "File" | "Voice note" | "System notification";
+export type AnnouncementPriority = "Normal" | "Important" | "Critical" | "Emergency" | "Urgent";
 export type NotificationChannel = "Internal" | "SMS" | "WhatsApp" | "Email";
+
+export type Conversation = {
+  id: string;
+  title: string;
+  company: string;
+  clientName: string;
+  phone: string;
+  pinned: boolean;
+  unreadCount: number;
+  lastMessage: string;
+  updatedAt: string;
+};
 
 export type InternalMessage = {
   id: string;
@@ -21,6 +34,12 @@ export type InternalMessage = {
   toRole: string;
   subject: string;
   body: string;
+  conversationId?: string;
+  companyName?: string;
+  messageType?: MessageType;
+  attachmentName?: string;
+  replyToId?: string;
+  pinned?: boolean;
   status: MessageStatus;
   deliveredAt: string;
   readAt?: string;
@@ -32,9 +51,19 @@ export type TeamAnnouncement = {
   title: string;
   body: string;
   priority: AnnouncementPriority;
-  audience: "All" | "Managers" | "Agents";
+  audience:
+    | "All"
+    | "All users"
+    | "Managers"
+    | "Agents"
+    | "Call Center"
+    | "Storekeepers"
+    | "Sales Team"
+    | "Specific company";
   createdBy: string;
   createdAt: string;
+  companyName?: string;
+  readCount?: number;
 };
 
 export type InternalNotification = {
@@ -91,6 +120,10 @@ const seedMessages: InternalMessage[] = [
     toRole: "manager",
     subject: "Kigali Mart payment promise",
     body: "Client promised to pay before Friday afternoon delivery.",
+    conversationId: "CONV-001",
+    companyName: "Agahozo Water",
+    messageType: "Text",
+    pinned: true,
     status: "read",
     deliveredAt: "2026-06-02T08:45:00.000Z",
     readAt: "2026-06-02T08:55:00.000Z",
@@ -104,6 +137,9 @@ const seedMessages: InternalMessage[] = [
     toRole: "callcenter",
     subject: "Confirm high balance clients",
     body: "Please prioritize stores with unpaid balances before taking new orders.",
+    conversationId: "CONV-002",
+    companyName: "Agahozo Water",
+    messageType: "System notification",
     status: "delivered",
     deliveredAt: "2026-06-02T09:10:00.000Z",
     createdAt: "2026-06-02T09:10:00.000Z"
@@ -144,6 +180,9 @@ export function sendInternalMessage(input: Pick<InternalMessage, "body" | "subje
     id: makeId("MSG"),
     fromUser: user.displayName,
     fromRole: user.role,
+    conversationId: "CONV-GENERAL",
+    companyName: user.companyName,
+    messageType: "Text",
     status: "delivered",
     deliveredAt: now,
     createdAt: now
@@ -158,6 +197,86 @@ export function sendInternalMessage(input: Pick<InternalMessage, "body" | "subje
     priority: "Medium"
   });
   return messages;
+}
+
+export function sendConversationMessage(
+  input: Pick<InternalMessage, "body" | "conversationId" | "messageType" | "subject" | "toRole" | "toUser"> & {
+    attachmentName?: string;
+  },
+  user: SessionUser
+) {
+  const now = new Date().toISOString();
+  const message: InternalMessage = {
+    ...input,
+    id: makeId("MSG"),
+    fromUser: user.displayName,
+    fromRole: user.role,
+    companyName: user.companyName,
+    status: "delivered",
+    deliveredAt: now,
+    createdAt: now
+  };
+  const messages = [message, ...getMessages()];
+  writeJson(MESSAGES_KEY, messages);
+  return messages;
+}
+
+export function getConversations(): Conversation[] {
+  const messages = getMessages();
+  const fallback: Conversation[] = [
+    {
+      id: "CONV-001",
+      title: "Kigali Mart",
+      company: "Agahozo Water",
+      clientName: "Kigali Mart",
+      phone: "0788000001",
+      pinned: true,
+      unreadCount: 1,
+      lastMessage: "Client promised to pay before Friday afternoon delivery.",
+      updatedAt: "2026-06-02T08:45:00.000Z"
+    },
+    {
+      id: "CONV-002",
+      title: "Manager Desk",
+      company: "Agahozo Water",
+      clientName: "Internal",
+      phone: "Extension 100",
+      pinned: true,
+      unreadCount: 2,
+      lastMessage: "Please prioritize stores with unpaid balances.",
+      updatedAt: "2026-06-02T09:10:00.000Z"
+    },
+    {
+      id: "CONV-003",
+      title: "Teju Juice Orders",
+      company: "Teju Juice",
+      clientName: "Green Valley Bar",
+      phone: "0788000004",
+      pinned: false,
+      unreadCount: 0,
+      lastMessage: "Delivery dispatch confirmed.",
+      updatedAt: "2026-06-02T09:30:00.000Z"
+    }
+  ];
+
+  const derived = new Map(fallback.map((conversation) => [conversation.id, conversation]));
+  messages.forEach((message) => {
+    const id = message.conversationId ?? "CONV-GENERAL";
+    const existing = derived.get(id);
+    derived.set(id, {
+      id,
+      title: existing?.title ?? message.subject,
+      company: message.companyName ?? existing?.company ?? "Agahozo Water",
+      clientName: existing?.clientName ?? message.toUser,
+      phone: existing?.phone ?? "Internal",
+      pinned: existing?.pinned ?? Boolean(message.pinned),
+      unreadCount: (existing?.unreadCount ?? 0) + (message.status === "read" ? 0 : 1),
+      lastMessage: message.body,
+      updatedAt: message.createdAt
+    });
+  });
+
+  return Array.from(derived.values()).sort((first, second) => Number(second.pinned) - Number(first.pinned) || second.updatedAt.localeCompare(first.updatedAt));
 }
 
 export function markMessageRead(messageId: string) {
@@ -235,7 +354,9 @@ export function getMessagingDashboardStats(user: SessionUser) {
     messagesToday: visibleMessages.filter((message) => message.createdAt.slice(0, 10) === today).length,
     unreadMessages: visibleMessages.filter((message) => message.status !== "read").length,
     announcements: announcements.length,
-    urgentAlerts: visibleNotifications.filter((notification) => notification.priority === "Urgent" || notification.priority === "High").length
+    urgentAlerts: visibleNotifications.filter((notification) => notification.priority === "Urgent" || notification.priority === "High").length,
+    activeChats: getConversations().filter((conversation) => conversation.updatedAt.slice(0, 10) === today || conversation.unreadCount > 0).length,
+    responseTime: "4m"
   };
 }
 
