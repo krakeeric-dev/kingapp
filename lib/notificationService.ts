@@ -5,6 +5,8 @@ export type NotificationTemplate =
   | "Delivered"
   | "Payment Reminder";
 
+export type NotificationChannel = "Internal" | "SMS" | "WhatsApp" | "Email";
+
 export type NotificationPayload = {
   clientName: string;
   phone: string;
@@ -16,7 +18,7 @@ export type NotificationPayload = {
 
 export type NotificationResult = {
   id: string;
-  channel: "WhatsApp";
+  channel: NotificationChannel;
   template: NotificationTemplate;
   phone: string;
   message: string;
@@ -73,6 +75,24 @@ export function sendWhatsAppNotification(
     createdAt: new Date().toISOString()
   };
 
+  writeJson(NOTIFICATIONS_KEY, [result, ...getNotificationHistory()]);
+  return result;
+}
+
+export function sendNotification(
+  channel: NotificationChannel,
+  template: NotificationTemplate,
+  payload: NotificationPayload
+): NotificationResult {
+  const result: NotificationResult = {
+    id: `NTF-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase(),
+    channel,
+    template,
+    phone: payload.phone,
+    message: buildNotificationMessage(template, payload),
+    status: "mock_sent",
+    createdAt: new Date().toISOString()
+  };
   writeJson(NOTIFICATIONS_KEY, [result, ...getNotificationHistory()]);
   return result;
 }

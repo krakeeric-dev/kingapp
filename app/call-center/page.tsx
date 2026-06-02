@@ -17,8 +17,10 @@ import {
   Gauge,
   Headphones,
   Home,
+  MessageCircle,
   MessageSquare,
   MessageSquareWarning,
+  Megaphone,
   MicOff,
   NotebookTabs,
   Pause,
@@ -76,6 +78,12 @@ import {
 } from "@/lib/call-center-operations";
 import { sendWhatsAppNotification } from "@/lib/notificationService";
 import { getProducts, type ProductMaster } from "@/lib/products-data";
+import {
+  getAnnouncements,
+  getClientTimeline,
+  getMessagingDashboardStats,
+  type TeamAnnouncement
+} from "@/lib/messageService";
 
 type ActionMode = "order" | "payment" | "complaint" | "delivery" | "callback";
 type DetailTab = "orders" | "payments" | "notes";
@@ -96,6 +104,9 @@ const menuItems = [
   { label: "Clients", href: "#clients", icon: UsersRound, badge: "" },
   { label: "Orders", href: "#orders", icon: ClipboardList, badge: "" },
   { label: "Follow Ups", href: "/call-center/callbacks", icon: CalendarClock, badge: "" },
+  { label: "Messages", href: "/call-center/messages", icon: MessageSquare, badge: "" },
+  { label: "Chat", href: "/call-center/chat", icon: MessageCircle, badge: "" },
+  { label: "Announcements", href: "/call-center/announcements", icon: Megaphone, badge: "" },
   { label: "Complaints", href: "/call-center/complaints", icon: MessageSquareWarning, badge: "" },
   { label: "Payments", href: "#payments", icon: CreditCard, badge: "" },
   { label: "Recordings", href: "/call-center/recordings", icon: Radio, badge: "" },
@@ -155,6 +166,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
   const [queueCalls, setQueueCalls] = useState<QueueCall[]>([]);
   const [agents, setAgents] = useState<CallCenterAgent[]>([]);
   const [products, setProducts] = useState<ProductMaster[]>([]);
+  const [announcements, setAnnouncements] = useState<TeamAnnouncement[]>([]);
   const [activeCompany, setActiveCompany] = useState("all");
   const [selectedClientId, setSelectedClientId] = useState("");
   const [query, setQuery] = useState("");
@@ -201,6 +213,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
     setQueueCalls(getCompanyQueueCalls());
     setAgents(getAgents());
     setProducts(getProducts());
+    setAnnouncements(getAnnouncements());
     setActiveCompany(getActiveCallCenterCompany());
   }, []);
 
@@ -239,6 +252,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
     deliveriesToday: orders.filter((order) => order.deliveryDate === today()).length,
     paymentsDue: payments.filter((payment) => payment.status !== "Closed").reduce((sum, payment) => sum + payment.amountDue, 0)
   };
+  const messagingStats = getMessagingDashboardStats(user);
 
   function requireClient() {
     if (!selectedClient) {
@@ -399,6 +413,13 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
               </div>
             ) : null}
 
+            {announcements[0] ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
+                <Megaphone className="mr-2 inline h-4 w-4" />
+                {announcements[0].title}: {announcements[0].body}
+              </div>
+            ) : null}
+
             {currentCall ? (
               <ClientAutoPopup
                 call={currentCall}
@@ -419,6 +440,10 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
                   <KpiCard accent="amber" icon={ClipboardList} label="Pending Orders" subtext="View all pending" value={kpis.pendingOrders.toLocaleString()} />
                   <KpiCard accent="blue" icon={Truck} label="Deliveries Today" subtext="On the way: 6" value={kpis.deliveriesToday.toLocaleString()} />
                   <KpiCard accent="red" icon={WalletCards} label="Payments Due" subtext={`From ${payments.length} clients`} value={`${formatMoney(kpis.paymentsDue)} RWF`} />
+                  <KpiCard accent="blue" icon={MessageSquare} label="Messages Today" subtext="Internal inbox" value={messagingStats.messagesToday.toLocaleString()} />
+                  <KpiCard accent="red" icon={MessageSquareWarning} label="Unread Messages" subtext="Need attention" value={messagingStats.unreadMessages.toLocaleString()} />
+                  <KpiCard accent="amber" icon={Megaphone} label="Announcements" subtext="Team broadcasts" value={messagingStats.announcements.toLocaleString()} />
+                  <KpiCard accent="red" icon={Bell} label="Urgent Alerts" subtext="Orders, complaints, callbacks" value={messagingStats.urgentAlerts.toLocaleString()} />
                 </div>
 
                 <Panel id="orders" title="Pending Orders (Real Time)" action={<Link className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-black text-blue-700" href="/loading">View All Orders</Link>}>
@@ -507,6 +532,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
                 <aside className="space-y-4">
                   <ClientDetailsCard client={selectedClient} onSearch={setQuery} query={query} results={filteredClients} onSelect={setSelectedClientId} />
                   <ClientTabs active={tab} client={selectedClient} orders={orders} payments={payments} onChange={setTab} />
+                  <ClientTimeline client={selectedClient} />
                   <CurrentOrderCard
                     actionMode={actionMode}
                     callbackForm={callbackForm}
@@ -805,6 +831,31 @@ function ClientTabs({ active, client, onChange, orders, payments }: { active: De
           ))
         ) : null}
         {active === "notes" ? client.notes.slice(0, 5).map((note) => <p className="rounded-lg bg-slate-50 px-3 py-2 font-semibold" key={note}>{note}</p>) : null}
+      </div>
+    </Panel>
+  );
+}
+
+function ClientTimeline({ client }: { client: CallCenterClient }) {
+  const timeline = getClientTimeline(client);
+
+  return (
+    <Panel title="Client Conversation Timeline">
+      <div className="max-h-96 space-y-3 overflow-y-auto pr-1">
+        {timeline.slice(0, 10).map((item) => (
+          <article className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm" key={`${item.type}-${item.id}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-black text-slate-950">{item.type}: {item.title}</p>
+                <p className="mt-1 font-semibold text-slate-600">{item.detail}</p>
+              </div>
+              <span className="text-xs font-bold text-slate-400">{item.createdAt.slice(0, 10)}</span>
+            </div>
+          </article>
+        ))}
+        {timeline.length === 0 ? (
+          <p className="text-sm font-semibold text-slate-500">No timeline activity yet.</p>
+        ) : null}
       </div>
     </Panel>
   );
