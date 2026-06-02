@@ -20,6 +20,9 @@ export type ExecutiveCompanyMetric = {
   complaintsOpen: number;
   staffOnline: number;
   inventoryValue: number;
+  expensesToday: number;
+  profitToday: number;
+  payables: number;
   performance: number;
 };
 
@@ -31,7 +34,7 @@ function companyIndex(companyId: string) {
   return Math.max(0, defaultCompanies.findIndex((company) => company.id === companyId));
 }
 
-function fallbackMetric(company: Company, field: "sales" | "cash" | "orders" | "debt" | "calls" | "complaints" | "deliveries" | "returns" | "inventory") {
+function fallbackMetric(company: Company, field: "sales" | "cash" | "orders" | "debt" | "calls" | "complaints" | "deliveries" | "returns" | "inventory" | "expenses" | "payables") {
   const index = companyIndex(company.id) + 1;
   const base = {
     sales: 1_100_000,
@@ -42,7 +45,9 @@ function fallbackMetric(company: Company, field: "sales" | "cash" | "orders" | "
     complaints: 2,
     deliveries: 12,
     returns: 7,
-    inventory: 2_400_000
+    inventory: 2_400_000,
+    expenses: 180_000,
+    payables: 90_000
   }[field];
   return base * index;
 }
@@ -90,8 +95,10 @@ export function getExecutiveCompanyMetrics(): ExecutiveCompanyMetric[] {
     const outstandingDebt = Math.max(0, salesToday - cashCollected) || fallbackMetric(company, "debt");
     const deliveries = companyOrders.filter((order) => order.status === "Delivered" || order.status === "Out for Delivery").length || fallbackMetric(company, "deliveries");
     const staffOnline = Math.max(2, callbacks.filter((callback) => callback.status === "Pending").length + companyIndex(company.id) + 3);
-    const expenseDrag = companyExpenses.reduce((sum, record) => sum + (Number(record.totalExpenses) || 0), 0);
-    const performance = Math.max(55, Math.min(99, Math.round(((cashCollected - expenseDrag) / Math.max(1, salesToday)) * 100)));
+    const expensesToday = companyExpenses.reduce((sum, record) => sum + (Number(record.totalExpenses) || 0), 0) || fallbackMetric(company, "expenses");
+    const payables = fallbackMetric(company, "payables");
+    const profitToday = Math.max(0, cashCollected - expensesToday - payables);
+    const performance = salesToday > 0 ? Math.round((cashCollected / salesToday) * 100) : 0;
 
     return {
       company,
@@ -105,6 +112,9 @@ export function getExecutiveCompanyMetrics(): ExecutiveCompanyMetric[] {
       complaintsOpen,
       staffOnline,
       inventoryValue,
+      expensesToday,
+      profitToday,
+      payables,
       performance
     };
   });
@@ -120,8 +130,68 @@ export function getExecutiveGroupSummary() {
     groupOutstandingDebt: rows.reduce((sum, row) => sum + row.outstandingDebt, 0),
     groupActiveCalls: rows.reduce((sum, row) => sum + row.callsToday, 0),
     groupComplaints: rows.reduce((sum, row) => sum + row.complaintsOpen, 0),
-    groupDeliveries: rows.reduce((sum, row) => sum + row.deliveries, 0)
+    groupDeliveries: rows.reduce((sum, row) => sum + row.deliveries, 0),
+    groupInventoryValue: rows.reduce((sum, row) => sum + row.inventoryValue, 0),
+    groupExpensesToday: rows.reduce((sum, row) => sum + row.expensesToday, 0),
+    groupProfitToday: rows.reduce((sum, row) => sum + row.profitToday, 0),
+    groupActiveStaff: rows.reduce((sum, row) => sum + row.staffOnline, 0),
+    groupPayables: rows.reduce((sum, row) => sum + row.payables, 0),
+    bestPerformingCompany: [...rows].sort((first, second) => second.performance - first.performance)[0]?.company.name ?? "No company",
+    weakestPerformingCompany: [...rows].sort((first, second) => first.performance - second.performance)[0]?.company.name ?? "No company"
   };
+}
+
+export function getExecutiveAlerts(rows = getExecutiveCompanyMetrics()) {
+  return rows.flatMap((row) => {
+    const alerts: Array<{ company: string; issue: string; severity: "High" | "Medium" | "Low"; action: string }> = [];
+
+    if (row.outstandingDebt > row.salesToday * 0.25) {
+      alerts.push({
+        company: row.company.name,
+        issue: "High unpaid balance",
+        severity: "High",
+        action: "Ask accountant and marketer to follow up on receivables."
+      });
+    }
+
+    if (row.performance < 75) {
+      alerts.push({
+        company: row.company.name,
+        issue: "Low cash collection",
+        severity: "High",
+        action: "Review cash collection and client payment promises today."
+      });
+    }
+
+    if (row.complaintsOpen > 3) {
+      alerts.push({
+        company: row.company.name,
+        issue: "Open complaints need attention",
+        severity: "Medium",
+        action: "Assign supervisor to resolve top complaints."
+      });
+    }
+
+    if (row.inventoryValue < 2_000_000) {
+      alerts.push({
+        company: row.company.name,
+        issue: "Low stock value",
+        severity: "Medium",
+        action: "Review warehouse stock and factory receipts."
+      });
+    }
+
+    if (row.returns > 20) {
+      alerts.push({
+        company: row.company.name,
+        issue: "High returns",
+        severity: "Low",
+        action: "Check loading quality and route demand."
+      });
+    }
+
+    return alerts;
+  });
 }
 
 export function switchExecutiveWorkspace(companyId: string) {
