@@ -8,7 +8,9 @@ export type UserRole =
   | "accountant"
   | "manager"
   | "marketer"
-  | "callcenter";
+  | "callcenter"
+  | "supplier"
+  | "client";
 
 export type MockUser = PlatformUser;
 
@@ -23,7 +25,9 @@ export const roleLabels: Record<UserRole, string> = {
   accountant: "Accountant",
   manager: "Manager",
   marketer: "Marketer",
-  callcenter: "Call Center Agent"
+  callcenter: "Call Center Agent",
+  supplier: "Supplier",
+  client: "Client"
 };
 
 function getAvailableUsers() {
@@ -43,7 +47,7 @@ export function authenticateUser(
   username: string,
   password: string
 ): SessionUser | null {
-  const normalizedUsername = username.trim().toLowerCase();
+  const normalizedLogin = username.trim().toLowerCase();
 
   if (
     typeof navigator !== "undefined" &&
@@ -55,12 +59,14 @@ export function authenticateUser(
 
   const user = getAvailableUsers().find(
     (mockUser) =>
-      mockUser.username.toLowerCase() === normalizedUsername &&
+      (mockUser.username.toLowerCase() === normalizedLogin ||
+        mockUser.email.toLowerCase() === normalizedLogin) &&
       mockUser.password === password &&
       mockUser.status !== "inactive"
   ) ?? mockUsers.find(
     (mockUser) =>
-      mockUser.username.toLowerCase() === normalizedUsername &&
+      (mockUser.username.toLowerCase() === normalizedLogin ||
+        mockUser.email.toLowerCase() === normalizedLogin) &&
       mockUser.password === password &&
       mockUser.status !== "inactive"
   );

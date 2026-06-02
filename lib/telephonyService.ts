@@ -209,9 +209,13 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
         nextAction: "Ended from webhook simulation"
       },
       {
+        id: `USER-${(payload.agentName ?? "Telephony").toUpperCase().replace(/\s+/g, "-")}`,
         username: payload.agentName ?? "Telephony",
+        name: payload.agentName ?? "Telephony",
         displayName: payload.agentName ?? "Telephony",
         role: "callcenter",
+        companyId: existingCall.companyId ?? "COMP-AGAHOZO",
+        companyName: existingCall.companyName ?? "Agahozo Water",
         phone: "",
         email: "",
         status: "active",

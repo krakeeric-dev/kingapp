@@ -731,9 +731,13 @@ export function closeActiveCall(callId: string, agentName: string, outcome: Call
         nextAction: call.transferTo ? `Transferred to ${call.transferTo}` : "Call completed"
       },
       {
+        id: `USER-${agentName.toUpperCase().replace(/\s+/g, "-")}`,
         username: agentName,
+        name: agentName,
         displayName: agentName,
         role: "callcenter",
+        companyId: call.companyId ?? "COMP-AGAHOZO",
+        companyName: call.companyName ?? "Agahozo Water",
         phone: "",
         email: "",
         status: "active",

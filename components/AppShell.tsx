@@ -7,6 +7,7 @@ import {
   BarChart3,
   BadgeDollarSign,
   Boxes,
+  Building2,
   ClipboardCheck,
   ClipboardList,
   Download,
@@ -31,6 +32,10 @@ import { canAccessPage, getAllowedRoles } from "@/lib/permissions";
 import { roleLabels } from "@/lib/auth";
 import { clearSession, getSession } from "@/lib/storage";
 import { syncPendingQueue } from "@/lib/supabase";
+import {
+  getActiveCompanyId,
+  getCompanyName
+} from "@/lib/companies-data";
 
 type NavItem = {
   href: string;
@@ -150,6 +155,12 @@ const navItems: NavItem[] = [
     roles: getAllowedRoles("/admin/users")
   },
   {
+    href: "/admin/companies",
+    label: "Companies",
+    icon: Building2,
+    roles: getAllowedRoles("/admin/companies")
+  },
+  {
     href: "/daily-report",
     label: "Daily Report",
     icon: ScrollText,
@@ -183,6 +194,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
   const [isOnline, setIsOnline] = useState(true);
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
+  const [activeCompanyId, setActiveCompany] = useState("all");
   const allowedRoleKey = allowedRoles?.join(",");
 
   useEffect(() => {
@@ -210,6 +222,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
 
       if (isMounted) {
         setUser(session);
+        setActiveCompany(getActiveCompanyId(session));
         setIsReady(true);
       }
 
@@ -231,6 +244,16 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
       isMounted = false;
     };
   }, [allowedRoleKey, pathname, router]);
+
+  useEffect(() => {
+    function updateCompany() {
+      const session = getSession();
+      setActiveCompany(getActiveCompanyId(session));
+    }
+
+    window.addEventListener("kingapp:company-switched", updateCompany);
+    return () => window.removeEventListener("kingapp:company-switched", updateCompany);
+  }, []);
 
   useEffect(() => {
     function handleBeforeInstallPrompt(event: Event) {
@@ -295,10 +318,13 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
     (item) => !item.href.startsWith("/call-center")
   );
 
+  const workspaceName =
+    activeCompanyId === "all" ? "All Companies" : getCompanyName(activeCompanyId, user.companyName);
+
   return (
     <main className="min-h-screen bg-transparent lg:grid lg:grid-cols-[280px_1fr]">
       <aside className="no-print fixed inset-y-0 left-0 z-30 hidden h-screen w-[280px] border-r border-white/10 bg-gradient-to-b from-brand-950 via-brand-900 to-brand-800 p-5 text-white shadow-executive lg:flex lg:flex-col">
-        <BrandBlock />
+        <BrandBlock companyName={workspaceName} />
         <nav className="mt-8 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
           {visibleNav.map((item) => (
             <NavLink
@@ -328,7 +354,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
             </div>
             <div className="hidden lg:block">
               <p className="text-xs font-bold uppercase tracking-normal text-brand-700">
-                KingApp Workspace
+                KingApp Workspace — {workspaceName}
               </p>
               <h1 className="mt-1 text-2xl font-bold text-slate-950">
                 {currentPageTitle(pathname)}
@@ -370,7 +396,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
           <div className="no-print fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm lg:hidden">
             <div className="flex h-full w-[min(88vw,340px)] flex-col bg-gradient-to-b from-brand-950 via-brand-900 to-brand-800 p-5 text-white shadow-executive">
               <div className="flex items-start justify-between gap-4">
-                <BrandBlock />
+                <BrandBlock companyName={workspaceName} />
                 <button
                   className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white transition hover:bg-white/15"
                   onClick={() => setMobileMenuOpen(false)}
@@ -446,13 +472,18 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function BrandBlock() {
+function BrandBlock({ companyName }: { companyName?: string }) {
   return (
     <div>
       <BrandMark />
       <p className="mt-4 text-sm font-medium leading-6 text-emerald-100">
         Sales & Stock Management
       </p>
+      {companyName ? (
+        <p className="mt-2 rounded-lg bg-white/10 px-3 py-2 text-xs font-black text-white">
+          {companyName}
+        </p>
+      ) : null}
     </div>
   );
 }

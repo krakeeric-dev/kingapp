@@ -12,6 +12,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import type { SessionUser, UserRole } from "@/lib/auth";
 import { roleLabels } from "@/lib/auth";
+import { getCompanies, type Company } from "@/lib/companies-data";
 import { formatDate } from "@/lib/loading-data";
 import {
   createUser,
@@ -31,6 +32,7 @@ type AddFormState = {
   role: UserRole | "";
   phone: string;
   email: string;
+  companyId: string;
   status: UserStatus;
 };
 
@@ -39,6 +41,7 @@ type EditFormState = {
   role: UserRole;
   phone: string;
   email: string;
+  companyId: string;
   status: UserStatus;
 };
 
@@ -49,7 +52,9 @@ const roleOptions: UserRole[] = [
   "storekeeper",
   "marketer",
   "accountant",
-  "callcenter"
+  "callcenter",
+  "supplier",
+  "client"
 ];
 
 const emptyAddForm: AddFormState = {
@@ -60,6 +65,7 @@ const emptyAddForm: AddFormState = {
   role: "",
   phone: "",
   email: "",
+  companyId: "COMP-AGAHOZO",
   status: "active"
 };
 
@@ -73,6 +79,7 @@ export default function UsersPage() {
 
 function UsersContent({ admin }: { admin: SessionUser }) {
   const [users, setUsers] = useState<PlatformUser[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [addForm, setAddForm] = useState<AddFormState>(emptyAddForm);
   const [editingUsername, setEditingUsername] = useState("");
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
@@ -83,6 +90,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
 
   useEffect(() => {
     setUsers(getUsers());
+    setCompanies(getCompanies());
   }, []);
 
   const sortedUsers = useMemo(() => {
@@ -146,6 +154,9 @@ function UsersContent({ admin }: { admin: SessionUser }) {
         username: addForm.username,
         password: addForm.password,
         role: addForm.role as UserRole,
+        name: addForm.displayName,
+        companyId: addForm.companyId,
+        companyName: companies.find((company) => company.id === addForm.companyId)?.name ?? "",
         phone: addForm.phone,
         email: addForm.email,
         status: addForm.status
@@ -166,6 +177,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
       role: user.role,
       phone: user.phone,
       email: user.email,
+      companyId: user.companyId,
       status: user.status
     });
   }
@@ -199,6 +211,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
         role: user.role,
         phone: user.phone,
         email: user.email,
+        companyId: user.companyId,
         status: user.status === "active" ? "inactive" : "active"
       },
       admin
@@ -324,6 +337,20 @@ function UsersContent({ admin }: { admin: SessionUser }) {
               ))}
             </select>
           </Field>
+          <Field label="Company">
+            <select
+              className="form-input"
+              onChange={(event) => updateAddForm("companyId", event.target.value)}
+              value={addForm.companyId}
+            >
+              <option value="all">All Companies</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="Phone">
             <input
               className="form-input"
@@ -371,6 +398,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
                 <th>Role</th>
                 <th>Phone</th>
                 <th>Email</th>
+                <th>Company</th>
                 <th>Status</th>
                 <th>Created date</th>
                 <th>Actions</th>
@@ -384,6 +412,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
                   <td>{roleLabels[user.role]}</td>
                   <td>{user.phone || "-"}</td>
                   <td>{user.email || "-"}</td>
+                  <td>{user.companyName || "-"}</td>
                   <td>
                     <StatusBadge status={user.status} />
                   </td>
@@ -417,6 +446,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
               <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                 <Info label="Phone" value={user.phone || "-"} />
                 <Info label="Email" value={user.email || "-"} />
+                <Info label="Company" value={user.companyName || "-"} />
                 <Info label="Created" value={formatDate(user.createdAt.slice(0, 10))} />
               </div>
               <div className="mt-4">
@@ -438,7 +468,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
           <h3 className="text-lg font-black text-slate-950">
             Edit user: {editingUsername}
           </h3>
-          <form className="mt-4 grid gap-4 lg:grid-cols-5" onSubmit={handleEditUser}>
+          <form className="mt-4 grid gap-4 lg:grid-cols-6" onSubmit={handleEditUser}>
             <Field label="Full name">
               <input
                 className="form-input"
@@ -480,6 +510,24 @@ function UsersContent({ admin }: { admin: SessionUser }) {
                 value={editForm.phone}
               />
             </Field>
+            <Field label="Company">
+              <select
+                className="form-input"
+                onChange={(event) =>
+                  setEditForm((current) =>
+                    current ? { ...current, companyId: event.target.value } : current
+                  )
+                }
+                value={editForm.companyId}
+              >
+                <option value="all">All Companies</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field label="Email">
               <input
                 className="form-input"
@@ -508,7 +556,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
                 <option value="inactive">Inactive</option>
               </select>
             </Field>
-            <div className="flex flex-col gap-2 sm:flex-row lg:col-span-5">
+            <div className="flex flex-col gap-2 sm:flex-row lg:col-span-6">
               <button className="primary-button" type="submit">
                 Save changes
               </button>

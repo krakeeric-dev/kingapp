@@ -42,6 +42,7 @@ import type { InventoryMovement, MinimumStock } from "@/lib/inventory-data";
 import { getSyncSummary } from "@/lib/offline-sync";
 import { getComplaints } from "@/lib/call-center-data";
 import type { ComplaintRecord } from "@/lib/call-center-data";
+import { filterCompanyRecords } from "@/lib/companies-data";
 
 type DashboardStat = {
   label: string;
@@ -127,34 +128,41 @@ function DashboardContent({ user }: { user: SessionUser }) {
   }, []);
 
   const dashboard = useMemo(() => {
+    const companyRecords = filterCompanyRecords(records, user);
+    const companySalesRecords = filterCompanyRecords(salesRecords, user);
+    const companyCashRecords = filterCompanyRecords(cashRecords, user);
+    const companyReturnRecords = filterCompanyRecords(returnRecords, user);
+    const companyExpenseRecords = filterCompanyRecords(expenseRecords, user);
+    const companyComplaints = filterCompanyRecords(complaints, user);
+
     const roleRecords =
       user.role === "marketer"
-        ? records.filter((record) => record.marketerUsername === user.username)
+        ? companyRecords.filter((record) => record.marketerUsername === user.username)
         : user.role === "storekeeper"
-          ? records.filter((record) => record.storekeeperUsername === user.username)
-          : records;
+          ? companyRecords.filter((record) => record.storekeeperUsername === user.username)
+          : companyRecords;
     const roleSalesRecords =
       user.role === "marketer"
-        ? salesRecords.filter(
+        ? companySalesRecords.filter(
             (record) => record.marketerUsername === user.username
           )
-        : salesRecords;
+        : companySalesRecords;
     const roleCashRecords =
       user.role === "marketer"
-        ? cashRecords.filter((record) => record.marketerUsername === user.username)
-        : cashRecords;
+        ? companyCashRecords.filter((record) => record.marketerUsername === user.username)
+        : companyCashRecords;
     const roleReturnRecords =
       user.role === "marketer"
-        ? returnRecords.filter(
+        ? companyReturnRecords.filter(
             (record) => record.marketerUsername === user.username
           )
-        : returnRecords;
+        : companyReturnRecords;
     const roleExpenseRecords =
       user.role === "marketer"
-        ? expenseRecords.filter(
+        ? companyExpenseRecords.filter(
             (record) => record.marketerUsername === user.username
           )
-        : expenseRecords;
+        : companyExpenseRecords;
 
     const todayLoads = roleRecords.filter(
       (record) => record.date === selectedDate && record.status !== "draft"
@@ -173,10 +181,10 @@ function DashboardContent({ user }: { user: SessionUser }) {
       (record) => record.date === selectedDate
     );
     const inventoryRows = getInventoryRows({
-      loadingRecords: records,
+      loadingRecords: roleRecords,
       manualMovements: inventoryMovements,
       minimumStocks,
-      returnRecords
+      returnRecords: roleReturnRecords
     });
     const inventoryTotals = getInventoryDashboardTotals(inventoryRows);
 
@@ -222,7 +230,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
       .length;
     const confirmed = roleRecords.filter((record) => record.status === "confirmed")
       .length;
-    const openComplaints = complaints.filter(
+    const openComplaints = companyComplaints.filter(
       (record) => record.status !== "Closed"
     ).length;
     const syncStats: DashboardStat[] =

@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LockKeyhole, LogIn, ShieldCheck, UserRound } from "lucide-react";
-import { mockUsers, roleLabels } from "@/lib/auth";
+import { authenticateUser, mockUsers, roleLabels } from "@/lib/auth";
 import { getSession, saveSession } from "@/lib/storage";
 
 export default function LoginPage() {
@@ -35,12 +35,12 @@ export default function LoginPage() {
 
     try {
       const user = await withTimeout(
-        Promise.resolve().then(() => authenticateLocalDefaultUser(username, password)),
+        Promise.resolve().then(() => authenticateUser(username, password) ?? authenticateLocalDefaultUser(username, password)),
         3000
       );
 
       if (!user) {
-        setError("Incorrect username or password.");
+        setError("Incorrect email, username, or password.");
         return;
       }
 
@@ -105,7 +105,7 @@ export default function LoginPage() {
           <form className="space-y-5" onSubmit={handleSubmit}>
             <label className="block">
               <span className="mb-2 block text-sm font-semibold text-slate-700">
-                Username
+                Email or Username
               </span>
               <span className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 shadow-sm focus-within:border-brand-600 focus-within:ring-4 focus-within:ring-brand-100">
                 <UserRound className="h-5 w-5 text-brand-700" />
@@ -114,7 +114,7 @@ export default function LoginPage() {
                   autoComplete="username"
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
-                  placeholder="admin"
+                  placeholder="admin or admin@kingapp.local"
                 />
               </span>
             </label>
@@ -180,7 +180,8 @@ function authenticateLocalDefaultUser(username: string, password: string) {
   const normalizedUsername = username.trim().toLowerCase();
   const user = mockUsers.find(
     (item) =>
-      item.username.toLowerCase() === normalizedUsername &&
+      (item.username.toLowerCase() === normalizedUsername ||
+        item.email.toLowerCase() === normalizedUsername) &&
       item.password === password &&
       item.status !== "inactive"
   );

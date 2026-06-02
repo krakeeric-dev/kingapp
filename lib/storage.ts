@@ -7,14 +7,14 @@ export function saveSession(user: SessionUser) {
   window.localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   const rawUsers = window.localStorage.getItem(OFFLINE_USERS_KEY);
   const users = rawUsers ? (JSON.parse(rawUsers) as string[]) : [];
-  const updatedUsers = Array.from(new Set([...users, user.username]));
+  const updatedUsers = Array.from(new Set([...users, user.username, user.email].filter(Boolean)));
   window.localStorage.setItem(OFFLINE_USERS_KEY, JSON.stringify(updatedUsers));
 }
 
 export function canLoginOffline(username: string) {
   const rawUsers = window.localStorage.getItem(OFFLINE_USERS_KEY);
   const users = rawUsers ? (JSON.parse(rawUsers) as string[]) : [];
-  return users.includes(username);
+  return users.includes(username) || users.includes(username.toLowerCase());
 }
 
 export function getSession(): SessionUser | null {

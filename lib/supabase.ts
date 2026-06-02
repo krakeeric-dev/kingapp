@@ -7,6 +7,7 @@ import {
 
 export type SupabaseTable =
   | "users"
+  | "companies"
   | "products"
   | "product_prices"
   | "inventory_movements"
@@ -19,6 +20,7 @@ export type SupabaseTable =
 
 type SupabasePayloadRow<T> = {
   id: string;
+  company_id?: string;
   payload: T;
   updated_at?: string;
 };
@@ -81,6 +83,10 @@ export async function upsertSupabaseRows<T>(
 
   const rows = records.map((record) => ({
     id: getId(record),
+    company_id:
+      typeof record === "object" && record && "companyId" in record
+        ? String((record as { companyId?: string }).companyId ?? "")
+        : undefined,
     payload: record,
     updated_at: getUpdatedAt(record) ?? new Date().toISOString()
   }));
