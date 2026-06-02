@@ -294,9 +294,9 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
 
   return (
     <main className="min-h-screen bg-transparent lg:grid lg:grid-cols-[280px_1fr]">
-      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-[280px] border-r border-white/10 bg-gradient-to-b from-brand-950 via-brand-900 to-brand-800 p-5 text-white shadow-executive lg:flex lg:flex-col">
+      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden h-screen w-[280px] border-r border-white/10 bg-gradient-to-b from-brand-950 via-brand-900 to-brand-800 p-5 text-white shadow-executive lg:flex lg:flex-col">
         <BrandBlock />
-        <nav className="mt-8 flex-1 space-y-1.5">
+        <nav className="mt-8 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
           {visibleNav.map((item) => (
             <NavLink
               href={item.href}
