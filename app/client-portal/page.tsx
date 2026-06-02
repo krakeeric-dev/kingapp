@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Bell, Building2, Clock, LogOut, PackageCheck, ShoppingCart, Truck, UserRound } from "lucide-react";
+import Link from "next/link";
+import { Bell, Building2, Clock, LogOut, MessageSquare, PackageCheck, ShoppingCart, Truck, UserRound } from "lucide-react";
 import {
   authenticatePortalClient,
   clearPortalSession,
@@ -17,6 +18,7 @@ import {
   type PortalSupplier
 } from "@/lib/client-portal-data";
 import { formatMoney } from "@/lib/sales-data";
+import { getClientMessageStats, getMessagesForPortalClient } from "@/lib/clientMessageService";
 
 export default function ClientPortalPage() {
   const [client, setClient] = useState<PortalClient | null>(null);
@@ -55,6 +57,11 @@ export default function ClientPortalPage() {
         : [],
     [client, ordersVersion]
   );
+  const clientMessages = useMemo(
+    () => (client ? getMessagesForPortalClient(client) : []),
+    [client, ordersVersion]
+  );
+  const messageStats = getClientMessageStats(clientMessages);
   const total = catalog.reduce((sum, product) => {
     const quantity = Number(quantities[product.itemCode]) || 0;
     return sum + quantity * product.clientPrice;
@@ -189,6 +196,30 @@ export default function ClientPortalPage() {
               <LogOut className="h-4 w-4" />
               Logout
             </button>
+            <Link className="primary-button" href="/client-portal/messages">
+              <MessageSquare className="h-4 w-4" />
+              Messages
+            </Link>
+          </div>
+        </section>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <PortalMetric label="Unread Messages" value={clientMessages.filter((item) => !item.readByClient).length} />
+          <PortalMetric label="Open Support Requests" value={messageStats.openSupportRequests} />
+          <PortalMetric label="Last Reply" value={messageStats.lastReply ? new Date(messageStats.lastReply).toLocaleDateString() : "-"} />
+          <PortalMetric label="Pending Replies" value={messageStats.waitingReply} />
+        </div>
+
+        <section className="app-card p-5">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-black text-slate-950">Messages</h2>
+              <p className="text-sm font-semibold text-slate-500">Send delivery, payment, order, and support messages to your supplier.</p>
+            </div>
+            <Link className="secondary-button" href="/client-portal/messages">
+              <MessageSquare className="h-4 w-4" />
+              Open Messages
+            </Link>
           </div>
         </section>
 
@@ -311,6 +342,12 @@ export default function ClientPortalPage() {
                   Supplier: {order.supplier} - Payment: {order.paymentStatus}
                 </p>
                 <DeliveryNotice order={order} />
+                <div className="mt-4">
+                  <Link className="secondary-button" href={`/client-portal/messages?orderId=${order.id}`}>
+                    <MessageSquare className="h-4 w-4" />
+                    Message about this order
+                  </Link>
+                </div>
                 {(order.notifications ?? []).length > 0 ? (
                   <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-950">
@@ -337,6 +374,15 @@ export default function ClientPortalPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function PortalMetric({ label, value }: { label: string; value: number | string }) {
+  return (
+    <article className="app-card p-5">
+      <p className="text-sm font-bold text-slate-500">{label}</p>
+      <p className="mt-3 text-2xl font-black text-brand-800">{value}</p>
+    </article>
   );
 }
 

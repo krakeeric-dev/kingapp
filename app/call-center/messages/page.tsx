@@ -36,6 +36,13 @@ import {
   type InternalMessage,
   type MessageType
 } from "@/lib/messageService";
+import {
+  closeClientMessageThread,
+  getClientMessageThreads,
+  getMessagesForStaff,
+  replyToClientMessage,
+  type ClientMessage
+} from "@/lib/clientMessageService";
 
 const messageTypes: MessageType[] = ["Text", "Image", "File", "Voice note", "System notification"];
 
@@ -51,6 +58,9 @@ function MessagesContent({ user }: { user: SessionUser }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<InternalMessage[]>([]);
   const [selectedId, setSelectedId] = useState("");
+  const [clientMessages, setClientMessages] = useState<ClientMessage[]>([]);
+  const [replyThreadId, setReplyThreadId] = useState("");
+  const [replyBody, setReplyBody] = useState("");
   const [query, setQuery] = useState("");
   const [companyQuery, setCompanyQuery] = useState("");
   const [draft, setDraft] = useState({
@@ -63,6 +73,7 @@ function MessagesContent({ user }: { user: SessionUser }) {
     const loadedConversations = getConversationsForUser(user);
     setConversations(loadedConversations);
     setMessages(getMessagesForUser(user));
+    setClientMessages(getMessagesForStaff(user));
     setSelectedId(loadedConversations[0]?.id ?? "");
   }, [user]);
 
@@ -89,6 +100,7 @@ function MessagesContent({ user }: { user: SessionUser }) {
   const callHistory = selectedClient ? getCallLogs().filter((call) => call.clientId === selectedClient.id) : [];
   const pinnedConversations = filteredConversations.filter((conversation) => conversation.pinned);
   const unreadCount = filteredConversations.reduce((sum, conversation) => sum + conversation.unreadCount, 0);
+  const clientThreads = getClientMessageThreads(clientMessages);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -111,6 +123,20 @@ function MessagesContent({ user }: { user: SessionUser }) {
     setDraft({ attachmentName: "", body: "", messageType: "Text" });
   }
 
+  function submitClientReply(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!replyThreadId || !replyBody.trim()) return;
+    replyToClientMessage({
+      body: replyBody,
+      fromName: user.displayName,
+      fromRole: user.role === "admin" ? "admin" : user.role === "manager" ? "manager" : "callcenter",
+      threadId: replyThreadId
+    });
+    setClientMessages(getMessagesForStaff(user));
+    setReplyBody("");
+    setReplyThreadId("");
+  }
+
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
@@ -121,6 +147,65 @@ function MessagesContent({ user }: { user: SessionUser }) {
         <Kpi icon={Clock} label="Active Chats" value={filteredConversations.length.toLocaleString()} />
         <Kpi icon={Bell} label="Urgent Alerts" value={notifications.filter((item) => item.priority === "High" || item.priority === "Urgent").length.toLocaleString()} />
       </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h3 className="text-lg font-black text-slate-950">Client Messages</h3>
+            <p className="text-sm font-semibold text-slate-500">Messages from client portal, filtered by assigned company.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="status-badge border-blue-200 bg-blue-50 text-blue-700">{clientThreads.filter((item) => item.status === "New").length} New</span>
+            <span className="status-badge border-amber-200 bg-amber-50 text-amber-700">{clientThreads.filter((item) => item.status !== "Closed" && item.fromRole === "client").length} Waiting Reply</span>
+          </div>
+        </div>
+        <div className="grid gap-3">
+          {clientThreads.map((thread) => (
+            <article className="rounded-lg border border-slate-200 p-4" key={thread.threadId}>
+              <div className="grid gap-4 xl:grid-cols-[1fr_220px_260px] xl:items-start">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">{thread.messageType}</span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">{thread.status}</span>
+                    {thread.orderId ? <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">{thread.orderId}</span> : null}
+                  </div>
+                  <h4 className="mt-3 font-black text-slate-950">{thread.clientName}</h4>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">{thread.companyName} - {thread.phone}</p>
+                  <p className="mt-2 text-sm text-slate-700">{thread.body}</p>
+                  <p className="mt-2 text-xs font-bold text-slate-400">{new Date(thread.createdAt).toLocaleString()}</p>
+                </div>
+                <div className="text-sm">
+                  <p><span className="font-black text-slate-500">Supplier:</span> {thread.supplierName ?? "-"}</p>
+                  <p><span className="font-black text-slate-500">Read:</span> {thread.readByStaff ? "Read" : "Unread"}</p>
+                  <button
+                    className="secondary-button mt-3"
+                    onClick={() => {
+                      closeClientMessageThread(thread.threadId);
+                      setClientMessages(getMessagesForStaff(user));
+                    }}
+                    type="button"
+                  >
+                    Close
+                  </button>
+                </div>
+                <form className="grid gap-2" onSubmit={submitClientReply}>
+                  <textarea
+                    className="form-input min-h-20"
+                    onChange={(event) => {
+                      setReplyThreadId(thread.threadId);
+                      setReplyBody(event.target.value);
+                    }}
+                    placeholder="Reply to client"
+                    value={replyThreadId === thread.threadId ? replyBody : ""}
+                  />
+                  <button className="primary-button"><Send className="h-4 w-4" /> Reply</button>
+                </form>
+              </div>
+            </article>
+          ))}
+          {!clientThreads.length ? <p className="rounded-lg bg-slate-50 p-4 text-sm font-semibold text-slate-500">No client portal messages for this company.</p> : null}
+        </div>
+      </section>
 
       <section className="grid min-h-[760px] gap-5 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
         <aside className="rounded-xl border border-slate-200 bg-white shadow-sm">

@@ -165,6 +165,12 @@ const defaultClients: PortalClient[] = [
   }
 ];
 
+function getCompanyForClientOrder(client: PortalClient, supplierId?: string) {
+  if (supplierId === "SUP-002") return { id: "COMP-TEJU", name: "Teju Juice" };
+  if (client.id === "PORTAL-CL-002") return { id: "COMP-TEJU", name: "Teju Juice" };
+  return { id: "COMP-AGAHOZO", name: "Agahozo Water" };
+}
+
 const defaultLinks: SupplierClientLink[] = [
   {
     id: "LINK-001",
@@ -334,6 +340,7 @@ export function getLinkForClientSupplier(clientId: string, supplierId: string) {
 
 export function getCatalogForClientSupplier(client: PortalClient, supplier: PortalSupplier) {
   const link = getLinkForClientSupplier(client.id, supplier.id);
+  const company = getCompanyForClientOrder(client, supplier.id);
 
   if (!link || supplier.status !== "active" || !activeClient(client)) {
     return [];
@@ -372,6 +379,7 @@ export function createClientOrder(
   }
 
   const link = getLinkForClientSupplier(client.id, supplier.id);
+  const company = getCompanyForClientOrder(client, supplier.id);
   const catalog = getCatalogForClientSupplier(client, supplier);
   const lines = catalog
     .map((product) => {
@@ -389,6 +397,8 @@ export function createClientOrder(
 
   const order: ClientPortalOrder = {
     id: makeId("CPO"),
+    companyId: company.id,
+    companyName: company.name,
     clientId: client.id,
     clientName: client.clientName,
     phone: client.phone,

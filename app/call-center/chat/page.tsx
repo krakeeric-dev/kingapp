@@ -25,6 +25,7 @@ import {
   type ChatChannel,
   type ChatMessage
 } from "@/lib/chatService";
+import { getClientMessageThreads, getMessagesForStaff } from "@/lib/clientMessageService";
 
 export default function CallCenterChatPage() {
   return (
@@ -64,6 +65,7 @@ function ChatContent({ user }: { user: SessionUser }) {
 
   const pinnedMessages = channelMessages.filter((message) => message.pinned && !message.deleted);
   const replyTarget = messages.find((message) => message.id === replyToId);
+  const clientThreads = getClientMessageThreads(getMessagesForStaff(user));
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -95,6 +97,11 @@ function ChatContent({ user }: { user: SessionUser }) {
           <p className="mt-1 text-sm font-semibold text-slate-500">Internal and multi-company rooms</p>
         </div>
         <div className="max-h-[690px] overflow-y-auto p-4">
+          <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 p-3">
+            <p className="text-xs font-black uppercase text-blue-700">Client Support Queue</p>
+            <p className="mt-2 text-2xl font-black text-slate-950">{clientThreads.filter((thread) => thread.status !== "Closed").length}</p>
+            <p className="mt-1 text-xs font-semibold text-slate-600">Open client portal threads</p>
+          </div>
           <ChannelGroup channels={channels.filter((channel) => !channel.companyId)} label="Company Operations" selectedChannel={selectedChannel} setSelectedChannel={setSelectedChannel} />
           <ChannelGroup channels={channels.filter((channel) => channel.companyId)} label="Multi-company Channels" selectedChannel={selectedChannel} setSelectedChannel={setSelectedChannel} />
         </div>

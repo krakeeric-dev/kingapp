@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Building2, ClipboardList, Link2, PackageCheck, Truck, UserPlus, WalletCards } from "lucide-react";
+import Link from "next/link";
+import { Building2, ClipboardList, Link2, MessageSquare, PackageCheck, Truck, UserPlus, WalletCards } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import type { SessionUser } from "@/lib/auth";
 import { formatMoney } from "@/lib/sales-data";
@@ -27,6 +28,7 @@ import {
   type SupplierClientLink
 } from "@/lib/client-portal-data";
 import { getProducts } from "@/lib/products-data";
+import { getClientMessageStats, getClientMessageThreads, getMessagesForStaff, type ClientMessage } from "@/lib/clientMessageService";
 
 export default function ClientOrdersPage() {
   return (
@@ -41,6 +43,7 @@ function ClientOrdersContent({ user }: { user: SessionUser }) {
   const [clients, setClients] = useState<PortalClient[]>([]);
   const [suppliers, setSuppliers] = useState<PortalSupplier[]>([]);
   const [links, setLinks] = useState<SupplierClientLink[]>([]);
+  const [clientMessages, setClientMessages] = useState<ClientMessage[]>([]);
   const [editingClientId, setEditingClientId] = useState("");
   const [editingSupplierId, setEditingSupplierId] = useState("");
   const [message, setMessage] = useState("");
@@ -54,6 +57,7 @@ function ClientOrdersContent({ user }: { user: SessionUser }) {
     setClients(getPortalClients());
     setSuppliers(getSuppliers());
     setLinks(getSupplierClientLinks());
+    setClientMessages(getMessagesForStaff(user));
   }
 
   const dashboard = useMemo(
@@ -65,6 +69,8 @@ function ClientOrdersContent({ user }: { user: SessionUser }) {
     }),
     [orders]
   );
+  const messageStats = getClientMessageStats(clientMessages);
+  const messageThreads = getClientMessageThreads(clientMessages);
 
   function setStatus(order: ClientPortalOrder, status: ClientOrderStatus) {
     const updates: Partial<ClientPortalOrder> = {};
@@ -215,6 +221,30 @@ function ClientOrdersContent({ user }: { user: SessionUser }) {
       </div>
 
       <section className="app-card p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-black text-slate-950">Client Message Queue</h3>
+            <p className="text-sm font-semibold text-slate-500">
+              {messageStats.newMessages} new messages, {messageStats.waitingReply} waiting reply.
+            </p>
+          </div>
+          <Link className="secondary-button" href="/call-center/messages">
+            <MessageSquare className="h-4 w-4" />
+            Open Messages
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-2">
+          {messageThreads.slice(0, 4).map((thread) => (
+            <div className="rounded-lg border border-slate-200 bg-white p-3" key={thread.threadId}>
+              <p className="font-black text-slate-950">{thread.clientName} - {thread.messageType}</p>
+              <p className="text-sm font-semibold text-slate-500">{thread.orderId ?? "No order"} - {thread.status}</p>
+            </div>
+          ))}
+          {!messageThreads.length ? <p className="text-sm font-semibold text-slate-500">No client messages yet.</p> : null}
+        </div>
+      </section>
+
+      <section className="app-card p-5">
         <h3 className="text-lg font-black text-slate-950">Supplier/Admin Order Dashboard</h3>
         <div className="mt-4 grid gap-3">
           {orders.map((order) => (
@@ -256,7 +286,13 @@ function ClientOrdersContent({ user }: { user: SessionUser }) {
                   </tbody>
                 </table>
               </div>
-              <DeliverySummary order={order} />
+                <DeliverySummary order={order} />
+              <div className="mt-4">
+                <Link className="secondary-button" href="/call-center/messages">
+                  <MessageSquare className="h-4 w-4" />
+                  Message about this order
+                </Link>
+              </div>
               {user.role === "admin" ? (
                 <DeliveryAssignmentForm order={order} onSubmit={saveDeliveryDetails} />
               ) : null}

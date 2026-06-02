@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Building2, ClipboardCheck, LogOut, PackageCheck, UsersRound, WalletCards } from "lucide-react";
+import { Building2, ClipboardCheck, LogOut, MessageSquare, PackageCheck, Send, UsersRound, WalletCards } from "lucide-react";
 import {
   authenticateSupplier,
   clearSupplierSession,
@@ -21,6 +21,13 @@ import {
 } from "@/lib/client-portal-data";
 import { getProducts } from "@/lib/products-data";
 import { formatMoney } from "@/lib/sales-data";
+import {
+  getClientMessageStats,
+  getClientMessageThreads,
+  getMessagesForSupplier,
+  replyToClientMessage,
+  type ClientMessage
+} from "@/lib/clientMessageService";
 
 export default function SupplierDashboardPage() {
   const [supplier, setSupplier] = useState<PortalSupplier | null>(null);
@@ -91,6 +98,9 @@ function SupplierDashboard({
   const [orders, setOrders] = useState<ClientPortalOrder[]>([]);
   const [clients, setClients] = useState<PortalClient[]>([]);
   const [links, setLinks] = useState<SupplierClientLink[]>([]);
+  const [clientMessages, setClientMessages] = useState<ClientMessage[]>([]);
+  const [replyThreadId, setReplyThreadId] = useState("");
+  const [replyBody, setReplyBody] = useState("");
   const [editingClientId, setEditingClientId] = useState("");
   const [message, setMessage] = useState("");
 
@@ -103,6 +113,7 @@ function SupplierDashboard({
     setOrders(supplierOrders);
     setClients(getClientsForSupplier(supplier.id));
     setLinks(getSupplierClientLinks().filter((link) => link.supplierId === supplier.id && link.active));
+    setClientMessages(getMessagesForSupplier(supplier));
   }
 
   const metrics = useMemo(
@@ -116,6 +127,8 @@ function SupplierDashboard({
     }),
     [clients.length, orders]
   );
+  const messageStats = getClientMessageStats(clientMessages);
+  const messageThreads = getClientMessageThreads(clientMessages);
 
   function setStatus(order: ClientPortalOrder, status: "Approved" | "Rejected") {
     const updates =
@@ -163,6 +176,20 @@ function SupplierDashboard({
     refresh();
   }
 
+  function submitReply(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!replyThreadId || !replyBody.trim()) return;
+    replyToClientMessage({
+      body: replyBody,
+      fromName: supplier.name,
+      fromRole: "supplier",
+      threadId: replyThreadId
+    });
+    setClientMessages(getMessagesForSupplier(supplier));
+    setReplyBody("");
+    setReplyThreadId("");
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -205,7 +232,43 @@ function SupplierDashboard({
           <Metric icon={ClipboardCheck} label="Pending Orders" value={metrics.pending} />
           <Metric icon={PackageCheck} label="Delivered Orders" value={metrics.delivered} />
           <Metric icon={WalletCards} label="Open Balance" value={`${formatMoney(metrics.balance)} RWF`} />
+          <Metric icon={MessageSquare} label="Unread Messages" value={messageStats.newMessages} />
         </div>
+
+        <section className="app-card p-5">
+          <h2 className="text-xl font-black text-slate-950">Client Messages</h2>
+          <div className="mt-4 grid gap-3">
+            {messageThreads.map((thread) => (
+              <article className="rounded-lg border border-slate-200 bg-white p-4" key={thread.threadId}>
+                <div className="grid gap-4 xl:grid-cols-[1fr_260px]">
+                  <div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge label={thread.messageType} />
+                      <Badge label={thread.status} />
+                      {thread.orderId ? <Badge label={thread.orderId} /> : null}
+                    </div>
+                    <h3 className="mt-3 font-black text-slate-950">{thread.clientName}</h3>
+                    <p className="text-sm font-semibold text-slate-500">{thread.companyName} - {thread.phone}</p>
+                    <p className="mt-2 text-sm text-slate-700">{thread.body}</p>
+                  </div>
+                  <form className="grid gap-2" onSubmit={submitReply}>
+                    <textarea
+                      className="form-input min-h-20"
+                      onChange={(event) => {
+                        setReplyThreadId(thread.threadId);
+                        setReplyBody(event.target.value);
+                      }}
+                      placeholder="Reply to client"
+                      value={replyThreadId === thread.threadId ? replyBody : ""}
+                    />
+                    <button className="primary-button"><Send className="h-4 w-4" /> Reply</button>
+                  </form>
+                </div>
+              </article>
+            ))}
+            {!messageThreads.length ? <p className="text-sm font-semibold text-slate-500">No client messages yet.</p> : null}
+          </div>
+        </section>
 
         <section className="app-card p-5">
           <h2 className="text-xl font-black text-slate-950">Incoming Orders</h2>
