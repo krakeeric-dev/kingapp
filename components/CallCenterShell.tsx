@@ -45,7 +45,8 @@ const menuItems = [
   { label: "Complaints", href: "/call-center#complaints", icon: MessageSquareWarning, badge: "" },
   { label: "Payments", href: "/call-center#payments", icon: CreditCard, badge: "" },
   { label: "Analytics", href: "/call-center/analytics", icon: BookOpen, badge: "" },
-  { label: "Settings", href: "/call-center/settings", icon: UserRound, badge: "" }
+  { label: "Settings", href: "/call-center/settings", icon: UserRound, badge: "" },
+  { label: "Go-Live Checklist", href: "/call-center/production-checklist", icon: ClipboardList, badge: "" }
 ];
 
 const toolItems = [

@@ -22,9 +22,15 @@ function LiveMonitorContent() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    refresh();
+    const interval = window.setInterval(refresh, 5000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  function refresh() {
     setCalls(getQueueCalls());
     setAgents(getAgents());
-  }, []);
+  }
 
   const active = calls.filter((call) => call.status === "Active" || call.status === "Transferred");
   const waiting = calls.filter((call) => call.status === "Waiting" || call.status === "Incoming");

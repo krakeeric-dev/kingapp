@@ -219,7 +219,7 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
     );
   }
 
-  if (payload.event === "call_recording_ready") {
+  if (payload.event === "call_recording_ready" || payload.event === "recording_ready") {
     const recordings = getCallRecordings();
     writeJson(RECORDINGS_KEY, [
       {

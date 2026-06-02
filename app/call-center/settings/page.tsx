@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { PhoneCall, Save, Server, ShieldCheck } from "lucide-react";
+import { KeyRound, PhoneCall, Save, Server, ShieldCheck } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
 import { getAgents, type AgentPhoneType } from "@/lib/call-center-data";
 import type { TelephonyProvider } from "@/lib/providerAdapters";
@@ -80,7 +80,6 @@ function SettingsContent() {
             </select>
           </label>
           <Field label="Provider Name" onChange={(value) => update("providerName", value)} value={settings.providerName} />
-          <Field label="API Key" onChange={(value) => update("apiKey", value)} value={settings.apiKey} />
           <Field label="SIP Server" onChange={(value) => update("sipServer", value)} value={settings.sipServer} />
           <Field label="Webhook URL" onChange={(value) => update("webhookUrl", value)} value={settings.webhookUrl} />
           <Field label="Company Phone Number" onChange={(value) => update("companyPhoneNumber", value)} value={settings.companyPhoneNumber} />
@@ -95,6 +94,17 @@ function SettingsContent() {
           </label>
           <button className="primary-button md:col-span-2 xl:col-span-3"><Save className="h-4 w-4" /> Save Settings</button>
         </form>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <SecretCard
+          label="Provider API Key"
+          value="TELEPHONY_API_KEY"
+        />
+        <SecretCard
+          label="Webhook Secret"
+          value="TELEPHONY_WEBHOOK_SECRET"
+        />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
@@ -164,4 +174,25 @@ function Field({ label, onChange, value }: { label: string; onChange: (value: st
 
 function Notice({ message }: { message: string }) {
   return <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{message}</div>;
+}
+
+function SecretCard({ label, value }: { label: string; value: string }) {
+  return (
+    <article className="rounded-lg border border-amber-200 bg-amber-50 p-5">
+      <div className="flex items-start gap-3">
+        <div className="rounded-lg bg-white p-2 text-amber-700">
+          <KeyRound className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="font-black text-slate-950">{label}</p>
+          <p className="mt-1 text-sm font-semibold text-amber-800">
+            Stored securely in environment variable: {value}
+          </p>
+          <p className="mt-2 text-xs font-bold text-slate-500">
+            Secrets are never displayed or saved in browser localStorage.
+          </p>
+        </div>
+      </div>
+    </article>
+  );
 }

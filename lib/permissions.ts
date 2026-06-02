@@ -11,6 +11,7 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/call-center/softphone": ["admin", "callcenter"],
   "/call-center/live-monitor": ["admin", "manager"],
   "/call-center/analytics": ["admin", "manager"],
+  "/call-center/production-checklist": ["admin", "manager"],
   "/client-orders": ["admin", "storekeeper", "accountant", "marketer", "manager", "supervisor"],
   "/loading": ["admin", "supervisor", "storekeeper"],
   "/inventory": ["admin", "manager", "supervisor", "storekeeper"],

@@ -20,7 +20,8 @@ export type TelephonyWebhookEvent =
   | "call_ended"
   | "call_missed"
   | "call_transferred"
-  | "call_recording_ready";
+  | "call_recording_ready"
+  | "recording_ready";
 
 export type WebhookPayload = {
   event: TelephonyWebhookEvent;
