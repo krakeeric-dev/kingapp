@@ -32,6 +32,10 @@ import {
   UsersRound,
   WalletCards
 } from "lucide-react";
+import {
+  CallCenterMobileBlock,
+  useIsMobileScreen
+} from "@/components/CallCenterDesktopOnly";
 import type { SessionUser } from "@/lib/auth";
 import { canAccessPage } from "@/lib/permissions";
 import { formatMoney } from "@/lib/sales-data";
@@ -95,6 +99,7 @@ const toolItems = [
 export default function CallCenterPage() {
   const router = useRouter();
   const [user, setUser] = useState<SessionUser | null>(null);
+  const isMobileScreen = useIsMobileScreen();
 
   useEffect(() => {
     const session = getSession();
@@ -115,6 +120,10 @@ export default function CallCenterPage() {
 
   if (!user) {
     return <main className="min-h-screen bg-slate-950" />;
+  }
+
+  if (isMobileScreen) {
+    return <CallCenterMobileBlock />;
   }
 
   return <CallCenterOffice user={user} />;

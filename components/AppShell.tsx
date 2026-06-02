@@ -291,6 +291,9 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
   }
 
   const visibleNav = navItems.filter((item) => item.roles.includes(user.role));
+  const mobileVisibleNav = visibleNav.filter(
+    (item) => !item.href.startsWith("/call-center")
+  );
 
   return (
     <main className="min-h-screen bg-transparent lg:grid lg:grid-cols-[280px_1fr]">
@@ -377,7 +380,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
                 </button>
               </div>
               <nav className="mt-8 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
-                {visibleNav.map((item) => (
+                {mobileVisibleNav.map((item) => (
                   <NavLink
                     href={item.href}
                     icon={item.icon}
@@ -415,7 +418,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
         <MobileBottomNav
           onOpenMenu={() => setMobileMenuOpen(true)}
           pathname={pathname}
-          visibleNav={visibleNav}
+          visibleNav={mobileVisibleNav}
         />
       </div>
     </main>

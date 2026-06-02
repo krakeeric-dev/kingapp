@@ -19,6 +19,10 @@ import {
   UserRound,
   UsersRound
 } from "lucide-react";
+import {
+  CallCenterMobileBlock,
+  useIsMobileScreen
+} from "@/components/CallCenterDesktopOnly";
 import type { SessionUser } from "@/lib/auth";
 import { getAgents, getQueueCalls } from "@/lib/call-center-data";
 import { canAccessPage } from "@/lib/permissions";
@@ -61,6 +65,7 @@ export function CallCenterShell({
   const [user, setUser] = useState<SessionUser | null>(null);
   const [callsInQueue, setCallsInQueue] = useState(0);
   const [agentsOnline, setAgentsOnline] = useState(0);
+  const isMobileScreen = useIsMobileScreen();
 
   useEffect(() => {
     const session = getSession();
@@ -90,6 +95,10 @@ export function CallCenterShell({
 
   if (!user) {
     return <main className="min-h-screen bg-[#061b33]" />;
+  }
+
+  if (isMobileScreen) {
+    return <CallCenterMobileBlock />;
   }
 
   return (
