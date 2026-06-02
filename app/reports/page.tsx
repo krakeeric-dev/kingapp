@@ -16,16 +16,23 @@ import {
   getMinimumStocks
 } from "@/lib/inventory-data";
 import type { InventoryMovement, MinimumStock } from "@/lib/inventory-data";
+import type { SessionUser } from "@/lib/auth";
+import {
+  getActiveCompanyId,
+  getCompanies,
+  setActiveCompanyId
+} from "@/lib/companies-data";
+import { getExecutiveCompanyMetrics } from "@/lib/executive-data";
 
 export default function ReportsPage() {
   return (
     <AppShell allowedRoles={["admin", "supervisor", "manager"]}>
-      {() => <ReportsContent />}
+      {(user) => <ReportsContent user={user} />}
     </AppShell>
   );
 }
 
-function ReportsContent() {
+function ReportsContent({ user }: { user: SessionUser }) {
   const [loadingRecords, setLoadingRecords] = useState<LoadingRecord[]>([]);
   const [salesRecords, setSalesRecords] = useState<SalesRecord[]>([]);
   const [returnRecords, setReturnRecords] = useState<ReturnRecord[]>([]);
@@ -33,6 +40,7 @@ function ReportsContent() {
     InventoryMovement[]
   >([]);
   const [minimumStocks, setMinimumStocks] = useState<MinimumStock[]>([]);
+  const [companyId, setCompanyId] = useState("all");
   const [filters, setFilters] = useState({
     date: "",
     location: "",
@@ -46,17 +54,32 @@ function ReportsContent() {
     setReturnRecords(safeArray(getReturnRecords));
     setInventoryMovements(safeArray(getInventoryMovements));
     setMinimumStocks(safeArray(getMinimumStocks));
+    setCompanyId(getActiveCompanyId(user));
   }, []);
+
+  function changeCompany(value: string) {
+    setCompanyId(value);
+    if (user.role === "admin") {
+      setActiveCompanyId(value);
+      window.dispatchEvent(new Event("kingapp:company-switched"));
+    }
+  }
+
+  const scopedLoadingRecords = useMemo(() => scopeRecords(loadingRecords, companyId, user), [companyId, loadingRecords, user]);
+  const scopedSalesRecords = useMemo(() => scopeRecords(salesRecords, companyId, user), [companyId, salesRecords, user]);
+  const scopedReturnRecords = useMemo(() => scopeRecords(returnRecords, companyId, user), [companyId, returnRecords, user]);
+  const scopedInventoryMovements = useMemo(() => scopeRecords(inventoryMovements, companyId, user), [companyId, inventoryMovements, user]);
+  const companyMetrics = useMemo(() => getExecutiveCompanyMetrics(), [companyId]);
 
   const inventorySummary = useMemo(
     () => {
       try {
         return getInventorySummary(
           getInventoryRows({
-            loadingRecords: safeRecords(loadingRecords),
-            manualMovements: safeRecords(inventoryMovements),
+            loadingRecords: safeRecords(scopedLoadingRecords),
+            manualMovements: safeRecords(scopedInventoryMovements),
             minimumStocks: safeRecords(minimumStocks),
-            returnRecords: safeRecords(returnRecords)
+            returnRecords: safeRecords(scopedReturnRecords)
           })
         );
       } catch (error) {
@@ -70,11 +93,11 @@ function ReportsContent() {
         };
       }
     },
-    [inventoryMovements, loadingRecords, minimumStocks, returnRecords]
+    [minimumStocks, scopedInventoryMovements, scopedLoadingRecords, scopedReturnRecords]
   );
 
   const clientSalesSummary = useMemo(() => {
-    const rows = safeRecords(salesRecords).flatMap((record) =>
+    const rows = safeRecords(scopedSalesRecords).flatMap((record) =>
       safeRecords(record?.clientSales).flatMap((client) => {
         const clientTotalAmount = safeNumber(client?.totalAmount);
         const clientAmountPaid = safeNumber(client?.amountPaid);
@@ -168,7 +191,7 @@ function ReportsContent() {
       paid: filteredRows.reduce((total, row) => total + row.amountPaid, 0),
       balance: filteredRows.reduce((total, row) => total + row.balance, 0)
     };
-  }, [filters, salesRecords]);
+  }, [filters, scopedSalesRecords]);
 
   function updateFilter(field: keyof typeof filters, value: string) {
     setFilters((current) => ({ ...current, [field]: value }));
@@ -177,18 +200,69 @@ function ReportsContent() {
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
             <BarChart3 className="h-5 w-5" />
           </div>
           <div>
             <h2 className="text-2xl font-bold text-slate-950">Reports</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Management summaries across stock, sales, cash, and inventory.
+              {companyId === "all" ? "Group report across all companies." : "Company report for the selected workspace."}
             </p>
           </div>
+          </div>
+          {user.role === "admin" ? (
+            <select className="form-input max-w-xs" onChange={(event) => changeCompany(event.target.value)} value={companyId}>
+              <option value="all">All Companies</option>
+              {getCompanies().map((company) => (
+                <option key={company.id} value={company.id}>{company.name}</option>
+              ))}
+            </select>
+          ) : null}
         </div>
       </div>
+
+      <section className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center gap-2">
+          <BarChart3 className="h-5 w-5 text-brand-700" />
+          <h3 className="text-lg font-bold text-slate-950">Company Comparison Summary</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Sales</th>
+                <th>Cash</th>
+                <th>Orders</th>
+                <th>Debt</th>
+                <th>Inventory Value</th>
+                <th>Calls</th>
+                <th>Complaints</th>
+                <th>Performance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {companyMetrics
+                .filter((row) => companyId === "all" || row.company.id === companyId)
+                .map((row) => (
+                  <tr key={row.company.id}>
+                    <td className="font-bold text-slate-950">{row.company.name}</td>
+                    <td>{formatMoney(row.salesToday)} RWF</td>
+                    <td>{formatMoney(row.cashCollected)} RWF</td>
+                    <td>{row.orders.toLocaleString()}</td>
+                    <td>{formatMoney(row.outstandingDebt)} RWF</td>
+                    <td>{formatMoney(row.inventoryValue)} RWF</td>
+                    <td>{row.callsToday.toLocaleString()}</td>
+                    <td>{row.complaintsOpen.toLocaleString()}</td>
+                    <td>{row.performance}%</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
@@ -337,6 +411,16 @@ function safeRecords<T>(records: T[] | null | undefined): T[] {
 function safeNumber(value: unknown) {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function scopeRecords<T extends object>(records: T[], companyId: string, user: SessionUser) {
+  const activeCompany = user.role === "admin" ? companyId : user.companyId;
+
+  if (user.role === "admin" && activeCompany === "all") {
+    return records;
+  }
+
+  return records.filter((record) => (record as { companyId?: string }).companyId === activeCompany);
 }
 
 function ReportMetric({ label, value }: { label: string; value: number }) {

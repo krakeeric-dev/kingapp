@@ -13,6 +13,7 @@ import {
   Download,
   FileText,
   Home,
+  LayoutDashboard,
   LogOut,
   Menu,
   PackageCheck,
@@ -34,7 +35,9 @@ import { clearSession, getSession } from "@/lib/storage";
 import { syncPendingQueue } from "@/lib/supabase";
 import {
   getActiveCompanyId,
-  getCompanyName
+  getCompanies,
+  getCompanyName,
+  setActiveCompanyId
 } from "@/lib/companies-data";
 
 type NavItem = {
@@ -57,6 +60,12 @@ const navItems: NavItem[] = [
     label: "Dashboard",
     icon: Home,
     roles: getAllowedRoles("/dashboard")
+  },
+  {
+    href: "/executive",
+    label: "Executive",
+    icon: LayoutDashboard,
+    roles: getAllowedRoles("/executive")
   },
   {
     href: "/loading",
@@ -195,6 +204,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [activeCompanyId, setActiveCompany] = useState("all");
+  const [companies, setCompanies] = useState<ReturnType<typeof getCompanies>>([]);
   const allowedRoleKey = allowedRoles?.join(",");
 
   useEffect(() => {
@@ -223,6 +233,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
       if (isMounted) {
         setUser(session);
         setActiveCompany(getActiveCompanyId(session));
+        setCompanies(getCompanies());
         setIsReady(true);
       }
 
@@ -249,6 +260,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
     function updateCompany() {
       const session = getSession();
       setActiveCompany(getActiveCompanyId(session));
+      setCompanies(getCompanies());
     }
 
     window.addEventListener("kingapp:company-switched", updateCompany);
@@ -301,6 +313,13 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
     await installPrompt.prompt();
     await installPrompt.userChoice;
     setInstallPrompt(null);
+  }
+
+  function handleCompanyChange(companyId: string) {
+    setActiveCompanyId(companyId);
+    setActiveCompany(companyId);
+    window.dispatchEvent(new Event("kingapp:company-switched"));
+    window.dispatchEvent(new Event("kingapp:data-synced"));
   }
 
   if (!isReady || !user) {
@@ -361,6 +380,20 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
               </h1>
             </div>
             <div className="flex items-center gap-3">
+              {user.role === "admin" ? (
+                <select
+                  className="hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-700 shadow-sm outline-none lg:block"
+                  onChange={(event) => handleCompanyChange(event.target.value)}
+                  value={activeCompanyId}
+                >
+                  <option value="all">All Companies</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
               <div className="hidden rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm sm:block">
                 <span className="font-bold text-slate-950">{user.displayName}</span>
                 <span className="ml-2 text-slate-500">{roleLabels[user.role]}</span>

@@ -17,6 +17,10 @@ export type TelephonyActionResult = {
 
 export type TelephonyWebhookEvent =
   | "incoming_call"
+  | "answered"
+  | "missed"
+  | "transferred"
+  | "ended"
   | "call_answered"
   | "call_ended"
   | "call_missed"
@@ -28,6 +32,14 @@ export type TelephonyWebhookEvent =
 export type WebhookPayload = {
   event: TelephonyWebhookEvent;
   phone: string;
+  fromNumber?: string;
+  toNumber?: string;
+  companyId?: string;
+  companyName?: string;
+  agentId?: string;
+  clientId?: string;
+  status?: string;
+  timestamp?: string;
   agentName?: string;
   callId?: string;
   transferTo?: QueueCall["transferTo"];

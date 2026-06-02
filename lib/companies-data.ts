@@ -161,8 +161,12 @@ export function canSeeCompanyRecord(
   user: Pick<SessionUser, "role" | "companyId">,
   recordCompanyId?: string
 ) {
-  if (user.role === "admin") return true;
-  if (!recordCompanyId) return true;
+  if (user.role === "admin") {
+    const activeCompanyId = getActiveCompanyId(user);
+    if (activeCompanyId === "all") return true;
+    return recordCompanyId === activeCompanyId;
+  }
+  if (!recordCompanyId) return false;
   return recordCompanyId === user.companyId;
 }
 

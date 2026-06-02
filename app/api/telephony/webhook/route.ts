@@ -5,6 +5,10 @@ import { verifyTelephonySignature } from "@/lib/telephonySecurity";
 
 const supportedEvents = [
   "incoming_call",
+  "answered",
+  "missed",
+  "transferred",
+  "ended",
   "call_answered",
   "call_ended",
   "call_missed",
@@ -64,8 +68,14 @@ export async function POST(request: Request) {
       action: "webhook_received",
       provider: payload.provider ?? "mock",
       event: payload.event,
-      phone: payload.phone,
-      receivedAt: new Date().toISOString()
+      callId: payload.callId ?? "",
+      fromNumber: payload.fromNumber ?? payload.phone,
+      toNumber: payload.toNumber ?? "",
+      companyId: payload.companyId ?? "",
+      agentId: payload.agentId ?? "",
+      clientId: payload.clientId ?? "",
+      status: payload.status ?? payload.event,
+      receivedAt: payload.timestamp ?? new Date().toISOString()
     },
     result
   });

@@ -22,6 +22,7 @@ import {
 } from "@/lib/client-portal-data";
 import { getActivePrice, getProducts, type ProductMaster } from "@/lib/products-data";
 import { getCallRecordings, type CallRecording } from "@/lib/telephonyService";
+import { getActiveCompanyId, setActiveCompanyId } from "@/lib/companies-data";
 
 export type CallCenterCompany = {
   id: string;
@@ -43,8 +44,6 @@ export const callCenterCompanies: CallCenterCompany[] = [
   { id: "COMP-KING-HONEY", name: "King Honey", industry: "Honey Distribution", status: "Active" },
   { id: "COMP-KING-EGGS", name: "King Eggs", industry: "Fresh Goods Distribution", status: "Active" }
 ];
-
-const COMPANY_KEY = "kingapp.callCenter.activeCompany";
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -73,8 +72,7 @@ function companyForAgent(agent: Pick<CallCenterAgent, "id" | "companyId" | "comp
 }
 
 function readCompanyId() {
-  if (typeof window === "undefined") return "all";
-  return window.localStorage.getItem(COMPANY_KEY) ?? "all";
+  return getActiveCompanyId({ role: "admin", companyId: "all" });
 }
 
 export function getActiveCallCenterCompany() {
@@ -83,7 +81,8 @@ export function getActiveCallCenterCompany() {
 
 export function setActiveCallCenterCompany(companyId: string) {
   if (typeof window !== "undefined") {
-    window.localStorage.setItem(COMPANY_KEY, companyId);
+    setActiveCompanyId(companyId);
+    window.dispatchEvent(new Event("kingapp:company-switched"));
   }
   return companyId;
 }
@@ -247,6 +246,9 @@ export function createOneClickOrder(
   const price = getActivePrice(product.name, product.itemCode);
   const portalOrder: ClientPortalOrder = {
     id: `CCO-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase(),
+    companyId: company.id,
+    companyName: company.name,
+    agentId: user.id,
     clientId: client.id,
     clientName: client.clientName,
     phone: client.phone,

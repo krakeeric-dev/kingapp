@@ -70,6 +70,8 @@ import {
   callCenterCompanies,
   createOneClickOrder,
   getActiveCallCenterCompany,
+  getCompanyClients,
+  getCompanyQueueCalls,
   setActiveCallCenterCompany
 } from "@/lib/call-center-operations";
 import { sendWhatsAppNotification } from "@/lib/notificationService";
@@ -188,7 +190,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
   });
 
   useEffect(() => {
-    const loadedClients = getCallCenterClients();
+    const loadedClients = getCompanyClients();
     setClients(loadedClients);
     setSelectedClientId(loadedClients[0]?.id ?? "");
     setCallLogs(getCallLogs());
@@ -196,7 +198,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
     setPayments(getPaymentFollowUps());
     setComplaints(getComplaints());
     setCallbacks(getCallbacks());
-    setQueueCalls(getQueueCalls());
+    setQueueCalls(getCompanyQueueCalls());
     setAgents(getAgents());
     setProducts(getProducts());
     setActiveCompany(getActiveCallCenterCompany());

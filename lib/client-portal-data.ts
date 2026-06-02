@@ -62,6 +62,9 @@ export type ClientOrderNotification = {
 
 export type ClientPortalOrder = {
   id: string;
+  companyId?: string;
+  companyName?: string;
+  agentId?: string;
   clientId: string;
   clientName: string;
   phone: string;

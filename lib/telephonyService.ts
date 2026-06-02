@@ -14,6 +14,7 @@ import {
   type TelephonyProvider,
   type WebhookPayload
 } from "@/lib/providerAdapters";
+import { getUnknownCompanyCallLabel, routeCallByInboundNumber } from "@/lib/company-call-routing";
 
 export type TelephonySettings = {
   provider: TelephonyProvider;
@@ -139,20 +140,25 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
   await getProviderAdapter(settings.provider).handleWebhookEvent(payload);
 
   const now = new Date().toISOString();
-  const client = recognizeClientByPhone(payload.phone);
+  const event = normalizeWebhookEvent(payload.event);
+  const fromNumber = payload.fromNumber ?? payload.phone;
+  const route = routeCallByInboundNumber(payload.toNumber);
+  const client = recognizeClientByPhone(fromNumber);
+  const companyId = payload.companyId ?? route?.companyId ?? client?.companyId;
+  const companyName = payload.companyName ?? route?.companyName ?? client?.companyName ?? getUnknownCompanyCallLabel();
   const calls = getQueueCalls();
   const existingCall = payload.callId
     ? calls.find((call) => call.id === payload.callId)
-    : calls.find((call) => call.phone === payload.phone && call.status !== "Closed");
+    : calls.find((call) => call.phone === fromNumber && call.status !== "Closed");
 
-  if (payload.event === "incoming_call") {
+  if (event === "incoming_call") {
     const call: QueueCall = {
       id: payload.callId ?? createId("QCALL"),
       clientId: client?.id ?? "UNKNOWN",
-      companyId: client?.companyId,
-      companyName: client?.companyName,
+      companyId,
+      companyName,
       clientName: client?.clientName ?? "Unknown Caller",
-      phone: payload.phone,
+      phone: fromNumber,
       location: client?.area ?? "Unknown",
       currentBalance: client?.currentBalance ?? 0,
       lastOrder: client ? `${client.lastOrderQuantity} cartons on ${client.lastOrderDate}` : "No history",
@@ -160,7 +166,10 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
       callReason: client ? "Customer Care" : "New Client Prospect",
       status: "Incoming",
       startedAt: now,
-      notes: [client ? "Client auto-recognized" : "Unknown caller"]
+      notes: [
+        client ? "Client auto-recognized" : "Unknown caller",
+        route ? `Routed by inbound number ${payload.toNumber}` : "Unknown Company Call"
+      ]
     };
     saveQueueCalls([call, ...calls]);
     return { call, client };
@@ -170,16 +179,16 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
 
   const updatedCalls = calls.map((call) => {
     if (call.id !== existingCall.id) return call;
-    if (payload.event === "call_answered") {
-      return { ...call, status: "Active" as const, assignedAgent: payload.agentName ?? call.assignedAgent, acceptedAt: now };
+    if (event === "call_answered") {
+      return { ...call, status: "Active" as const, assignedAgent: payload.agentName ?? call.assignedAgent, acceptedAt: now, companyId: companyId ?? call.companyId, companyName: companyName ?? call.companyName };
     }
-    if (payload.event === "call_ended") {
+    if (event === "call_ended") {
       return { ...call, status: "Closed" as const, endedAt: now };
     }
-    if (payload.event === "call_missed") {
+    if (event === "call_missed") {
       return { ...call, status: "Missed" as const, endedAt: now };
     }
-    if (payload.event === "call_transferred") {
+    if (event === "call_transferred") {
       return { ...call, status: "Transferred" as const, transferTo: payload.transferTo };
     }
     return call;
@@ -187,7 +196,7 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
 
   saveQueueCalls(updatedCalls);
 
-  if (payload.event === "call_answered" && payload.agentName) {
+  if (event === "call_answered" && payload.agentName) {
     saveAgents(
       getAgents().map((agent) =>
         agent.name === payload.agentName ? { ...agent, status: "On Call" } : agent
@@ -195,7 +204,7 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
     );
   }
 
-  if (payload.event === "call_ended") {
+  if (event === "call_ended") {
     addCallLog(
       {
         date: now.slice(0, 10),
@@ -225,7 +234,7 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
     );
   }
 
-  if (payload.event === "call_recording_ready" || payload.event === "recording_ready" || payload.event === "recording_available") {
+  if (event === "recording_available") {
     const recordings = getCallRecordings();
     writeJson(RECORDINGS_KEY, [
       {
@@ -243,6 +252,15 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
   }
 
   return { call: updatedCalls.find((call) => call.id === existingCall.id) ?? null, client };
+}
+
+function normalizeWebhookEvent(event: WebhookPayload["event"]) {
+  if (event === "answered") return "call_answered";
+  if (event === "missed") return "call_missed";
+  if (event === "transferred") return "call_transferred";
+  if (event === "ended") return "call_ended";
+  if (event === "call_recording_ready" || event === "recording_ready") return "recording_available";
+  return event;
 }
 
 export function updateAgentPhoneType(agentId: string, phoneType: NonNullable<CallCenterAgent["phoneType"]>) {
