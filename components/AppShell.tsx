@@ -27,6 +27,7 @@ import {
   X
 } from "lucide-react";
 import type { SessionUser, UserRole } from "@/lib/auth";
+import { KingAppLogo } from "@/components/KingAppLogo";
 import { cleanupLegacyDemoProductData } from "@/lib/data-cleanup";
 import { syncSupabaseToLocalStorage } from "@/lib/live-data";
 import { canAccessPage, getAllowedRoles } from "@/lib/permissions";
@@ -487,9 +488,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
 function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-700 text-lg font-black text-white shadow-soft">
-        K
-      </div>
+      <KingAppLogo size={44} />
       {!compact ? (
         <div>
           <h1 className="text-xl font-bold text-white">KingApp</h1>

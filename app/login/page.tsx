@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LockKeyhole, LogIn, ShieldCheck, UserRound } from "lucide-react";
 import { authenticateUser, mockUsers, roleLabels } from "@/lib/auth";
+import { KingAppLogo } from "@/components/KingAppLogo";
 import { getSession, saveSession } from "@/lib/storage";
 
 export default function LoginPage() {
@@ -64,9 +65,7 @@ export default function LoginPage() {
             Live-ready sales operations
           </div>
           <div>
-            <div className="mb-5 inline-flex h-16 w-16 items-center justify-center rounded-lg bg-gradient-to-br from-brand-700 to-brand-950 text-2xl font-black text-white shadow-soft">
-              K
-            </div>
+            <KingAppLogo className="mb-5 shadow-soft" priority size={88} />
             <h1 className="text-4xl font-black tracking-normal text-brand-950 sm:text-6xl">
               KingApp
             </h1>

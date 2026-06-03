@@ -19,8 +19,9 @@ const APP_ROUTES = [
 const APP_SHELL_URLS = [
   OFFLINE_URL,
   "/manifest.json",
-  "/icons/icon-192.svg",
-  "/icons/icon-512.svg",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/favicon.png",
   ...APP_ROUTES
 ];
 
