@@ -99,6 +99,13 @@ import {
 
 type ActionMode = "order" | "payment" | "complaint" | "delivery" | "callback";
 type DetailTab = "orders" | "payments" | "notes";
+type MtnCallForm = {
+  callerPhone: string;
+  clientName: string;
+  companyId: string;
+  reason: CallType;
+  notes: string;
+};
 
 const today = () => {
   const date = new Date();
@@ -106,6 +113,7 @@ const today = () => {
 };
 
 const nowTime = () => new Date().toTimeString().slice(0, 5);
+const normalizePhone = (value: string) => value.replace(/\D/g, "");
 
 const menuItems = [
   { label: "Dashboard", href: "/call-center", icon: Home, badge: "" },
@@ -215,6 +223,14 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
   const [message, setMessage] = useState("");
   const [actionMode, setActionMode] = useState<ActionMode>("order");
   const [tab, setTab] = useState<DetailTab>("orders");
+  const [mtnFormOpen, setMtnFormOpen] = useState(false);
+  const [mtnForm, setMtnForm] = useState<MtnCallForm>({
+    callerPhone: "",
+    clientName: "",
+    companyId: user.companyId === "all" ? "COMP-AGAHOZO" : user.companyId,
+    reason: "Customer Care",
+    notes: ""
+  });
   const [noteDraft, setNoteDraft] = useState("");
   const [orderForm, setOrderForm] = useState({
     product: "",
@@ -323,6 +339,25 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
     paymentsDue: payments.filter((payment) => payment.status !== "Closed").reduce((sum, payment) => sum + payment.amountDue, 0)
   };
   const messagingStats = getMessagingDashboardStats(user);
+  const mtnMatchedClient = useMemo(() => {
+    const phone = normalizePhone(mtnForm.callerPhone);
+    const name = mtnForm.clientName.trim().toLowerCase();
+
+    return clients.find((client) => {
+      const phoneMatches = phone && normalizePhone(client.phone).includes(phone);
+      const nameMatches = name && `${client.clientName} ${client.ownerName}`.toLowerCase().includes(name);
+      return phoneMatches || nameMatches;
+    }) ?? null;
+  }, [clients, mtnForm.callerPhone, mtnForm.clientName]);
+  const mtnClientSuggestions = useMemo(() => {
+    const search = `${mtnForm.callerPhone} ${mtnForm.clientName}`.trim().toLowerCase();
+    if (!search) return clients.slice(0, 4);
+    return clients
+      .filter((client) =>
+        `${client.clientName} ${client.ownerName} ${client.phone} ${client.area}`.toLowerCase().includes(search)
+      )
+      .slice(0, 5);
+  }, [clients, mtnForm.callerPhone, mtnForm.clientName]);
 
   function refreshDesk() {
     const loadedClients = getCompanyClients(user);
@@ -403,6 +438,51 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
     setQueueCalls(getCompanyQueueCalls(user));
     setFocusedCallId("");
     setMessage("Call rejected and saved as missed.");
+  }
+
+  function saveMtnPhysicalCall(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!mtnForm.callerPhone.trim()) {
+      setMessage("Enter caller phone number.");
+      return;
+    }
+
+    const companyName =
+      callCenterCompanies.find((company) => company.id === mtnForm.companyId)?.name ??
+      mtnMatchedClient?.companyName ??
+      user.companyName;
+    const clientName = mtnMatchedClient?.clientName ?? (mtnForm.clientName.trim() || "Unknown Caller");
+    const phone = mtnMatchedClient?.phone ?? mtnForm.callerPhone.trim();
+
+    setCallLogs(
+      addCallLog(
+        {
+          date: today(),
+          time: nowTime(),
+          clientId: mtnMatchedClient?.id ?? `MTN-${Date.now()}`,
+          clientName,
+          phone,
+          callType: mtnForm.reason,
+          duration: "Manual MTN line",
+          outcome: "Closed",
+          nextAction: mtnForm.notes || `Logged from MTN physical line for ${companyName}`
+        },
+        user
+      )
+    );
+
+    if (mtnMatchedClient) {
+      setSelectedClientId(mtnMatchedClient.id);
+      setQuery(mtnMatchedClient.clientName);
+    }
+
+    setMtnFormOpen(false);
+    setMessage(
+      mtnMatchedClient
+        ? "MTN physical line call logged. Client profile is open for order, complaint, payment follow-up, or callback."
+        : "MTN physical line call logged as Unknown Caller."
+    );
   }
 
   function requireClient() {
@@ -591,17 +671,133 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
           />
           <div className="space-y-4 p-4 lg:p-6">
             <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-xs font-black uppercase text-blue-700">Provider: Mock Mode</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-600">Real phone provider not connected</p>
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-black uppercase text-blue-700">Provider: MTN Physical Line</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-600">Status: Manual Logging Mode</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-black uppercase text-amber-700">Provider: Mock Mode</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-600">Real phone provider not connected</p>
+                  </div>
                 </div>
-                <button className="primary-button" onClick={simulateIncomingCall} type="button">
-                  <PhoneIncoming className="h-4 w-4" />
-                  Simulate Incoming Call
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button className="primary-button" onClick={() => setMtnFormOpen((current) => !current)} type="button">
+                    <Phone className="h-4 w-4" />
+                    Log Incoming MTN Call
+                  </button>
+                  <button className="secondary-button" onClick={simulateIncomingCall} type="button">
+                    <PhoneIncoming className="h-4 w-4" />
+                    Simulate Incoming Call
+                  </button>
+                </div>
+              </div>
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
+                MTN physical line cannot trigger automatic popup until connected through GSM Gateway, 3CX, Asterisk, or SIP integration.
               </div>
             </section>
+
+            {mtnFormOpen ? (
+              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-950">Log Incoming MTN Call</h3>
+                    <p className="mt-1 text-sm font-semibold text-slate-500">Search by phone or client name, then save the manual call log.</p>
+                  </div>
+                  <button className="secondary-button" onClick={() => setMtnFormOpen(false)} type="button">Close</button>
+                </div>
+                <form className="grid gap-4 lg:grid-cols-5" onSubmit={saveMtnPhysicalCall}>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-black uppercase text-slate-500">Caller phone number</span>
+                    <input
+                      className="form-input"
+                      onChange={(event) => setMtnForm((current) => ({ ...current, callerPhone: event.target.value }))}
+                      value={mtnForm.callerPhone}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-black uppercase text-slate-500">Client name auto-search</span>
+                    <input
+                      className="form-input"
+                      onChange={(event) => setMtnForm((current) => ({ ...current, clientName: event.target.value }))}
+                      value={mtnForm.clientName}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-black uppercase text-slate-500">Company</span>
+                    <select
+                      className="form-input"
+                      onChange={(event) => setMtnForm((current) => ({ ...current, companyId: event.target.value }))}
+                      value={mtnForm.companyId}
+                    >
+                      {callCenterCompanies.map((company) => (
+                        <option key={company.id} value={company.id}>{company.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-black uppercase text-slate-500">Reason for call</span>
+                    <select
+                      className="form-input"
+                      onChange={(event) => setMtnForm((current) => ({ ...current, reason: event.target.value as CallType }))}
+                      value={mtnForm.reason}
+                    >
+                      {["New Order", "Reorder", "Complaint", "Payment Follow-up", "Customer Care", "New Client Prospect"].map((reason) => (
+                        <option key={reason} value={reason}>{reason}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-black uppercase text-slate-500">Notes</span>
+                    <input
+                      className="form-input"
+                      onChange={(event) => setMtnForm((current) => ({ ...current, notes: event.target.value }))}
+                      value={mtnForm.notes}
+                    />
+                  </label>
+                  <div className="lg:col-span-5">
+                    {mtnMatchedClient ? (
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
+                        Client found: {mtnMatchedClient.clientName} - {mtnMatchedClient.phone} - {mtnMatchedClient.companyName}
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600">
+                        No exact client match yet. This will be saved as Unknown Caller unless you choose a suggestion.
+                      </div>
+                    )}
+                    {mtnClientSuggestions.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {mtnClientSuggestions.map((client) => (
+                          <button
+                            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50"
+                            key={client.id}
+                            onClick={() =>
+                              setMtnForm((current) => ({
+                                ...current,
+                                callerPhone: client.phone,
+                                clientName: client.clientName,
+                                companyId: client.companyId ?? current.companyId
+                              }))
+                            }
+                            type="button"
+                          >
+                            {client.clientName} - {client.phone}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2 lg:col-span-5">
+                    <button className="primary-button" type="submit">Save MTN Call</button>
+                    <button className="secondary-button" onClick={() => setActionMode("order")} type="button">Create Order</button>
+                    <button className="secondary-button" onClick={() => setActionMode("complaint")} type="button">Complaint</button>
+                    <button className="secondary-button" onClick={() => setActionMode("payment")} type="button">Payment Follow-up</button>
+                    <button className="secondary-button" onClick={() => setActionMode("callback")} type="button">Schedule Callback</button>
+                  </div>
+                </form>
+              </section>
+            ) : null}
 
             {message ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
