@@ -89,6 +89,7 @@ import {
 import { sendWhatsAppNotification } from "@/lib/notificationService";
 import { getProducts, type ProductMaster } from "@/lib/products-data";
 import { getNumbersForUser, type CallCenterNumber } from "@/lib/call-center-numbers";
+import { importIncomingProviderCalls } from "@/lib/call-provider-client";
 import {
   getAnnouncementsForUser,
   getClientTimeline,
@@ -257,6 +258,32 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
     setProducts(getProducts());
     setAnnouncements(getAnnouncementsForUser(user));
     setActiveCompany(getActiveCallCenterCompanyForUser(user));
+  }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function pollIncomingCalls() {
+      try {
+        const importedCalls = await importIncomingProviderCalls(user);
+        if (cancelled) return;
+        if (importedCalls.length) {
+          updateCurrentAgentStatus("Ringing");
+          setFocusedCallId(importedCalls[0].id);
+          setQueueCalls(getCompanyQueueCalls(user));
+          setMessage("Incoming call received from provider webhook.");
+        }
+      } catch (error) {
+        console.warn("[KingApp] Incoming call polling failed", error);
+      }
+    }
+
+    void pollIncomingCalls();
+    const interval = window.setInterval(pollIncomingCalls, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, [user]);
 
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];

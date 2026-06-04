@@ -18,6 +18,7 @@ import {
 
 const providers: TelephonyProvider[] = ["Manual Mode", "Twilio", "3CX", "Asterisk / SIP"];
 const phoneTypes: AgentPhoneType[] = ["Browser Softphone", "IP Desk Phone", "Mobile App", "Fixed Line"];
+const webhookUrl = "https://kingapp-delta.vercel.app/api/call-center/incoming-call";
 
 export default function CallCenterSettingsPage() {
   return (
@@ -33,8 +34,9 @@ function SettingsContent({ user }: { user: SessionUser }) {
     providerName: "Manual Mode",
     apiKey: "",
     sipServer: "",
-    webhookUrl: "/api/mock-phone-webhook",
+    webhookUrl,
     companyPhoneNumber: "+250 788 000 000",
+    providerStatus: "Not Connected",
     defaultQueue: "Sales Queue",
     recordingEnabled: false,
     callPopupEnabled: true
@@ -59,6 +61,31 @@ function SettingsContent({ user }: { user: SessionUser }) {
     setMessage("Telephony settings saved in mock mode.");
   }
 
+  async function sendTestIncomingCall() {
+    try {
+      const response = await fetch("/api/call-center/incoming-call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          callerNumber: "0788000001",
+          calledNumber: settings.companyPhoneNumber || "+250 788 100 500",
+          provider: settings.providerName || "Mock Provider",
+          callId: `TEST-${Date.now()}`,
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      if (!response.ok) {
+        setMessage("Test webhook failed. Check the provider endpoint.");
+        return;
+      }
+
+      setMessage("Test incoming call sent. Open /call-center to see the popup.");
+    } catch {
+      setMessage("Test webhook failed. The browser could not reach the endpoint.");
+    }
+  }
+
   function updatePhoneType(agentId: string, phoneType: AgentPhoneType) {
     setAgents(updateAgentPhoneType(agentId, phoneType));
   }
@@ -66,6 +93,23 @@ function SettingsContent({ user }: { user: SessionUser }) {
   return (
     <div className="space-y-6">
       {message ? <Notice message={message} /> : null}
+      {settings.providerStatus !== "Connected" ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
+          Your phone rings physically, but KingApp will not detect calls until your provider sends calls to this webhook.
+        </div>
+      ) : null}
+
+      <section className="rounded-lg border border-blue-200 bg-blue-50 p-5">
+        <p className="text-xs font-black uppercase text-blue-700">Incoming Call Webhook URL</p>
+        <p className="mt-2 break-all rounded-lg bg-white px-4 py-3 text-sm font-black text-slate-950 shadow-sm">
+          {webhookUrl}
+        </p>
+        <button className="primary-button mt-4" onClick={sendTestIncomingCall} type="button">
+          <PhoneCall className="h-4 w-4" />
+          Send Test Incoming Call
+        </button>
+      </section>
+
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-5 flex items-center gap-3">
           <div className="rounded-lg bg-blue-50 p-3 text-blue-700"><Server className="h-5 w-5" /></div>
@@ -84,7 +128,15 @@ function SettingsContent({ user }: { user: SessionUser }) {
           <Field label="Provider Name" onChange={(value) => update("providerName", value)} value={settings.providerName} />
           <Field label={providerServerLabel(settings.provider)} onChange={(value) => update("sipServer", value)} value={settings.sipServer} />
           <Field label="Webhook URL" onChange={(value) => update("webhookUrl", value)} value={settings.webhookUrl} />
+          <Field label="API Key Placeholder" onChange={(value) => update("apiKey", value)} placeholder="Stored securely later" type="password" value={settings.apiKey} />
           <Field label={settings.provider === "Twilio" ? "Twilio Phone Number" : "Company Phone Number"} onChange={(value) => update("companyPhoneNumber", value)} value={settings.companyPhoneNumber} />
+          <label className="block">
+            <span className="mb-1 block text-xs font-black uppercase text-slate-500">Status</span>
+            <select className="form-input" onChange={(event) => update("providerStatus", event.target.value)} value={settings.providerStatus ?? "Not Connected"}>
+              <option value="Connected">Connected</option>
+              <option value="Not Connected">Not Connected</option>
+            </select>
+          </label>
           <Field label={settings.provider === "Asterisk / SIP" || settings.provider === "3CX" ? "Extension Range" : "Default Queue"} onChange={(value) => update("defaultQueue", value)} value={settings.defaultQueue} />
           <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black">
             <input checked={settings.recordingEnabled} onChange={(event) => update("recordingEnabled", event.target.checked)} type="checkbox" />
@@ -194,11 +246,23 @@ function Panel({ children, icon: Icon, title }: { children: React.ReactNode; ico
   );
 }
 
-function Field({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
+function Field({
+  label,
+  onChange,
+  placeholder,
+  type = "text",
+  value
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+  value: string;
+}) {
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-black uppercase text-slate-500">{label}</span>
-      <input className="form-input" onChange={(event) => onChange(event.target.value)} value={value} />
+      <input className="form-input" onChange={(event) => onChange(event.target.value)} placeholder={placeholder} type={type} value={value} />
     </label>
   );
 }

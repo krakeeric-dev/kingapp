@@ -42,6 +42,7 @@ import {
 } from "@/lib/call-center-operations";
 import { sendWhatsAppNotification } from "@/lib/notificationService";
 import { getProducts, type ProductMaster } from "@/lib/products-data";
+import { importIncomingProviderCalls } from "@/lib/call-provider-client";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const nowTime = () => new Date().toTimeString().slice(0, 5);
@@ -68,6 +69,30 @@ function QueueContent({ user }: { user: SessionUser }) {
   useEffect(() => {
     refresh();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function pollIncomingCalls() {
+      try {
+        const importedCalls = await importIncomingProviderCalls(user);
+        if (cancelled) return;
+        if (importedCalls.length) {
+          refresh();
+          setSelectedCallId(importedCalls[0].id);
+          setMessage("Incoming call received from provider webhook.");
+        }
+      } catch (error) {
+        console.warn("[KingApp] Queue incoming call polling failed", error);
+      }
+    }
+
+    const interval = window.setInterval(pollIncomingCalls, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [user]);
 
   function refresh() {
     const loadedCalls = getCompanyQueueCalls(user);

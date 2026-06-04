@@ -23,6 +23,7 @@ export type TelephonySettings = {
   sipServer: string;
   webhookUrl: string;
   companyPhoneNumber: string;
+  providerStatus?: "Connected" | "Not Connected";
   defaultQueue: string;
   recordingEnabled: boolean;
   callPopupEnabled: boolean;
@@ -58,8 +59,9 @@ const defaultSettings: TelephonySettings = {
   providerName: "Manual Mode",
   apiKey: "",
   sipServer: "",
-  webhookUrl: "/api/mock-phone-webhook",
+  webhookUrl: "/api/call-center/incoming-call",
   companyPhoneNumber: "+250 788 000 000",
+  providerStatus: "Not Connected",
   defaultQueue: "Sales Queue",
   recordingEnabled: false,
   callPopupEnabled: true
@@ -94,7 +96,7 @@ function createId(prefix: string) {
 }
 
 export function getTelephonySettings() {
-  return readJson<TelephonySettings>(SETTINGS_KEY, defaultSettings);
+  return { ...defaultSettings, ...readJson<Partial<TelephonySettings>>(SETTINGS_KEY, defaultSettings) };
 }
 
 export function saveTelephonySettings(settings: TelephonySettings) {
