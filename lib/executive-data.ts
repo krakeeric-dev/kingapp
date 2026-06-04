@@ -3,7 +3,6 @@ import { getCashRecords } from "@/lib/cash-data";
 import { defaultCompanies, getCompanies, setActiveCompanyId, type Company } from "@/lib/companies-data";
 import { getExpenseRecords } from "@/lib/expenses-data";
 import { getInventoryMovements } from "@/lib/inventory-data";
-import { getLoadingRecords } from "@/lib/loading-data";
 import { getReturnRecords } from "@/lib/returns-data";
 import { getSalesRecords } from "@/lib/sales-data";
 import { getClientOrders } from "@/lib/client-portal-data";
@@ -68,7 +67,6 @@ export function getExecutiveCompanyMetrics(): ExecutiveCompanyMetric[] {
   const complaints = getComplaints();
   const callbacks = getCallbacks();
   const inventory = getInventoryMovements();
-  const loading = getLoadingRecords();
   const expenses = getExpenseRecords();
 
   return companies.map((company) => {
@@ -82,7 +80,6 @@ export function getExecutiveCompanyMetrics(): ExecutiveCompanyMetric[] {
       ...callLogs.filter((record) => record.date === date && byCompany(queueCalls, company.id).some((call) => call.clientId === record.clientId))
     ];
     const companyInventory = byCompany(inventory, company.id);
-    const companyLoading = byCompany(loading, company.id).filter((record) => record.date === date);
     const companyExpenses = byCompany(expenses, company.id).filter((record) => record.date === date);
 
     const salesToday = companySales.reduce((sum, record) => sum + (Number(record.salesValue) || 0), 0) || fallbackMetric(company, "sales");

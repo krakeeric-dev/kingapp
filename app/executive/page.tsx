@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, BarChart3, Boxes, Building2, Headphones, PackageCheck, PhoneCall, ReceiptText, ShoppingCart, TrendingUp, UserRound, WalletCards } from "lucide-react";
+import { AlertTriangle, BarChart3, Boxes, Building2, PackageCheck, PhoneCall, ReceiptText, ShoppingCart, TrendingUp, UserRound, WalletCards } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { getCompanies } from "@/lib/companies-data";
 import {

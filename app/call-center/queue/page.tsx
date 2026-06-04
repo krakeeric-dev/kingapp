@@ -6,7 +6,6 @@ import {
   Clock,
   Headphones,
   PhoneCall,
-  PhoneIncoming,
   PhoneOff,
   Timer,
   UserCheck,
@@ -23,13 +22,10 @@ import {
   addComplaint,
   addPaymentFollowUp,
   closeActiveCall,
-  getAgents,
   getAverageWaitSeconds,
-  getCallCenterClients,
   getCallDuration,
   getCallbacks,
   getMissedCalls,
-  getQueueCalls,
   markCallMissed,
   sendCallToQueue,
   transferCall,
@@ -214,44 +210,6 @@ function QueueContent({ user }: { user: SessionUser }) {
         )}
       </div>
     </div>
-  );
-}
-
-function IncomingPopup({
-  call,
-  onAccept,
-  onMissed,
-  onQueue
-}: {
-  call: QueueCall;
-  onAccept: (call: QueueCall) => void;
-  onMissed: (call: QueueCall) => void;
-  onQueue: (call: QueueCall) => void;
-}) {
-  return (
-    <section className="rounded-lg border border-brand-200 bg-white p-5 shadow-executive">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-            <PhoneIncoming className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-xs font-black uppercase tracking-normal text-brand-700">Incoming Call</p>
-            <h3 className="mt-1 text-2xl font-black text-slate-950">{call.clientName}</h3>
-            <p className="mt-1 text-sm font-semibold text-slate-600">{call.phone} - {call.location}</p>
-            <p className="mt-2 text-sm text-slate-600">
-              Balance: <span className="font-black text-slate-950">{formatMoney(call.currentBalance)} RWF</span> - Last order: {call.lastOrder}
-            </p>
-            <p className="text-sm text-slate-600">Assigned marketer: {call.assignedMarketer}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button className="primary-button" onClick={() => onAccept(call)} type="button">Accept Call</button>
-          <button className="secondary-button" onClick={() => onQueue(call)} type="button">Send to Queue</button>
-          <button className="danger-button" onClick={() => onMissed(call)} type="button">Reject / Missed</button>
-        </div>
-      </div>
-    </section>
   );
 }
 

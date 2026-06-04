@@ -340,7 +340,6 @@ export function getLinkForClientSupplier(clientId: string, supplierId: string) {
 
 export function getCatalogForClientSupplier(client: PortalClient, supplier: PortalSupplier) {
   const link = getLinkForClientSupplier(client.id, supplier.id);
-  const company = getCompanyForClientOrder(client, supplier.id);
 
   if (!link || supplier.status !== "active" || !activeClient(client)) {
     return [];

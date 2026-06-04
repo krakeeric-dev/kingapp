@@ -3,7 +3,6 @@ import { canAccessCompany, getCompanyWorkspaceId } from "@/lib/companies-data";
 import {
   getClientOrders,
   getClientsForSupplier,
-  getPortalClients,
   getSupplierClientLinks,
   getSuppliers,
   type ClientPortalOrder,

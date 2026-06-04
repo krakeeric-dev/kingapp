@@ -7,8 +7,6 @@ import {
   Boxes,
   ClipboardCheck,
   FileText,
-  PackageCheck,
-  ReceiptText,
   RefreshCw,
   ShieldCheck,
   TrendingDown,

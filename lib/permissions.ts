@@ -3,6 +3,7 @@ import type { UserRole } from "@/lib/auth";
 export const pagePermissions: Record<string, UserRole[]> = {
   "/dashboard": ["admin", "manager", "supervisor", "storekeeper", "marketer", "accountant", "supplier", "client"],
   "/executive": ["admin"],
+  "/debug-offline": ["admin", "manager", "supervisor", "storekeeper", "marketer", "accountant"],
   "/call-center": ["admin", "manager", "callcenter"],
   "/call-center/queue": ["admin", "manager", "callcenter"],
   "/call-center/agents": ["admin", "manager", "callcenter"],
@@ -20,7 +21,10 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/call-center/complaints": ["admin", "manager", "callcenter"],
   "/call-center/wallboard": ["admin", "manager"],
   "/call-center/production-checklist": ["admin", "manager"],
+  "/client-portal": ["admin", "client"],
+  "/client-portal/messages": ["admin", "client"],
   "/client-orders": ["admin", "storekeeper", "accountant", "marketer", "manager", "supervisor"],
+  "/supplier-dashboard": ["admin", "manager", "supplier"],
   "/loading": ["admin", "supervisor", "storekeeper"],
   "/inventory": ["admin", "manager", "supervisor", "storekeeper"],
   "/price-management": ["admin"],
