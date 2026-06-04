@@ -17,6 +17,7 @@ import {
   MessageSquare,
   MessageSquareWarning,
   Megaphone,
+  LogOut,
   PhoneCall,
   PhoneIncoming,
   Radio,
@@ -29,6 +30,7 @@ import {
   CallCenterMobileBlock,
   useIsMobileScreen
 } from "@/components/CallCenterDesktopOnly";
+import { CallCenterLogoutDialog } from "@/components/CallCenterLogoutDialog";
 import { KingAppLogo } from "@/components/KingAppLogo";
 import type { SessionUser } from "@/lib/auth";
 import {
@@ -40,7 +42,9 @@ import {
 } from "@/lib/call-center-operations";
 import { getNumbersForUser, type CallCenterNumber } from "@/lib/call-center-numbers";
 import { canAccessRoute } from "@/lib/permissions";
-import { getSession } from "@/lib/storage";
+import { clearSession, getSession } from "@/lib/storage";
+import { setActiveCompanyId } from "@/lib/companies-data";
+import { roleLabels } from "@/lib/auth";
 
 type CallCenterShellProps = {
   children: ReactNode | ((user: SessionUser) => ReactNode);
@@ -88,6 +92,7 @@ export function CallCenterShell({
   const [agentsOnline, setAgentsOnline] = useState(0);
   const [assignedNumbers, setAssignedNumbers] = useState<CallCenterNumber[]>([]);
   const [activeCompany, setActiveCompany] = useState("all");
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const isMobileScreen = useIsMobileScreen();
 
   useEffect(() => {
@@ -122,12 +127,29 @@ export function CallCenterShell({
     setActiveCompany(setActiveCallCenterCompany(companyId));
   }
 
+  function finishLogout() {
+    clearSession();
+    setActiveCompanyId("all");
+    window.sessionStorage.removeItem("kingapp.permissionMessage");
+    window.sessionStorage.removeItem("kingapp.callCenter.session");
+    setUser(null);
+    setLogoutOpen(false);
+    router.replace("/login");
+  }
+
   if (!user) {
     return <main className="min-h-screen bg-[#061b33]" />;
   }
 
   if (isMobileScreen) {
-    return <CallCenterMobileBlock />;
+    return (
+      <>
+        <CallCenterMobileBlock onLogout={() => setLogoutOpen(true)} user={user} />
+        {logoutOpen ? (
+          <CallCenterLogoutDialog onCancel={() => setLogoutOpen(false)} onLogout={finishLogout} />
+        ) : null}
+      </>
+    );
   }
 
   const allowedCompanies = getAssignableCallCenterCompanies(user);
@@ -178,11 +200,21 @@ export function CallCenterShell({
             </SidebarGroup>
           </nav>
 
-          <div className="border-t border-white/10 p-6 text-center">
-            <KingAppLogo className="mx-auto mb-3" size={64} />
-            <p className="text-xl font-black">KINGAPP</p>
-            <p className="text-sm font-semibold text-blue-100">Call Center Module</p>
-            <p className="mt-8 text-xs font-semibold text-blue-200">Version 1.0.0</p>
+          <div className="border-t border-white/10 p-5">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+              <p className="text-sm font-black text-white">{user.displayName}</p>
+              <p className="mt-1 text-xs font-semibold text-blue-100">{roleLabels[user.role]}</p>
+              <p className="mt-1 text-xs font-semibold text-blue-100">{activeCompanyName}</p>
+              <button
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-black text-white transition hover:bg-red-600"
+                onClick={() => setLogoutOpen(true)}
+                type="button"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </div>
+            <p className="mt-4 text-center text-xs font-semibold text-blue-200">Version 1.0.0</p>
           </div>
         </aside>
 
@@ -241,6 +273,9 @@ export function CallCenterShell({
           </div>
         </section>
       </div>
+      {logoutOpen ? (
+        <CallCenterLogoutDialog onCancel={() => setLogoutOpen(false)} onLogout={finishLogout} />
+      ) : null}
     </main>
   );
 }

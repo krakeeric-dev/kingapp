@@ -21,6 +21,7 @@ import {
   MessageSquare,
   MessageSquareWarning,
   Megaphone,
+  LogOut,
   MicOff,
   Pause,
   Phone,
@@ -41,11 +42,14 @@ import {
   useIsMobileScreen
 } from "@/components/CallCenterDesktopOnly";
 import { ClientAutoPopup } from "@/components/ClientAutoPopup";
+import { CallCenterLogoutDialog } from "@/components/CallCenterLogoutDialog";
 import { KingAppLogo } from "@/components/KingAppLogo";
 import type { SessionUser } from "@/lib/auth";
 import { canAccessRoute } from "@/lib/permissions";
 import { formatMoney } from "@/lib/sales-data";
-import { getSession } from "@/lib/storage";
+import { clearSession, getSession } from "@/lib/storage";
+import { setActiveCompanyId } from "@/lib/companies-data";
+import { roleLabels } from "@/lib/auth";
 import {
   addCallLog,
   addCallback,
@@ -127,6 +131,7 @@ const toolItems = [
 export default function CallCenterPage() {
   const router = useRouter();
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const isMobileScreen = useIsMobileScreen();
 
   useEffect(() => {
@@ -146,18 +151,45 @@ export default function CallCenterPage() {
     setUser(session);
   }, [router]);
 
+  function finishLogout() {
+    clearSession();
+    setActiveCompanyId("all");
+    window.sessionStorage.removeItem("kingapp.permissionMessage");
+    window.sessionStorage.removeItem("kingapp.callCenter.session");
+    setUser(null);
+    setLogoutOpen(false);
+    router.replace("/login");
+  }
+
   if (!user) {
     return <main className="min-h-screen bg-slate-950" />;
   }
 
   if (isMobileScreen) {
-    return <CallCenterMobileBlock />;
+    return (
+      <>
+        <CallCenterMobileBlock onLogout={() => setLogoutOpen(true)} user={user} />
+        {logoutOpen ? (
+          <CallCenterLogoutDialog
+            onCancel={() => setLogoutOpen(false)}
+            onLogout={finishLogout}
+          />
+        ) : null}
+      </>
+    );
   }
 
-  return <CallCenterOffice user={user} />;
+  return (
+    <>
+      <CallCenterOffice onLogout={() => setLogoutOpen(true)} user={user} />
+      {logoutOpen ? (
+        <CallCenterLogoutDialog onCancel={() => setLogoutOpen(false)} onLogout={finishLogout} />
+      ) : null}
+    </>
+  );
 }
 
-function CallCenterOffice({ user }: { user: SessionUser }) {
+function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: SessionUser }) {
   const [clients, setClients] = useState<CallCenterClient[]>([]);
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [orders, setOrders] = useState<PendingOrder[]>([]);
@@ -400,7 +432,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
   return (
     <main className="min-h-screen bg-[#f3f6fb] text-slate-950">
       <div className="flex min-h-screen">
-        <CallCenterSidebar user={user} />
+        <CallCenterSidebar activeCompany={activeCompany} onLogout={onLogout} user={user} />
         <section className="min-w-0 flex-1">
           <TopBar
             activeCompany={activeCompany}
@@ -567,7 +599,20 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
   );
 }
 
-function CallCenterSidebar({ user }: { user: SessionUser }) {
+function CallCenterSidebar({
+  activeCompany,
+  onLogout,
+  user
+}: {
+  activeCompany: string;
+  onLogout: () => void;
+  user: SessionUser;
+}) {
+  const companyName =
+    activeCompany === "all"
+      ? "All Companies"
+      : callCenterCompanies.find((company) => company.id === activeCompany)?.name ?? user.companyName;
+
   return (
     <aside className="hidden w-72 shrink-0 flex-col bg-[#061b33] text-white shadow-2xl lg:flex">
       <div className="border-b border-white/10 p-7">
@@ -593,11 +638,21 @@ function CallCenterSidebar({ user }: { user: SessionUser }) {
         </SidebarGroup>
       </nav>
 
-      <div className="border-t border-white/10 p-6 text-center">
-        <KingAppLogo className="mx-auto mb-3" size={64} />
-        <p className="text-xl font-black">KINGAPP</p>
-        <p className="text-sm font-semibold text-blue-100">Call Center Module</p>
-        <p className="mt-8 text-xs font-semibold text-blue-200">Version 1.0.0</p>
+      <div className="border-t border-white/10 p-5">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <p className="text-sm font-black text-white">{user.displayName}</p>
+          <p className="mt-1 text-xs font-semibold text-blue-100">{roleLabels[user.role]}</p>
+          <p className="mt-1 text-xs font-semibold text-blue-100">{companyName}</p>
+          <button
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-black text-white transition hover:bg-red-600"
+            onClick={onLogout}
+            type="button"
+          >
+            <LogOut className="h-4 w-4" />
+            Logout
+          </button>
+        </div>
+        <p className="mt-4 text-center text-xs font-semibold text-blue-200">Version 1.0.0</p>
       </div>
     </aside>
   );
