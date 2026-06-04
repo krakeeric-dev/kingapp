@@ -288,6 +288,7 @@ export const routePermissions: Record<string, PermissionKey[]> = {
   "/sync-status": ["sync.view"],
   "/admin/audit-log": ["admin.audit.view"],
   "/admin/users": ["admin.users.manage"],
+  "/admin/call-center-numbers": ["admin.permissions.manage"],
   "/admin/companies": ["admin.companies.manage"]
 };
 
@@ -329,6 +330,7 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/sync-status": ["admin", "manager", "supervisor", "storekeeper", "marketer", "accountant"],
   "/admin/audit-log": ["admin"],
   "/admin/users": ["admin"],
+  "/admin/call-center-numbers": ["admin"],
   "/admin/companies": ["admin"]
 };
 

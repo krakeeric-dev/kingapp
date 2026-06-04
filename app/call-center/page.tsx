@@ -78,6 +78,7 @@ import {
 } from "@/lib/call-center-operations";
 import { sendWhatsAppNotification } from "@/lib/notificationService";
 import { getProducts, type ProductMaster } from "@/lib/products-data";
+import { getNumbersForUser, type CallCenterNumber } from "@/lib/call-center-numbers";
 import {
   getAnnouncementsForUser,
   getClientTimeline,
@@ -165,6 +166,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
   const [callbacks, setCallbacks] = useState<CallbackItem[]>([]);
   const [queueCalls, setQueueCalls] = useState<QueueCall[]>([]);
   const [agents, setAgents] = useState<CallCenterAgent[]>([]);
+  const [assignedNumbers, setAssignedNumbers] = useState<CallCenterNumber[]>([]);
   const [products, setProducts] = useState<ProductMaster[]>([]);
   const [announcements, setAnnouncements] = useState<TeamAnnouncement[]>([]);
   const [activeCompany, setActiveCompany] = useState("all");
@@ -212,6 +214,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
     setCallbacks(getCompanyCallbacks(user));
     setQueueCalls(getCompanyQueueCalls(user));
     setAgents(getCompanyAgents(user));
+    setAssignedNumbers(getNumbersForUser(user));
     setProducts(getProducts());
     setAnnouncements(getAnnouncementsForUser(user));
     setActiveCompany(getActiveCallCenterCompanyForUser(user));
@@ -404,6 +407,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
             agentsOnline={agentsOnline}
             callsInQueue={callsInQueue}
             onCompanyChange={(companyId) => setActiveCompany(setActiveCallCenterCompany(companyId))}
+            assignedNumbers={assignedNumbers}
             user={user}
           />
           <div className="space-y-4 p-4 lg:p-6">
@@ -430,6 +434,7 @@ function CallCenterOffice({ user }: { user: SessionUser }) {
             <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
               <div className="space-y-4">
                 <CurrentCallCard call={currentCall} client={selectedClient} onEnd={endCurrentCall} onMessage={setMessage} />
+                <AssignedNumbersCard numbers={assignedNumbers} />
                 <QuickActions active={actionMode} onSelect={setActionMode} />
                 <CallStats stats={stats} />
               </div>
@@ -604,12 +609,14 @@ function normalizeMenuHref(href: string) {
 
 function TopBar({
   activeCompany,
+  assignedNumbers,
   agentsOnline,
   callsInQueue,
   onCompanyChange,
   user
 }: {
   activeCompany: string;
+  assignedNumbers: CallCenterNumber[];
   agentsOnline: number;
   callsInQueue: number;
   onCompanyChange: (companyId: string) => void;
@@ -626,6 +633,7 @@ function TopBar({
           <TopMetric icon={PhoneCall} label="Connected" value="00:03:12" tone="green" />
           <TopMetric label="Calls in Queue" value={callsInQueue.toLocaleString()} />
           <TopMetric label="Agents Online" value={agentsOnline.toLocaleString()} dot />
+          <TopMetric label="Assigned Number" value={assignedNumbers[0]?.phoneNumber ?? "Not assigned"} />
           {user.role === "admin" || user.role === "manager" ? (
             <select
               className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-slate-700 outline-none"
@@ -685,6 +693,28 @@ function CurrentCallCard({ call, client, onEnd, onMessage }: { call?: QueueCall;
         <button className="secondary-button w-full" onClick={() => onMessage("Call placed on hold.")} type="button"><Pause className="h-4 w-4" /> Hold</button>
         <button className="secondary-button w-full" onClick={() => onMessage("Call muted.")} type="button"><MicOff className="h-4 w-4" /> Mute</button>
         <button className="danger-button w-full" onClick={onEnd} type="button"><PhoneOff className="h-4 w-4" /> End Call</button>
+      </div>
+    </Panel>
+  );
+}
+
+function AssignedNumbersCard({ numbers }: { numbers: CallCenterNumber[] }) {
+  return (
+    <Panel title="Assigned Numbers">
+      <div className="space-y-3">
+        {numbers.map((number) => (
+          <article className="rounded-lg border border-slate-100 bg-slate-50 p-3" key={number.id}>
+            <p className="text-sm font-black text-slate-950">{number.phoneNumber}</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">{number.companyName} - {number.label}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <StatusPill label={number.purpose} tone="blue" />
+              <StatusPill label={number.status} tone={number.status === "Active" ? "green" : "amber"} />
+            </div>
+          </article>
+        ))}
+        {!numbers.length ? (
+          <p className="text-sm font-semibold text-slate-500">No call center number assigned.</p>
+        ) : null}
       </div>
     </Panel>
   );

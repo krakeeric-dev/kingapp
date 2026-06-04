@@ -165,6 +165,12 @@ const navItems: NavItem[] = [
     roles: getAllowedRoles("/admin/users")
   },
   {
+    href: "/admin/call-center-numbers",
+    label: "Call Numbers",
+    icon: PhoneCall,
+    roles: getAllowedRoles("/admin/call-center-numbers")
+  },
+  {
     href: "/admin/companies",
     label: "Companies",
     icon: Building2,

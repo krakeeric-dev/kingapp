@@ -38,6 +38,7 @@ import {
   getCompanyQueueCalls,
   setActiveCallCenterCompany
 } from "@/lib/call-center-operations";
+import { getNumbersForUser, type CallCenterNumber } from "@/lib/call-center-numbers";
 import { canAccessRoute } from "@/lib/permissions";
 import { getSession } from "@/lib/storage";
 
@@ -85,6 +86,7 @@ export function CallCenterShell({
   const [user, setUser] = useState<SessionUser | null>(null);
   const [callsInQueue, setCallsInQueue] = useState(0);
   const [agentsOnline, setAgentsOnline] = useState(0);
+  const [assignedNumbers, setAssignedNumbers] = useState<CallCenterNumber[]>([]);
   const [activeCompany, setActiveCompany] = useState("all");
   const isMobileScreen = useIsMobileScreen();
 
@@ -113,6 +115,7 @@ export function CallCenterShell({
       ).length
     );
     setAgentsOnline(getCompanyAgents(session).filter((agent) => agent.status !== "Offline").length);
+    setAssignedNumbers(getNumbersForUser(session));
   }, [pathname, router]);
 
   function changeCompany(companyId: string) {
@@ -194,6 +197,7 @@ export function CallCenterShell({
                 <TopMetric icon={PhoneCall} label="Connected" tone="green" value="00:03:12" />
                 <TopMetric label="Calls in Queue" value={callsInQueue.toLocaleString()} />
                 <TopMetric dot label="Agents Online" value={agentsOnline.toLocaleString()} />
+                <TopMetric label="Assigned Number" value={assignedNumbers[0]?.phoneNumber ?? "Not assigned"} />
                 <div className="rounded-lg bg-slate-50 px-3 py-2">
                   <p className="text-[11px] font-black uppercase text-slate-400">Working For</p>
                   {canSwitchCompanies ? (
