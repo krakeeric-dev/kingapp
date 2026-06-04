@@ -30,7 +30,7 @@ import type { SessionUser, UserRole } from "@/lib/auth";
 import { KingAppLogo } from "@/components/KingAppLogo";
 import { cleanupLegacyDemoProductData } from "@/lib/data-cleanup";
 import { syncSupabaseToLocalStorage } from "@/lib/live-data";
-import { canAccessPage, getAllowedRoles } from "@/lib/permissions";
+import { canAccessRoute, getAllowedRoles } from "@/lib/permissions";
 import { roleLabels } from "@/lib/auth";
 import { clearSession, getSession } from "@/lib/storage";
 import { syncPendingQueue } from "@/lib/supabase";
@@ -222,10 +222,10 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
 
       const pageAllowedRoles = allowedRoles ?? getAllowedRoles(pathname);
 
-      if (!pageAllowedRoles.includes(session.role) || !canAccessPage(pathname, session.role)) {
+      if (!pageAllowedRoles.includes(session.role) || !canAccessRoute(session, pathname)) {
         window.sessionStorage.setItem(
           "kingapp.permissionMessage",
-          "You do not have permission to access this page."
+          "You do not have permission to access this operation."
         );
         router.replace(session.role === "callcenter" ? "/call-center" : "/dashboard");
         return;
@@ -333,7 +333,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
     );
   }
 
-  const visibleNav = navItems.filter((item) => item.roles.includes(user.role));
+  const visibleNav = navItems.filter((item) => item.roles.includes(user.role) && canAccessRoute(user, item.href));
   const mobileVisibleNav = visibleNav.filter(
     (item) => !item.href.startsWith("/call-center")
   );

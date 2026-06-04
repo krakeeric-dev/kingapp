@@ -6,6 +6,7 @@ import {
   Pencil,
   Plus,
   Power,
+  ShieldCheck,
   Trash2,
   UserRound
 } from "lucide-react";
@@ -20,9 +21,16 @@ import {
   removeUser,
   resetUserPassword,
   updateUser,
+  updateUserAccess,
   type PlatformUser,
   type UserStatus
 } from "@/lib/users-data";
+import {
+  getRoleDefaultPermissions,
+  getUserEffectivePermissions,
+  permissionGroups,
+  type PermissionKey
+} from "@/lib/permissions";
 
 type AddFormState = {
   displayName: string;
@@ -87,6 +95,9 @@ function UsersContent({ admin }: { admin: SessionUser }) {
   const [editingUsername, setEditingUsername] = useState("");
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [resetUsername, setResetUsername] = useState("");
+  const [accessUsername, setAccessUsername] = useState("");
+  const [accessPermissions, setAccessPermissions] = useState<string[]>([]);
+  const [accessDeniedPermissions, setAccessDeniedPermissions] = useState<string[]>([]);
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -282,6 +293,94 @@ function UsersContent({ admin }: { admin: SessionUser }) {
     setMessage("User removed.");
   }
 
+  function startManageAccess(user: PlatformUser) {
+    setError("");
+    setMessage("");
+    setAccessUsername(user.username);
+    setAccessPermissions(user.permissions ?? []);
+    setAccessDeniedPermissions(user.deniedPermissions ?? []);
+  }
+
+  function togglePermission(permission: PermissionKey) {
+    const targetUser = users.find((user) => user.username === accessUsername);
+
+    if (!targetUser) {
+      return;
+    }
+
+    const defaultPermissions = new Set(getRoleDefaultPermissions(targetUser.role));
+    const currentlyAllowed = getUserEffectivePermissions({
+      ...targetUser,
+      permissions: accessPermissions,
+      deniedPermissions: accessDeniedPermissions
+    }).includes(permission);
+
+    if (currentlyAllowed) {
+      setAccessPermissions((current) => current.filter((item) => item !== permission));
+      if (defaultPermissions.has(permission)) {
+        setAccessDeniedPermissions((current) =>
+          current.includes(permission) ? current : [...current, permission]
+        );
+      }
+      return;
+    }
+
+    setAccessDeniedPermissions((current) => current.filter((item) => item !== permission));
+    if (!defaultPermissions.has(permission)) {
+      setAccessPermissions((current) =>
+        current.includes(permission) ? current : [...current, permission]
+      );
+    }
+  }
+
+  function saveAccessChanges() {
+    setError("");
+    setMessage("");
+
+    const targetUser = users.find((user) => user.username === accessUsername);
+
+    if (!targetUser) {
+      setError("Select a user to manage access.");
+      return;
+    }
+
+    const nextEffectivePermissions = getUserEffectivePermissions({
+      ...targetUser,
+      permissions: accessPermissions,
+      deniedPermissions: accessDeniedPermissions
+    });
+    const anotherActiveAdminExists = users.some(
+      (user) =>
+        user.username !== admin.username &&
+        user.role === "admin" &&
+        user.status === "active"
+    );
+
+    if (
+      targetUser.username === admin.username &&
+      !anotherActiveAdminExists &&
+      (!nextEffectivePermissions.includes("admin.users.manage") ||
+        !nextEffectivePermissions.includes("admin.permissions.manage"))
+    ) {
+      setError("You cannot remove your own user or permission management access unless another active admin exists.");
+      return;
+    }
+
+    const updatedUsers = updateUserAccess(
+      accessUsername,
+      {
+        permissions: accessPermissions,
+        deniedPermissions: accessDeniedPermissions
+      },
+      admin
+    );
+    setUsers(updatedUsers);
+    setAccessUsername("");
+    setAccessPermissions([]);
+    setAccessDeniedPermissions([]);
+    setMessage("User access updated successfully.");
+  }
+
   return (
     <div className="space-y-6">
       <div className="app-card-soft p-5 sm:p-6">
@@ -466,6 +565,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
                     <ActionButtons
                       onDeactivate={() => handleDeactivate(user)}
                       onEdit={() => startEdit(user)}
+                      onAccess={() => startManageAccess(user)}
                       onRemove={() => handleRemove(user)}
                       onReset={() => setResetUsername(user.username)}
                       status={user.status}
@@ -499,6 +599,7 @@ function UsersContent({ admin }: { admin: SessionUser }) {
                 <ActionButtons
                   onDeactivate={() => handleDeactivate(user)}
                   onEdit={() => startEdit(user)}
+                  onAccess={() => startManageAccess(user)}
                   onRemove={() => handleRemove(user)}
                   onReset={() => setResetUsername(user.username)}
                   status={user.status}
@@ -631,6 +732,21 @@ function UsersContent({ admin }: { admin: SessionUser }) {
         </section>
       ) : null}
 
+      {accessUsername ? (
+        <AccessPanel
+          deniedPermissions={accessDeniedPermissions}
+          onCancel={() => {
+            setAccessUsername("");
+            setAccessPermissions([]);
+            setAccessDeniedPermissions([]);
+          }}
+          onSave={saveAccessChanges}
+          onToggle={togglePermission}
+          permissions={accessPermissions}
+          user={users.find((item) => item.username === accessUsername) ?? null}
+        />
+      ) : null}
+
       {resetUsername ? (
         <section className="app-card p-5">
           <h3 className="text-lg font-black text-slate-950">
@@ -699,12 +815,14 @@ function StatusBadge({ status }: { status: UserStatus }) {
 }
 
 function ActionButtons({
+  onAccess,
   onDeactivate,
   onEdit,
   onRemove,
   onReset,
   status
 }: {
+  onAccess: () => void;
   onDeactivate: () => void;
   onEdit: () => void;
   onRemove: () => void;
@@ -721,6 +839,10 @@ function ActionButtons({
         <KeyRound className="h-3.5 w-3.5" />
         Reset
       </button>
+      <button className="secondary-button !px-3 !py-2 !text-xs" onClick={onAccess} type="button">
+        <ShieldCheck className="h-3.5 w-3.5" />
+        Access
+      </button>
       <button className="secondary-button !px-3 !py-2 !text-xs" onClick={onDeactivate} type="button">
         <Power className="h-3.5 w-3.5" />
         {status === "active" ? "Deactivate" : "Activate"}
@@ -734,6 +856,95 @@ function ActionButtons({
         Remove
       </button>
     </div>
+  );
+}
+
+function AccessPanel({
+  deniedPermissions,
+  onCancel,
+  onSave,
+  onToggle,
+  permissions,
+  user
+}: {
+  deniedPermissions: string[];
+  onCancel: () => void;
+  onSave: () => void;
+  onToggle: (permission: PermissionKey) => void;
+  permissions: string[];
+  user: PlatformUser | null;
+}) {
+  if (!user) {
+    return null;
+  }
+
+  const effectivePermissions = getUserEffectivePermissions({
+    ...user,
+    permissions,
+    deniedPermissions
+  });
+  const roleDefaults = new Set(getRoleDefaultPermissions(user.role));
+
+  return (
+    <section className="app-card p-5">
+      <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-normal text-brand-700">Manage Access</p>
+          <h3 className="mt-1 text-xl font-black text-slate-950">{user.displayName}</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            Role defaults apply first. Checked custom access wins unless a permission is explicitly removed.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="primary-button" onClick={onSave} type="button">
+            Save access
+          </button>
+          <button className="secondary-button" onClick={onCancel} type="button">
+            Cancel
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-2">
+        {permissionGroups.map((group) => (
+          <div className="rounded-lg border border-slate-200 bg-white p-4" key={group.title}>
+            <h4 className="text-sm font-black uppercase tracking-normal text-slate-700">{group.title}</h4>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {group.permissions.map((permission) => {
+                const isDefault = roleDefaults.has(permission.key);
+                const isDenied = deniedPermissions.includes(permission.key);
+                const isExplicit = permissions.includes(permission.key);
+                const checked = effectivePermissions.includes(permission.key);
+
+                return (
+                  <label
+                    className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${
+                      checked
+                        ? "border-brand-200 bg-brand-50 text-brand-900"
+                        : "border-slate-200 bg-slate-50 text-slate-500"
+                    }`}
+                    key={permission.key}
+                  >
+                    <input
+                      checked={checked}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-700"
+                      onChange={() => onToggle(permission.key)}
+                      type="checkbox"
+                    />
+                    <span>
+                      {permission.label}
+                      <span className="mt-1 block text-[11px] font-semibold text-slate-500">
+                        {isDenied ? "Removed override" : isExplicit ? "Added override" : isDefault ? "Role default" : "Not assigned"}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

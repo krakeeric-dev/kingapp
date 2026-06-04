@@ -21,6 +21,8 @@ export type PlatformUser = {
   phone: string;
   email: string;
   status: UserStatus;
+  permissions?: string[];
+  deniedPermissions?: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -226,7 +228,8 @@ function appendUserAuditLog(entry: {
     | "user_edited"
     | "user_deactivated"
     | "user_password_reset"
-    | "user_removed";
+    | "user_removed"
+    | "user_access_changed";
   reason: string;
   performedBy: string;
   performedByRole: string;
@@ -266,6 +269,8 @@ function normalizeUser(user: LegacyUser): PlatformUser {
     phone: user.phone ?? "",
     email: user.email ?? "",
     status: user.status ?? "active",
+    permissions: user.permissions ?? defaultUser?.permissions ?? [],
+    deniedPermissions: user.deniedPermissions ?? defaultUser?.deniedPermissions ?? [],
     createdAt,
     updatedAt: user.updatedAt ?? createdAt
   };
@@ -308,7 +313,8 @@ function auditUserAction({
     | "user_edited"
     | "user_deactivated"
     | "user_password_reset"
-    | "user_removed";
+    | "user_removed"
+    | "user_access_changed";
   reason: string;
   targetUsername: string;
   user: SessionUser;
@@ -362,6 +368,8 @@ export function createUser(
     companyName: getCompanyName(input.companyId, input.companyName),
     phone: input.phone.trim(),
     email: input.email.trim(),
+    permissions: input.permissions ?? [],
+    deniedPermissions: input.deniedPermissions ?? [],
     createdAt: now,
     updatedAt: now
   };
@@ -444,6 +452,46 @@ export function removeUser(username: string, admin: SessionUser) {
   auditUserAction({
     action: "user_removed",
     reason: `User removed: ${username}`,
+    targetUsername: username,
+    user: admin
+  });
+  return updatedUsers;
+}
+
+export function updateUserAccess(
+  username: string,
+  access: Pick<PlatformUser, "permissions" | "deniedPermissions">,
+  admin: SessionUser
+) {
+  const users = getUsers();
+  const targetUser = users.find((user) => user.username === username);
+  const previousPermissions = new Set(targetUser?.permissions ?? []);
+  const previousDenied = new Set(targetUser?.deniedPermissions ?? []);
+  const nextPermissions = access.permissions ?? [];
+  const nextDenied = access.deniedPermissions ?? [];
+  const changedPermissions = [
+    ...nextPermissions.filter((permission) => !previousPermissions.has(permission)).map((permission) => `added ${permission}`),
+    ...Array.from(previousPermissions).filter((permission) => !nextPermissions.includes(permission)).map((permission) => `removed explicit ${permission}`),
+    ...nextDenied.filter((permission) => !previousDenied.has(permission)).map((permission) => `denied ${permission}`),
+    ...Array.from(previousDenied).filter((permission) => !nextDenied.includes(permission)).map((permission) => `restored ${permission}`)
+  ];
+  const updatedUsers = users.map((user) =>
+    user.username === username
+      ? {
+          ...user,
+          permissions: nextPermissions,
+          deniedPermissions: nextDenied,
+          updatedAt: new Date().toISOString()
+        }
+      : user
+  );
+
+  saveUsers(updatedUsers);
+  auditUserAction({
+    action: "user_access_changed",
+    reason: changedPermissions.length
+      ? `Access changed for ${username}: ${changedPermissions.join(", ")}`
+      : `Access reviewed for ${username}`,
     targetUsername: username,
     user: admin
   });

@@ -43,7 +43,7 @@ import {
 import { ClientAutoPopup } from "@/components/ClientAutoPopup";
 import { KingAppLogo } from "@/components/KingAppLogo";
 import type { SessionUser } from "@/lib/auth";
-import { canAccessPage } from "@/lib/permissions";
+import { canAccessRoute } from "@/lib/permissions";
 import { formatMoney } from "@/lib/sales-data";
 import { getSession } from "@/lib/storage";
 import {
@@ -136,8 +136,8 @@ export default function CallCenterPage() {
       return;
     }
 
-    if (!canAccessPage("/call-center", session.role)) {
-      window.sessionStorage.setItem("kingapp.permissionMessage", "You do not have permission to access this page.");
+    if (!canAccessRoute(session, "/call-center")) {
+      window.sessionStorage.setItem("kingapp.permissionMessage", "You do not have permission to access this operation.");
       router.push("/dashboard");
       return;
     }
@@ -577,7 +577,7 @@ function CallCenterSidebar({ user }: { user: SessionUser }) {
 
       <nav className="flex-1 space-y-8 overflow-y-auto p-5">
         <SidebarGroup title="Main">
-          {menuItems.filter((item) => canAccessPage(normalizeMenuHref(item.href), user.role)).map((item, index) => (
+          {menuItems.filter((item) => canAccessRoute(user, normalizeMenuHref(item.href))).map((item, index) => (
             <SidebarLink active={index === 0} href={item.href} icon={item.icon} key={item.label} label={item.label} badge={item.badge} />
           ))}
         </SidebarGroup>

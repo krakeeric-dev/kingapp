@@ -38,7 +38,7 @@ import {
   getCompanyQueueCalls,
   setActiveCallCenterCompany
 } from "@/lib/call-center-operations";
-import { canAccessPage } from "@/lib/permissions";
+import { canAccessRoute } from "@/lib/permissions";
 import { getSession } from "@/lib/storage";
 
 type CallCenterShellProps = {
@@ -96,10 +96,10 @@ export function CallCenterShell({
       return;
     }
 
-    if (!canAccessPage(pathname, session.role)) {
+    if (!canAccessRoute(session, pathname)) {
       window.sessionStorage.setItem(
         "kingapp.permissionMessage",
-        "You do not have permission to access this page."
+        "You do not have permission to access this operation."
       );
       router.push("/dashboard");
       return;
@@ -152,7 +152,7 @@ export function CallCenterShell({
 
           <nav className="flex-1 space-y-8 overflow-y-auto p-5">
             <SidebarGroup title="Main">
-              {menuItems.filter((item) => canAccessPage(item.href.split("#")[0], user.role)).map((item) => (
+              {menuItems.filter((item) => canAccessRoute(user, item.href.split("#")[0])).map((item) => (
                 <SidebarLink
                   active={pathname === item.href}
                   badge={item.badge}
