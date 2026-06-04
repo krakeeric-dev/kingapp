@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Activity, Headphones, MessageSquareWarning, PhoneOff, ShoppingCart, UsersRound, WalletCards } from "lucide-react";
 import { CallCenterShell } from "@/components/CallCenterShell";
+import { KingAppLogo } from "@/components/KingAppLogo";
 import type { SessionUser } from "@/lib/auth";
 import { getCallCenterSummary } from "@/lib/call-center-operations";
 import { formatMoney } from "@/lib/sales-data";
@@ -46,9 +47,12 @@ function WallboardContent({ user }: { user: SessionUser }) {
   return (
     <div className="min-h-[calc(100vh-150px)] rounded-2xl bg-[#061b33] p-6 text-white shadow-2xl">
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-black uppercase text-blue-200">KINGAPP Outsourcing Center</p>
-          <h2 className="mt-2 text-4xl font-black">Live Wallboard</h2>
+        <div className="flex items-center gap-4">
+          <KingAppLogo size={56} />
+          <div>
+            <p className="text-sm font-black uppercase text-blue-200">KINGAPP Outsourcing Center</p>
+            <h2 className="mt-2 text-4xl font-black">Live Wallboard</h2>
+          </div>
         </div>
         <div className="rounded-xl bg-white/10 px-5 py-3 text-right">
           <p className="text-xs font-black uppercase text-blue-200">Auto refresh</p>

@@ -29,6 +29,7 @@ import {
   CallCenterMobileBlock,
   useIsMobileScreen
 } from "@/components/CallCenterDesktopOnly";
+import { KingAppLogo } from "@/components/KingAppLogo";
 import type { SessionUser } from "@/lib/auth";
 import {
   getActiveCallCenterCompanyForUser,
@@ -139,7 +140,7 @@ export function CallCenterShell({
         <aside className="hidden w-72 shrink-0 flex-col bg-[#061b33] text-white shadow-2xl lg:flex">
           <div className="border-b border-white/10 p-7">
             <div className="flex items-center gap-3">
-              <div className="text-4xl leading-none text-amber-300">♛</div>
+              <KingAppLogo size={48} />
               <div>
                 <h1 className="text-2xl font-black tracking-wide">KINGAPP</h1>
                 <p className="text-xs font-semibold text-blue-200">
@@ -175,7 +176,7 @@ export function CallCenterShell({
           </nav>
 
           <div className="border-t border-white/10 p-6 text-center">
-            <div className="mx-auto mb-3 text-5xl text-amber-300">♛</div>
+            <KingAppLogo className="mx-auto mb-3" size={64} />
             <p className="text-xl font-black">KINGAPP</p>
             <p className="text-sm font-semibold text-blue-100">Call Center Module</p>
             <p className="mt-8 text-xs font-semibold text-blue-200">Version 1.0.0</p>
