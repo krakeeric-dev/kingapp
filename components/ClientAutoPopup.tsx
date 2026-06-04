@@ -8,16 +8,26 @@ type ClientAutoPopupProps = {
   call?: QueueCall | null;
   client?: CallCenterClient | null;
   onAccept?: () => void;
+  onAddNewClient?: () => void;
   onClose?: () => void;
+  onCreateOrder?: () => void;
+  onLogComplaint?: () => void;
   onQueue?: () => void;
+  onReject?: () => void;
+  onScheduleCallback?: () => void;
 };
 
 export function ClientAutoPopup({
   call,
   client,
   onAccept,
+  onAddNewClient,
   onClose,
-  onQueue
+  onCreateOrder,
+  onLogComplaint,
+  onQueue,
+  onReject,
+  onScheduleCallback
 }: ClientAutoPopupProps) {
   if (!call && !client) return null;
 
@@ -39,7 +49,7 @@ export function ClientAutoPopup({
             <PhoneIncoming className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-xs font-black uppercase text-blue-700">Client Auto Popup</p>
+            <p className="text-xs font-black uppercase text-blue-700">Incoming Call</p>
             <h3 className="mt-1 text-2xl font-black text-slate-950">{name}</h3>
             <p className="mt-1 text-sm font-bold text-slate-600">{phone} - {area}</p>
           </div>
@@ -75,9 +85,14 @@ export function ClientAutoPopup({
         </div>
       ) : null}
 
-      {(onAccept || onQueue) ? (
+      {(onAccept || onQueue || onReject || onCreateOrder || onLogComplaint || onScheduleCallback || onAddNewClient) ? (
         <div className="mt-5 flex flex-wrap gap-2">
-          {onAccept ? <button className="primary-button" onClick={onAccept} type="button">Accept Call</button> : null}
+          {onAccept ? <button className="primary-button" onClick={onAccept} type="button">Answer</button> : null}
+          {onReject ? <button className="danger-button" onClick={onReject} type="button">Reject</button> : null}
+          {onCreateOrder ? <button className="secondary-button" onClick={onCreateOrder} type="button">Create Order</button> : null}
+          {onLogComplaint ? <button className="secondary-button" onClick={onLogComplaint} type="button">Log Complaint</button> : null}
+          {onScheduleCallback ? <button className="secondary-button" onClick={onScheduleCallback} type="button">Schedule Callback</button> : null}
+          {!displayClient && onAddNewClient ? <button className="secondary-button" onClick={onAddNewClient} type="button">Add New Client</button> : null}
           {onQueue ? <button className="secondary-button" onClick={onQueue} type="button">Send to Queue</button> : null}
         </div>
       ) : null}

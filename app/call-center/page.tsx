@@ -55,10 +55,16 @@ import {
   addCallback,
   addComplaint,
   addPaymentFollowUp,
+  acceptQueueCall,
+  getAgents,
   getCallLogs,
   getComplaints,
   getPaymentFollowUps,
+  getQueueCalls,
+  markCallMissed,
   saveClientNotes,
+  saveAgents,
+  saveQueueCalls,
   type CallbackItem,
   type CallCenterAgent,
   type CallCenterClient,
@@ -202,6 +208,7 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
   const [products, setProducts] = useState<ProductMaster[]>([]);
   const [announcements, setAnnouncements] = useState<TeamAnnouncement[]>([]);
   const [activeCompany, setActiveCompany] = useState("all");
+  const [focusedCallId, setFocusedCallId] = useState("");
   const [selectedClientId, setSelectedClientId] = useState("");
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState("");
@@ -253,7 +260,8 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
   }, [user]);
 
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
-  const currentCall = queueCalls.find((call) => call.status === "Active") ?? queueCalls.find((call) => call.status === "Incoming");
+  const focusedCall = queueCalls.find((call) => call.id === focusedCallId && (call.status === "Incoming" || call.status === "Active"));
+  const currentCall = focusedCall ?? queueCalls.find((call) => call.status === "Active") ?? queueCalls.find((call) => call.status === "Incoming");
   const agentsOnline = agents.filter((agent) => agent.status !== "Offline").length;
   const callsInQueue = queueCalls.filter((call) => call.status === "Waiting" || call.status === "Incoming").length;
   const todaysLogs = callLogs.filter((record) => record.date === today());
@@ -288,6 +296,87 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
     paymentsDue: payments.filter((payment) => payment.status !== "Closed").reduce((sum, payment) => sum + payment.amountDue, 0)
   };
   const messagingStats = getMessagingDashboardStats(user);
+
+  function refreshDesk() {
+    const loadedClients = getCompanyClients(user);
+    setClients(loadedClients);
+    setCallLogs(getCallLogs().filter((log) => loadedClients.some((client) => client.id === log.clientId)));
+    setOrders(getCompanyOrders(user));
+    setPayments(getCompanyPayments(user));
+    setComplaints(getCompanyComplaints(user));
+    setCallbacks(getCompanyCallbacks(user));
+    setQueueCalls(getCompanyQueueCalls(user));
+    setAgents(getCompanyAgents(user));
+  }
+
+  function updateCurrentAgentStatus(status: CallCenterAgent["status"]) {
+    const existingAgents = getAgents();
+    const matchingAgent = existingAgents.find((agent) => agent.name === user.displayName);
+    const updatedAgents = matchingAgent
+      ? existingAgents.map((agent) => agent.name === user.displayName ? { ...agent, status } : agent)
+      : [
+          {
+            id: `AG-${user.username.toUpperCase()}`,
+            companyId: user.companyId,
+            companyName: user.companyName,
+            name: user.displayName,
+            extension: "WEB",
+            status,
+            phoneType: "Browser Softphone" as const
+          },
+          ...existingAgents
+        ];
+    saveAgents(updatedAgents);
+    setAgents(getCompanyAgents(user));
+  }
+
+  function simulateIncomingCall() {
+    const matchedClient = clients[0];
+    const companyId = matchedClient?.companyId ?? (activeCompany === "all" ? user.companyId : activeCompany);
+    const companyName =
+      matchedClient?.companyName ??
+      callCenterCompanies.find((company) => company.id === companyId)?.name ??
+      user.companyName;
+    const call: QueueCall = {
+      id: `QCALL-MOCK-${Date.now()}`,
+      companyId,
+      companyName,
+      clientId: matchedClient?.id ?? `UNKNOWN-${Date.now()}`,
+      clientName: matchedClient?.clientName ?? "Unknown Caller",
+      phone: matchedClient?.phone ?? "0788999000",
+      location: matchedClient?.area ?? "Unknown location",
+      currentBalance: matchedClient?.currentBalance ?? 0,
+      lastOrder: matchedClient ? `${matchedClient.lastOrderQuantity} cartons on ${matchedClient.lastOrderDate}` : "No order history",
+      assignedMarketer: matchedClient?.assignedMarketer ?? "Unassigned",
+      callReason: "Customer Care",
+      status: "Incoming",
+      startedAt: new Date().toISOString(),
+      notes: ["Mock provider test call"]
+    };
+
+    saveQueueCalls([call, ...getQueueCalls()]);
+    updateCurrentAgentStatus("Ringing");
+    setQueueCalls(getCompanyQueueCalls(user));
+    setFocusedCallId(call.id);
+    setSelectedClientId(matchedClient?.id ?? "");
+    setMessage("Mock incoming call created. Provider: Mock Mode.");
+  }
+
+  function answerCall(call: QueueCall) {
+    acceptQueueCall(call.id, user.displayName);
+    updateCurrentAgentStatus("On Call");
+    setQueueCalls(getCompanyQueueCalls(user));
+    setFocusedCallId(call.id);
+    setMessage("Call answered. Agent status changed to On Call.");
+  }
+
+  function rejectCall(call: QueueCall) {
+    markCallMissed(call.id, "Rejected from Call Center desk");
+    updateCurrentAgentStatus("Available");
+    setQueueCalls(getCompanyQueueCalls(user));
+    setFocusedCallId("");
+    setMessage("Call rejected and saved as missed.");
+  }
 
   function requireClient() {
     if (!selectedClient) {
@@ -395,8 +484,39 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
   }
 
   function endCurrentCall() {
-    const client = requireClient();
+    if (currentCall) {
+      const endedAt = new Date().toISOString();
+      saveQueueCalls(
+        getQueueCalls().map((call) =>
+          call.id === currentCall.id
+            ? { ...call, status: "Closed", endedAt, notes: ["Call ended from Call Center desk", ...call.notes] }
+            : call
+        )
+      );
+      updateCurrentAgentStatus("Available");
+      setQueueCalls(getCompanyQueueCalls(user));
+      setFocusedCallId("");
+      setCallLogs(
+        addCallLog(
+          {
+            date: today(),
+            time: nowTime(),
+            clientId: currentCall.clientId,
+            clientName: currentCall.clientName,
+            phone: currentCall.phone,
+            callType: currentCall.callReason,
+            duration: "Completed",
+            outcome: "Closed",
+            nextAction: "Call ended from command center"
+          },
+          user
+        )
+      );
+      setMessage("Call ended and logged.");
+      return;
+    }
 
+    const client = requireClient();
     if (!client) return;
 
     setCallLogs(
@@ -443,6 +563,19 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
             user={user}
           />
           <div className="space-y-4 p-4 lg:p-6">
+            <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase text-blue-700">Provider: Mock Mode</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-600">Real phone provider not connected</p>
+                </div>
+                <button className="primary-button" onClick={simulateIncomingCall} type="button">
+                  <PhoneIncoming className="h-4 w-4" />
+                  Simulate Incoming Call
+                </button>
+              </div>
+            </section>
+
             {message ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
                 {message}
@@ -459,7 +592,13 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
             {currentCall ? (
               <ClientAutoPopup
                 call={currentCall}
-                client={clients.find((client) => client.id === currentCall.clientId) ?? selectedClient}
+                client={clients.find((client) => client.id === currentCall.clientId)}
+                onAccept={() => answerCall(currentCall)}
+                onAddNewClient={() => setMessage("Unknown caller captured. Client creation workflow can be opened from Client Management.")}
+                onCreateOrder={() => setActionMode("order")}
+                onLogComplaint={() => setActionMode("complaint")}
+                onReject={() => rejectCall(currentCall)}
+                onScheduleCallback={() => setActionMode("callback")}
               />
             ) : null}
 
@@ -722,12 +861,32 @@ function TopBar({
 }
 
 function CurrentCallCard({ call, client, onEnd, onMessage }: { call?: QueueCall; client?: CallCenterClient; onEnd: () => void; onMessage: (message: string) => void }) {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const displayName = call?.clientName ?? client?.clientName ?? "No active client";
   const phone = call?.phone ?? client?.phone ?? "";
   const location = call?.location ?? client?.area ?? "";
+  const timerStart = call?.acceptedAt ?? call?.startedAt;
+  const statusLabel = call?.status === "Incoming" ? "Ringing" : call?.status === "Active" ? "On Call" : call?.status ?? "Ready";
+  const timerLabel = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
+
+  useEffect(() => {
+    if (!timerStart || !call || !["Incoming", "Active"].includes(call.status)) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const startedAt = timerStart;
+
+    function updateTimer() {
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000)));
+    }
+
+    updateTimer();
+    const interval = window.setInterval(updateTimer, 1000);
+    return () => window.clearInterval(interval);
+  }, [call, timerStart]);
 
   return (
-    <Panel title="Current Call" action={<span className="rounded-md bg-emerald-500 px-2 py-1 text-xs font-black text-white">LIVE</span>}>
+    <Panel title="Current Call" action={<span className="rounded-md bg-emerald-500 px-2 py-1 text-xs font-black text-white">{statusLabel}</span>}>
       <div className="flex flex-col items-center text-center">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
           <PhoneCall className="h-8 w-8" />
@@ -737,7 +896,7 @@ function CurrentCallCard({ call, client, onEnd, onMessage }: { call?: QueueCall;
         <p className="text-sm font-semibold text-slate-500">{location}</p>
         <p className="mt-5 flex items-center gap-2 text-sm font-bold text-slate-500">
           <span className="h-2 w-2 rounded-full bg-emerald-300" />
-          00:01:24
+          {timerLabel}
         </p>
       </div>
       <div className="mt-5 grid gap-2">
