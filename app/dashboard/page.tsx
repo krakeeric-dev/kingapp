@@ -47,6 +47,7 @@ type DashboardStat = {
   value: string;
   icon: typeof BarChart3;
   tone?: "success" | "danger" | "warning" | "neutral";
+  trend?: string;
 };
 
 type Activity = {
@@ -259,34 +260,40 @@ function DashboardContent({ user }: { user: SessionUser }) {
       {
         label: "Loaded Today",
         icon: Boxes,
+        trend: "Distribution volume",
         value: totalLoaded.toLocaleString()
       },
       {
         label: "Sold Today",
         icon: FileText,
+        trend: "Cartons sold",
         value: totalSold.toLocaleString()
       },
       {
         label: "Sales Value",
         icon: TrendingUp,
         tone: "success",
+        trend: "Revenue booked",
         value: formatMoney(salesValue)
       },
       {
         label: "Cash Received",
         icon: WalletCards,
         tone: "success",
+        trend: "Cash collected",
         value: formatMoney(cashReceived)
       },
       {
         label: "Cash Variance",
         icon: cashVariance < 0 ? TrendingDown : TrendingUp,
         tone: cashVariance < 0 ? "danger" : cashVariance > 0 ? "warning" : "success",
+        trend: cashVariance < 0 ? "Needs attention" : "Controlled",
         value: formatMoney(cashVariance)
       },
       {
         label: "Warehouse Stock",
         icon: Boxes,
+        trend: "Closing stock",
         value: inventoryTotals.totalWarehouseStock.toLocaleString()
       },
       ...syncStats
@@ -450,20 +457,20 @@ function DashboardContent({ user }: { user: SessionUser }) {
 
   return (
     <div className="space-y-6">
-      <div className="app-card-soft overflow-hidden p-5 sm:p-6">
+      <div className="enterprise-panel overflow-hidden p-5 sm:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-normal text-brand-700">
               {roleLabels[user.role]} Dashboard
             </p>
             <h2 className="mt-2 text-2xl font-black text-slate-950 sm:text-4xl">
-              Executive Overview
+              Beverage Operations Control Room
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               {roleSummaries[user.role] ?? "Manage your KingApp workspace."}
             </p>
           </div>
-          <div className="rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-bold text-brand-900">
+          <div className="rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-black text-brand-900 shadow-sm">
             {user.displayName} - {user.username}
           </div>
         </div>
@@ -487,24 +494,29 @@ function DashboardContent({ user }: { user: SessionUser }) {
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        {dashboard.stats.map((stat) => {
+        {dashboard.stats.map((stat, index) => {
           const Icon = stat.icon;
           const toneClass = getStatToneClass(stat.tone);
+          const featured = index === 0;
 
           return (
             <article
-              className="app-card p-5 transition hover:-translate-y-0.5 hover:shadow-soft"
+              className={featured ? "enterprise-kpi enterprise-kpi-featured" : "enterprise-kpi"}
               key={stat.label}
             >
+              <div className={`absolute right-0 top-0 h-24 w-24 rounded-full ${featured ? "bg-white/10" : "bg-brand-50"} translate-x-8 -translate-y-8`} />
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-bold text-slate-500">{stat.label}</p>
-                  <p className={`mt-3 text-3xl font-black ${toneClass.text}`}>
+                  <p className={`text-sm font-black ${featured ? "text-emerald-50" : "text-slate-600"}`}>{stat.label}</p>
+                  <p className={`mt-3 text-4xl font-black ${featured ? "text-white" : toneClass.text}`}>
                     {stat.value}
+                  </p>
+                  <p className={`mt-4 inline-flex rounded-full px-2.5 py-1 text-xs font-black ${featured ? "bg-white/15 text-emerald-50" : "bg-slate-50 text-slate-500"}`}>
+                    {stat.trend ?? "Operational metric"}
                   </p>
                 </div>
                 <div
-                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${toneClass.icon}`}
+                  className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${featured ? "bg-white text-brand-800" : toneClass.icon}`}
                 >
                   <Icon className="h-6 w-6" />
                 </div>
@@ -617,13 +629,13 @@ function ExecutiveSection({
   title: string;
 }) {
   return (
-    <section className="app-card p-5">
+    <section className="enterprise-panel p-5">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-lg font-black text-slate-950">{title}</h3>
+          <h3 className="enterprise-section-title">{title}</h3>
           <p className="mt-1 text-sm font-semibold text-slate-500">{subtitle}</p>
         </div>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700">
           <Icon className="h-5 w-5" />
         </div>
       </div>
@@ -653,7 +665,7 @@ function StockCashOverview({
       <div className="grid grid-cols-7 gap-2">
         {days.map((day) => (
           <div className="space-y-2" key={day.date}>
-            <div className="flex h-40 items-end justify-center gap-1 rounded-lg border border-slate-100 bg-slate-50 px-2 py-3">
+            <div className="flex h-40 items-end justify-center gap-1 rounded-lg border border-slate-100 bg-[repeating-linear-gradient(135deg,#f8fafc_0,#f8fafc_4px,#eef4f0_4px,#eef4f0_8px)] px-2 py-3">
               <span
                 className="w-3 rounded-t bg-brand-700"
                 style={{ height: `${Math.max(4, (day.loaded / maxCartons) * 100)}%` }}
@@ -770,7 +782,7 @@ function SummaryTile({
   value: number | string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <p className="text-xs font-bold uppercase tracking-normal text-slate-500">
         {label}
       </p>

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
   BadgeDollarSign,
+  Bell,
   Boxes,
   Building2,
   ClipboardCheck,
@@ -16,10 +17,13 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageSquare,
   PackageCheck,
   PhoneCall,
+  Plus,
   ReceiptText,
   RefreshCw,
+  Search,
   ScrollText,
   ShieldCheck,
   UserRound,
@@ -46,6 +50,11 @@ type NavItem = {
   label: string;
   icon: typeof Home;
   roles: UserRole[];
+};
+
+type NavGroup = {
+  items: NavItem[];
+  title: string;
 };
 
 type BeforeInstallPromptEvent = Event & {
@@ -109,6 +118,18 @@ const navItems: NavItem[] = [
     label: "Client Orders",
     icon: ClipboardList,
     roles: getAllowedRoles("/client-orders")
+  },
+  {
+    href: "/client-portal",
+    label: "Client Portal",
+    icon: UserRound,
+    roles: getAllowedRoles("/client-portal")
+  },
+  {
+    href: "/supplier-dashboard",
+    label: "Suppliers",
+    icon: Building2,
+    roles: getAllowedRoles("/supplier-dashboard")
   },
   {
     href: "/inventory",
@@ -343,23 +364,34 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
   const mobileVisibleNav = visibleNav.filter(
     (item) => !item.href.startsWith("/call-center")
   );
+  const groupedVisibleNav = groupNavItems(visibleNav);
+  const groupedMobileNav = groupNavItems(mobileVisibleNav);
 
   const workspaceName =
     activeCompanyId === "all" ? "All Companies" : getCompanyName(activeCompanyId, user.companyName);
+  const currentDateLabel = new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  }).format(new Date());
 
   return (
-    <main className="min-h-screen bg-transparent lg:grid lg:grid-cols-[280px_1fr]">
-      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden h-screen w-[280px] border-r border-white/10 bg-gradient-to-b from-brand-950 via-brand-900 to-brand-800 p-5 text-white shadow-executive lg:flex lg:flex-col">
+    <main className="min-h-screen bg-transparent lg:grid lg:grid-cols-[300px_1fr]">
+      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden h-screen w-[300px] border-r border-white/10 bg-gradient-to-b from-brand-950 via-brand-900 to-brand-800 p-5 text-white shadow-executive lg:flex lg:flex-col">
         <BrandBlock companyName={workspaceName} />
-        <nav className="mt-8 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
-          {visibleNav.map((item) => (
-            <NavLink
-              href={item.href}
-              icon={item.icon}
-              isActive={pathname === item.href}
-              key={item.href}
-              label={item.label}
-            />
+        <nav className="mt-8 min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
+          {groupedVisibleNav.map((group) => (
+            <NavGroupBlock key={group.title} title={group.title}>
+              {group.items.map((item) => (
+                <NavLink
+                  href={item.href}
+                  icon={item.icon}
+                  isActive={pathname === item.href}
+                  key={item.href}
+                  label={item.label}
+                />
+              ))}
+            </NavGroupBlock>
           ))}
         </nav>
         <UserPanel handleLogout={handleLogout} user={user} />
@@ -378,15 +410,25 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
               </button>
               <BrandMark compact />
             </div>
-            <div className="hidden lg:block">
+            <div className="hidden shrink-0 lg:block">
               <p className="text-xs font-bold uppercase tracking-normal text-brand-700">
-                KingApp Workspace — {workspaceName}
+                KingApp Workspace - {workspaceName}
               </p>
               <h1 className="mt-1 text-2xl font-bold text-slate-950">
                 {currentPageTitle(pathname)}
               </h1>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="hidden min-w-0 flex-1 items-center justify-center px-4 xl:flex">
+              <label className="relative w-full max-w-xl">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-brand-600 focus:bg-white focus:ring-4 focus:ring-brand-100"
+                  placeholder="Search sales, clients, calls, stock, reports..."
+                  type="search"
+                />
+              </label>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3">
               {user.role === "admin" ? (
                 <select
                   className="hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-700 shadow-sm outline-none lg:block"
@@ -401,6 +443,19 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
                   ))}
                 </select>
               ) : null}
+              <div className="hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 shadow-sm xl:block">
+                {currentDateLabel}
+              </div>
+              <button className="hidden h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-brand-50 hover:text-brand-700 sm:inline-flex" type="button">
+                <Bell className="h-4 w-4" />
+              </button>
+              <button className="hidden h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-brand-50 hover:text-brand-700 sm:inline-flex" type="button">
+                <MessageSquare className="h-4 w-4" />
+              </button>
+              <Link className="primary-button hidden xl:inline-flex" href="/loading">
+                <Plus className="h-4 w-4" />
+                Quick Action
+              </Link>
               <div className="hidden rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm sm:block">
                 <span className="font-bold text-slate-950">{user.displayName}</span>
                 <span className="ml-2 text-slate-500">{roleLabels[user.role]}</span>
@@ -445,16 +500,20 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <nav className="mt-8 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
-                {mobileVisibleNav.map((item) => (
-                  <NavLink
-                    href={item.href}
-                    icon={item.icon}
-                    isActive={pathname === item.href}
-                    key={item.href}
-                    label={item.label}
-                    onClick={() => setMobileMenuOpen(false)}
-                  />
+              <nav className="mt-8 min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
+                {groupedMobileNav.map((group) => (
+                  <NavGroupBlock key={group.title} title={group.title}>
+                    {group.items.map((item) => (
+                      <NavLink
+                        href={item.href}
+                        icon={item.icon}
+                        isActive={pathname === item.href}
+                        key={item.href}
+                        label={item.label}
+                        onClick={() => setMobileMenuOpen(false)}
+                      />
+                    ))}
+                  </NavGroupBlock>
                 ))}
               </nav>
               {installPrompt ? (
@@ -515,13 +574,46 @@ function BrandBlock({ companyName }: { companyName?: string }) {
     <div>
       <BrandMark />
       <p className="mt-4 text-sm font-medium leading-6 text-emerald-100">
-        Sales & Stock Management
+        Enterprise Business Platform
       </p>
       {companyName ? (
         <p className="mt-2 rounded-lg bg-white/10 px-3 py-2 text-xs font-black text-white">
           {companyName}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+function groupNavItems(items: NavItem[]): NavGroup[] {
+  const groupOrder = ["Main", "Operations", "Client Network", "Call Center", "Management"];
+  const groups = new Map<string, NavItem[]>();
+
+  items.forEach((item) => {
+    const title = getNavGroupTitle(item.href);
+    groups.set(title, [...(groups.get(title) ?? []), item]);
+  });
+
+  return groupOrder
+    .map((title) => ({ title, items: groups.get(title) ?? [] }))
+    .filter((group) => group.items.length > 0);
+}
+
+function getNavGroupTitle(href: string) {
+  if (href === "/dashboard" || href === "/executive") return "Main";
+  if (href.startsWith("/call-center")) return "Call Center";
+  if (href === "/client-orders" || href === "/supplier-dashboard" || href === "/client-portal") return "Client Network";
+  if (href.startsWith("/admin") || href === "/reports" || href === "/daily-report" || href === "/sync-status") return "Management";
+  return "Operations";
+}
+
+function NavGroupBlock({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <div>
+      <p className="mb-3 px-3 text-[11px] font-black uppercase tracking-wide text-emerald-100/70">
+        {title}
+      </p>
+      <div className="space-y-1.5">{children}</div>
     </div>
   );
 }
