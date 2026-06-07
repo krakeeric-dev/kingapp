@@ -49,6 +49,7 @@ export type SalesRecord = {
   totalPaid?: number;
   totalUnpaidBalance?: number;
   clientsServed?: number;
+  paymentStatus?: "Paid" | "Partially Paid" | "Unpaid";
   status: SalesStatus;
   locked: boolean;
   submittedAt?: string;
@@ -102,7 +103,11 @@ export function normalizeSalesRecord(record: SalesRecord): SalesRecord {
       ...record,
       clientsServed: record.clientsServed ?? 0,
       totalPaid: record.totalPaid ?? record.salesValue,
-      totalUnpaidBalance: record.totalUnpaidBalance ?? 0
+      totalUnpaidBalance: record.totalUnpaidBalance ?? 0,
+      paymentStatus: getRecordPaymentStatus(
+        record.totalPaid ?? record.salesValue,
+        record.salesValue
+      )
     };
   }
 
@@ -130,8 +135,24 @@ export function normalizeSalesRecord(record: SalesRecord): SalesRecord {
     salesValue,
     totalPaid,
     totalUnpaidBalance,
-    clientsServed: clientSales.length
+    clientsServed: clientSales.length,
+    paymentStatus: getRecordPaymentStatus(totalPaid, salesValue)
   };
+}
+
+export function getRecordPaymentStatus(
+  totalPaid: number,
+  salesValue: number
+): "Paid" | "Partially Paid" | "Unpaid" {
+  if (salesValue <= 0 || totalPaid >= salesValue) {
+    return "Paid";
+  }
+
+  if (totalPaid > 0) {
+    return "Partially Paid";
+  }
+
+  return "Unpaid";
 }
 
 export function getSalesRecordForLoad(loadingRecordId: string) {
@@ -175,6 +196,7 @@ export function createSalesRecordFromLoad(
     totalPaid,
     totalUnpaidBalance,
     clientsServed: clientSales.length,
+    paymentStatus: getRecordPaymentStatus(totalPaid, salesValue),
     status: "sales_submitted",
     locked: true,
     submittedAt: now,
@@ -224,6 +246,7 @@ export function submitSalesRecord(
         totalPaid,
         totalUnpaidBalance,
         clientsServed: clientSales.length,
+        paymentStatus: getRecordPaymentStatus(totalPaid, salesValue),
         status: "sales_submitted" as const,
         locked: true,
         submittedAt: now,
@@ -235,6 +258,86 @@ export function submitSalesRecord(
     record,
     records: upsertSalesRecord(record)
   };
+}
+
+export function applyCashToSalesByMarketerDate({
+  cashReceived,
+  date,
+  marketerUsername
+}: {
+  cashReceived: number;
+  date: string;
+  marketerUsername: string;
+}) {
+  const records = getSalesRecords();
+  let remainingCash = Math.max(0, cashReceived);
+  let changed = false;
+  const updatedRecords = records.map((record) => {
+    if (
+      record.date !== date ||
+      record.marketerUsername !== marketerUsername ||
+      record.status !== "sales_submitted"
+    ) {
+      return record;
+    }
+
+    const paidForRecord = Math.min(record.salesValue, remainingCash);
+    remainingCash -= paidForRecord;
+    changed = true;
+
+    if (!record.clientSales?.length) {
+      return {
+        ...record,
+        paymentStatus: getRecordPaymentStatus(paidForRecord, record.salesValue),
+        totalPaid: paidForRecord,
+        totalUnpaidBalance: Math.max(0, record.salesValue - paidForRecord),
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    let remainingForClients = paidForRecord;
+    const clientSales = record.clientSales.map((clientSale) => {
+      const paidForClient = Math.min(clientSale.totalAmount, remainingForClients);
+      remainingForClients -= paidForClient;
+
+      return {
+        ...clientSale,
+        amountPaid: paidForClient,
+        balance: Math.max(0, clientSale.totalAmount - paidForClient),
+        paymentStatus: normalizeClientPaymentStatus(paidForClient, clientSale.totalAmount)
+      };
+    });
+
+    return {
+      ...record,
+      clientSales,
+      paymentStatus: getRecordPaymentStatus(paidForRecord, record.salesValue),
+      totalPaid: paidForRecord,
+      totalUnpaidBalance: Math.max(0, record.salesValue - paidForRecord),
+      updatedAt: new Date().toISOString()
+    };
+  });
+
+  if (changed) {
+    saveSalesRecords(updatedRecords);
+  }
+
+  return updatedRecords;
+}
+
+function normalizeClientPaymentStatus(
+  amountPaid: number,
+  totalAmount: number
+): PaymentStatus {
+  if (totalAmount <= 0 || amountPaid >= totalAmount) {
+    return "Paid";
+  }
+
+  if (amountPaid > 0) {
+    return "Partial";
+  }
+
+  return "Unpaid";
 }
 
 export function unlockSalesRecord(

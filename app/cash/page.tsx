@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import type { SessionUser } from "@/lib/auth";
 import { formatDate, statusChipClass } from "@/lib/loading-data";
 import {
+  applyCashToSalesByMarketerDate,
   getSalesRecords,
   formatMoney
 } from "@/lib/sales-data";
@@ -155,7 +156,13 @@ function CashContent({ user }: { user: SessionUser }) {
       existingRecord,
       draftNotes[salesRecord.id] ?? ""
     );
+    const updatedSalesRecords = applyCashToSalesByMarketerDate({
+      cashReceived,
+      date: salesRecord.date,
+      marketerUsername: salesRecord.marketerUsername
+    }).filter((record) => record.status === "sales_submitted");
     setCashRecords(result.records);
+    setSalesRecords(updatedSalesRecords);
     setDraftCash((current) => ({
       ...current,
       [salesRecord.id]: String(result.record.cashReceived)
@@ -164,7 +171,7 @@ function CashContent({ user }: { user: SessionUser }) {
       ...current,
       [salesRecord.id]: result.record.notes ?? ""
     }));
-    setMessage("Cash received submitted and locked.");
+    setMessage("Cash received submitted, locked, and marketer sales payment status updated.");
   }
 
   function handleUnlock(event: FormEvent<HTMLFormElement>) {

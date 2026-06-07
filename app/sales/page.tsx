@@ -300,7 +300,7 @@ function SalesContent({ user }: { user: SessionUser }) {
       const productAmounts = getProductAmounts(row, products);
       const quantityCartons = getRowTotalCartons(row);
       const totalAmount = getRowTotalAmount(row, products);
-      const amountPaid = toNumber(row.amountPaid);
+      const amountPaid = 0;
       const selectedProduct = productGrid.find(
         (product) => product.key === row.productKey
       );
@@ -320,7 +320,7 @@ function SalesContent({ user }: { user: SessionUser }) {
         quantityCartons,
         pricePerCarton,
         totalAmount,
-        paymentStatus: normalizePaymentStatus(row.paymentStatus),
+        paymentStatus: "Unpaid" as PaymentStatus,
         amountPaid,
         balance: totalAmount - amountPaid,
         notes: row.notes.trim()
@@ -357,12 +357,11 @@ function SalesContent({ user }: { user: SessionUser }) {
     const invalidRow = clientSales.find(
       (row) =>
         row.quantityCartons < 0 ||
-        row.amountPaid < 0 ||
-        row.amountPaid > row.totalAmount
+        row.amountPaid < 0
     );
 
     if (invalidRow) {
-      setError("Check quantities and paid amounts before submitting.");
+      setError("Check quantities before submitting.");
       return;
     }
 
@@ -619,6 +618,7 @@ function SalesLoadPanel({
   const canEdit = user.role === "marketer" && !isLocked;
   const totals = getTotals(draftRows);
   const expectedReturn = load.loadedCartons - totals.soldCartons;
+  const loadPaymentStatus = getDisplayPaymentStatus(totals.totalPaid, totals.salesValue);
 
   return (
     <article className="app-card overflow-hidden">
@@ -640,7 +640,7 @@ function SalesLoadPanel({
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
           <Metric label="Loaded" value={load.loadedCartons.toLocaleString()} />
           <Metric label="Sold" value={totals.soldCartons.toLocaleString()} />
           <Metric
@@ -655,6 +655,12 @@ function SalesLoadPanel({
             tone={totals.totalUnpaidBalance > 0 ? "danger" : "default"}
             value={`${formatMoney(totals.totalUnpaidBalance)} RWF`}
           />
+          <div className="rounded-lg border border-brand-100 bg-brand-50 px-3 py-2">
+            <span className="block text-xs font-semibold text-brand-800">Payment Status</span>
+            <span className="mt-1 block">
+              <PaymentStatusChip status={loadPaymentStatus} />
+            </span>
+          </div>
         </div>
       </div>
 
@@ -799,6 +805,11 @@ function SalesEntryTable({
         getProductPrice(row.productKey, products),
     0
   );
+  const totalPaid = draftRows.reduce(
+    (total, row) => total + toNumber(row.amountPaid),
+    0
+  );
+  const totalBalance = Math.max(0, totalAmount - totalPaid);
   const datalistId = `saved-clients-${load.id}`;
 
   function handleClientLookup(
@@ -818,7 +829,7 @@ function SalesEntryTable({
     <div>
       <SavedClientDatalists clients={savedClients} id={datalistId} />
       <div className="hidden overflow-x-auto rounded-lg border border-slate-200 bg-white md:block">
-        <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[1480px] border-collapse text-left text-sm">
           <thead className="bg-brand-50 text-xs font-black uppercase tracking-normal text-brand-900">
             <tr>
               <th className="border-b border-brand-100 px-3 py-3">Client Name</th>
@@ -830,6 +841,9 @@ function SalesEntryTable({
               <th className="border-b border-brand-100 px-3 py-3 text-right">Quantity</th>
               <th className="border-b border-brand-100 px-3 py-3 text-right">Unit Price</th>
               <th className="border-b border-brand-100 px-3 py-3 text-right">Amount</th>
+              <th className="border-b border-brand-100 px-3 py-3 text-right">Paid</th>
+              <th className="border-b border-brand-100 px-3 py-3 text-right">Unpaid Balance</th>
+              <th className="border-b border-brand-100 px-3 py-3">Payment Status</th>
               {canEdit ? <th className="border-b border-brand-100 px-3 py-3" /> : null}
             </tr>
           </thead>
@@ -838,6 +852,8 @@ function SalesEntryTable({
               const price = getProductPrice(row.productKey, products);
               const quantity = toNumber(row.quantities[row.productKey]);
               const amount = quantity * price;
+              const paid = toNumber(row.amountPaid);
+              const balance = Math.max(0, amount - paid);
 
               return (
                 <tr className="border-b border-slate-100 last:border-b-0" key={row.id}>
@@ -932,6 +948,15 @@ function SalesEntryTable({
                   <td className="px-3 py-2 text-right font-black text-brand-800">
                     {formatMoney(amount)} RWF
                   </td>
+                  <td className="px-3 py-2 text-right font-black text-emerald-700">
+                    {formatMoney(paid)} RWF
+                  </td>
+                  <td className="px-3 py-2 text-right font-black text-red-700">
+                    {formatMoney(balance)} RWF
+                  </td>
+                  <td className="px-3 py-2">
+                    <PaymentStatusChip status={normalizePaymentStatus(row.paymentStatus)} />
+                  </td>
                   {canEdit ? (
                     <td className="px-2 py-2 text-right">
                       <button
@@ -960,6 +985,13 @@ function SalesEntryTable({
               <td className="px-3 py-3 text-right font-black text-brand-900">
                 {formatMoney(totalAmount)} RWF
               </td>
+              <td className="px-3 py-3 text-right font-black text-emerald-700">
+                {formatMoney(totalPaid)} RWF
+              </td>
+              <td className="px-3 py-3 text-right font-black text-red-700">
+                {formatMoney(totalBalance)} RWF
+              </td>
+              <td />
               {canEdit ? <td /> : null}
             </tr>
           </tfoot>
@@ -971,6 +1003,8 @@ function SalesEntryTable({
           const price = getProductPrice(row.productKey, products);
           const quantity = toNumber(row.quantities[row.productKey]);
           const amount = quantity * price;
+          const paid = toNumber(row.amountPaid);
+          const balance = Math.max(0, amount - paid);
 
           return (
             <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm" key={row.id}>
@@ -1059,7 +1093,14 @@ function SalesEntryTable({
                 <div className="grid grid-cols-2 gap-2">
                   <Metric label="Unit Price" value={`${formatMoney(price)} RWF`} />
                   <Metric label="Amount" value={`${formatMoney(amount)} RWF`} />
+                  <Metric label="Paid" value={`${formatMoney(paid)} RWF`} />
+                  <Metric
+                    label="Unpaid Balance"
+                    tone={balance > 0 ? "danger" : "default"}
+                    value={`${formatMoney(balance)} RWF`}
+                  />
                 </div>
+                <PaymentStatusChip status={normalizePaymentStatus(row.paymentStatus)} />
                 {canEdit ? (
                   <button
                     className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-700 hover:bg-red-50"
@@ -1077,6 +1118,12 @@ function SalesEntryTable({
         <div className="grid grid-cols-2 gap-2">
           <Metric label="Total Quantity" value={totalQuantity.toLocaleString()} />
           <Metric label="Total Amount" value={`${formatMoney(totalAmount)} RWF`} />
+          <Metric label="Total Paid" value={`${formatMoney(totalPaid)} RWF`} />
+          <Metric
+            label="Total Unpaid"
+            tone={totalBalance > 0 ? "danger" : "default"}
+            value={`${formatMoney(totalBalance)} RWF`}
+          />
         </div>
       </div>
     </div>
@@ -1260,11 +1307,8 @@ function ClientSaleCard({
         <Field label="Cash Received">
           <input
             className="form-input"
-            disabled={!canEdit}
+            disabled
             min="0"
-            onChange={(event) =>
-              updateClientRow(load, row.id, "amountPaid", event.target.value)
-            }
             type="number"
             value={row.amountPaid}
           />
@@ -1277,10 +1321,7 @@ function ClientSaleCard({
         <Field label="Payment Status">
           <select
             className="form-input"
-            disabled={!canEdit}
-            onChange={(event) =>
-              updateClientRow(load, row.id, "paymentStatus", event.target.value)
-            }
+            disabled
             value={row.paymentStatus}
           >
             {paymentStatuses.map((status) => (
@@ -1404,6 +1445,23 @@ function SalesStatusChip({ salesRecord }: { salesRecord?: SalesRecord }) {
   );
 }
 
+function PaymentStatusChip({ status }: { status: PaymentStatus | "Partially Paid" }) {
+  const normalizedStatus =
+    status === "Partial" || status === "Partially Paid" ? "Partially Paid" : status;
+  const className =
+    normalizedStatus === "Paid"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : normalizedStatus === "Partially Paid"
+        ? "border-amber-200 bg-amber-50 text-amber-700"
+        : "border-slate-200 bg-slate-50 text-slate-700";
+
+  return (
+    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${className}`}>
+      {normalizedStatus}
+    </span>
+  );
+}
+
 function SavedClientDatalists({
   clients,
   id
@@ -1458,6 +1516,21 @@ function findSavedClient(query: string, clients: MarketerClient[]) {
 
     return nameMatch || phoneMatch || locationMatch;
   });
+}
+
+function getDisplayPaymentStatus(
+  totalPaid: number,
+  salesValue: number
+): "Paid" | "Partially Paid" | "Unpaid" {
+  if (salesValue <= 0 || totalPaid >= salesValue) {
+    return "Paid";
+  }
+
+  if (totalPaid > 0) {
+    return "Partially Paid";
+  }
+
+  return "Unpaid";
 }
 
 function FilterField({
