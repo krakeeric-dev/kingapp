@@ -20,6 +20,7 @@ export type RawMaterialMovement = {
 export type RawMaterialMinimum = {
   materialName: string;
   minimumLevel: number;
+  reorderLevel: number;
   unit: string;
 };
 
@@ -31,18 +32,34 @@ export type RawMaterialRow = {
   rawMaterialOut: number;
   remainingStock: number;
   minimumLevel: number;
-  status: "Available" | "Low Stock" | "Reorder Required";
+  reorderLevel: number;
+  status: "Sufficient" | "Low Stock" | "Reorder Immediately";
 };
 
 const RAW_MATERIAL_MOVEMENTS_KEY = "kingapp.rawMaterialMovements";
 const RAW_MATERIAL_MINIMUMS_KEY = "kingapp.rawMaterialMinimums";
 
+const legacyRawMaterialNames: Record<string, string> = {
+  "bottle preforms": "Preforms",
+  "packaging cartons": "Cartons",
+  "shrink wrap": "Shrink Film"
+};
+
 const defaultRawMaterials: Array<RawMaterialMinimum & { openingStock: number }> = [
-  { materialName: "Bottle Preforms", minimumLevel: 1000, openingStock: 5000, unit: "Pieces" },
-  { materialName: "Bottle Caps", minimumLevel: 1000, openingStock: 6000, unit: "Pieces" },
-  { materialName: "Labels", minimumLevel: 1200, openingStock: 7000, unit: "Pieces" },
-  { materialName: "Shrink Wrap", minimumLevel: 100, openingStock: 450, unit: "Rolls" },
-  { materialName: "Packaging Cartons", minimumLevel: 150, openingStock: 600, unit: "Cartons" }
+  { materialName: "Bottle Caps", minimumLevel: 1000, openingStock: 6000, reorderLevel: 500, unit: "Pieces" },
+  { materialName: "Preforms", minimumLevel: 1000, openingStock: 5000, reorderLevel: 500, unit: "Pieces" },
+  { materialName: "Labels", minimumLevel: 1200, openingStock: 7000, reorderLevel: 600, unit: "Pieces" },
+  { materialName: "Cartons", minimumLevel: 150, openingStock: 600, reorderLevel: 75, unit: "Cartons" },
+  { materialName: "Shrink Film", minimumLevel: 100, openingStock: 450, reorderLevel: 50, unit: "Rolls" },
+  { materialName: "Bottle Handles", minimumLevel: 500, openingStock: 2500, reorderLevel: 250, unit: "Pieces" },
+  { materialName: "Water Treatment Chemicals", minimumLevel: 50, openingStock: 220, reorderLevel: 25, unit: "Kg" },
+  { materialName: "Ink / Printing Materials", minimumLevel: 30, openingStock: 120, reorderLevel: 15, unit: "Liters" },
+  { materialName: "Glue", minimumLevel: 40, openingStock: 160, reorderLevel: 20, unit: "Kg" },
+  { materialName: "Packaging Tape", minimumLevel: 60, openingStock: 240, reorderLevel: 30, unit: "Rolls" },
+  { materialName: "Pallets", minimumLevel: 25, openingStock: 90, reorderLevel: 12, unit: "Pieces" },
+  { materialName: "Bottle Sleeves", minimumLevel: 500, openingStock: 2200, reorderLevel: 250, unit: "Pieces" },
+  { materialName: "Disinfectant / Sanitizer", minimumLevel: 40, openingStock: 180, reorderLevel: 20, unit: "Liters" },
+  { materialName: "Machine Lubricants", minimumLevel: 20, openingStock: 80, reorderLevel: 10, unit: "Liters" }
 ];
 
 function readJson<T>(key: string, fallback: T): T {
@@ -76,6 +93,10 @@ function materialKey(materialName: string) {
   return materialName.trim().toLowerCase();
 }
 
+function officialRawMaterialName(materialName: string) {
+  return legacyRawMaterialNames[materialKey(materialName)] ?? materialName;
+}
+
 export function createRawMaterialMovement(
   movement: Omit<RawMaterialMovement, "id">
 ): RawMaterialMovement {
@@ -88,10 +109,28 @@ export function createRawMaterialMovement(
 export function ensureDefaultRawMaterials() {
   const existingMovements = readJson<RawMaterialMovement[]>(RAW_MATERIAL_MOVEMENTS_KEY, []);
   const existingMinimums = readJson<RawMaterialMinimum[]>(RAW_MATERIAL_MINIMUMS_KEY, []);
-  const seededMovements = [...existingMovements];
-  const seededMinimums = [...existingMinimums];
   let movementsChanged = false;
   let minimumsChanged = false;
+  const seededMovements = existingMovements.map((movement) => {
+    const officialName = officialRawMaterialName(movement.materialName);
+
+    if (officialName !== movement.materialName) {
+      movementsChanged = true;
+      return { ...movement, materialName: officialName };
+    }
+
+    return movement;
+  });
+  const seededMinimums = existingMinimums.map((minimum) => {
+    const officialName = officialRawMaterialName(minimum.materialName);
+
+    if (officialName !== minimum.materialName) {
+      minimumsChanged = true;
+      return { ...minimum, materialName: officialName };
+    }
+
+    return minimum;
+  });
 
   defaultRawMaterials.forEach((material) => {
     const key = materialKey(material.materialName);
@@ -126,12 +165,17 @@ export function ensureDefaultRawMaterials() {
       seededMinimums[minimumIndex] = {
         ...seededMinimums[minimumIndex],
         minimumLevel: seededMinimums[minimumIndex].minimumLevel || material.minimumLevel,
+        reorderLevel:
+          seededMinimums[minimumIndex].reorderLevel ??
+          Math.min(material.reorderLevel, seededMinimums[minimumIndex].minimumLevel || material.minimumLevel),
         unit: seededMinimums[minimumIndex].unit || material.unit
       };
+      minimumsChanged = true;
     } else {
       seededMinimums.push({
         materialName: material.materialName,
         minimumLevel: material.minimumLevel,
+        reorderLevel: material.reorderLevel,
         unit: material.unit
       });
       minimumsChanged = true;
@@ -205,7 +249,8 @@ export function getRawMaterialRows({
         rawMaterialOut: 0,
         remainingStock: 0,
         minimumLevel: minimum?.minimumLevel ?? 0,
-        status: "Available"
+        reorderLevel: minimum?.reorderLevel ?? Math.floor((minimum?.minimumLevel ?? 0) / 2),
+        status: "Sufficient"
       });
     }
 
@@ -244,11 +289,11 @@ export function getRawMaterialRows({
     .map((row) => {
       const remainingStock = row.openingStock + row.rawMaterialIn - row.rawMaterialOut;
       const status: RawMaterialRow["status"] =
-        remainingStock <= 0
-          ? "Reorder Required"
+        row.reorderLevel > 0 && remainingStock <= row.reorderLevel
+          ? "Reorder Immediately"
           : row.minimumLevel > 0 && remainingStock < row.minimumLevel
             ? "Low Stock"
-            : "Available";
+            : "Sufficient";
 
       return {
         ...row,
@@ -266,6 +311,6 @@ export function getRawMaterialTotals(rows: RawMaterialRow[]) {
     rawMaterialIn: rows.reduce((total, row) => total + row.rawMaterialIn, 0),
     rawMaterialOut: rows.reduce((total, row) => total + row.rawMaterialOut, 0),
     remainingStock: rows.reduce((total, row) => total + row.remainingStock, 0),
-    reorderRequired: rows.filter((row) => row.status === "Reorder Required").length
+    reorderRequired: rows.filter((row) => row.status === "Reorder Immediately").length
   };
 }

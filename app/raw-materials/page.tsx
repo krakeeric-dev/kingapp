@@ -33,6 +33,7 @@ type MinimumForm = {
   materialName: string;
   unit: string;
   minimumLevel: string;
+  reorderLevel: string;
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -49,8 +50,9 @@ const emptyMovementForm: MovementForm = {
 
 const emptyMinimumForm: MinimumForm = {
   materialName: "",
-  unit: "",
-  minimumLevel: ""
+  minimumLevel: "",
+  reorderLevel: "",
+  unit: ""
 };
 
 export default function RawMaterialsPage() {
@@ -161,6 +163,7 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
     setError("");
 
     const minimumLevel = Number(minimumForm.minimumLevel);
+    const reorderLevel = Number(minimumForm.reorderLevel);
 
     if (!minimumForm.materialName.trim() || !minimumForm.unit.trim()) {
       setError("Raw material name and unit are required.");
@@ -172,11 +175,22 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
       return;
     }
 
+    if (!Number.isFinite(reorderLevel) || reorderLevel < 0) {
+      setError("Reorder level cannot be negative.");
+      return;
+    }
+
+    if (reorderLevel > minimumLevel) {
+      setError("Reorder level should be less than or equal to minimum stock level.");
+      return;
+    }
+
     setMinimums(
       saveRawMaterialMinimum({
         materialName: minimumForm.materialName.trim(),
-        unit: minimumForm.unit.trim(),
-        minimumLevel
+        minimumLevel,
+        reorderLevel,
+        unit: minimumForm.unit.trim()
       })
     );
     setMinimumForm(emptyMinimumForm);
@@ -264,7 +278,7 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
         <div className="border-b border-brand-100 p-5">
           <h3 className="text-lg font-bold text-slate-950">Raw Materials Stock Table</h3>
           <p className="mt-1 text-sm text-slate-600">
-            Remaining = Opening Stock + Raw Material In - Raw Material Out.
+            Remaining Stock = Opening Stock + Raw Material In - Raw Material Out.
           </p>
         </div>
         <RawMaterialsTable rows={rows} />
@@ -371,6 +385,7 @@ function MinimumFormCard({
     onChange("materialName", materialName);
     onChange("unit", material?.unit ?? "");
     onChange("minimumLevel", material ? String(material.minimumLevel) : "");
+    onChange("reorderLevel", material ? String(material.reorderLevel) : "");
   }
 
   return (
@@ -396,7 +411,8 @@ function MinimumFormCard({
           </select>
         </label>
         <Input label="Unit" onChange={(value) => onChange("unit", value)} value={form.unit} />
-        <Input label="Minimum Level" onChange={(value) => onChange("minimumLevel", value)} type="number" value={form.minimumLevel} />
+        <Input label="Minimum Stock Level" onChange={(value) => onChange("minimumLevel", value)} type="number" value={form.minimumLevel} />
+        <Input label="Reorder Level" onChange={(value) => onChange("reorderLevel", value)} type="number" value={form.reorderLevel} />
       </div>
       <button className="mt-4 rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-800">
         Save minimum level
@@ -412,7 +428,7 @@ function RawMaterialsTable({ rows }: { rows: RawMaterialRow[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="data-table min-w-[860px]">
+      <table className="data-table min-w-[980px]">
         <thead>
           <tr>
             <th>Raw Material</th>
@@ -420,7 +436,8 @@ function RawMaterialsTable({ rows }: { rows: RawMaterialRow[] }) {
             <th>Raw Material In</th>
             <th>Raw Material Out</th>
             <th>Remaining Stock</th>
-            <th>Minimum Level</th>
+            <th>Minimum Stock Level</th>
+            <th>Reorder Level</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -436,6 +453,7 @@ function RawMaterialsTable({ rows }: { rows: RawMaterialRow[] }) {
               <td>{formatNumber(row.rawMaterialOut)}</td>
               <td className="font-black text-brand-800">{formatNumber(row.remainingStock)}</td>
               <td>{formatNumber(row.minimumLevel)}</td>
+              <td>{formatNumber(row.reorderLevel)}</td>
               <td><StatusBadge status={row.status} /></td>
             </tr>
           ))}
@@ -514,7 +532,7 @@ function SummaryCard({
 
 function StatusBadge({ status }: { status: RawMaterialRow["status"] }) {
   const className =
-    status === "Reorder Required"
+    status === "Reorder Immediately"
       ? "border-red-200 bg-red-50 text-red-700"
       : status === "Low Stock"
         ? "border-amber-200 bg-amber-50 text-amber-700"
