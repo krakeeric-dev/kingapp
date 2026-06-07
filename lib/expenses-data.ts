@@ -4,7 +4,28 @@ import { mirrorRecordsToSupabase } from "@/lib/live-data";
 import { appendAuditLog, getTodayIsoDate } from "@/lib/loading-data";
 import { dedupeById } from "@/lib/record-utils";
 
-export type ExpenseStatus = "expenses_submitted";
+export type ExpenseStatus = "Pending" | "Paid" | "Submitted" | "expenses_submitted";
+
+export type ExpenseCategory =
+  | "Salaries"
+  | "Rent"
+  | "Fuel"
+  | "Internet"
+  | "Phone"
+  | "Car Rental"
+  | "Repairs"
+  | "Office Costs"
+  | "Transport"
+  | "Marketing"
+  | "Other";
+
+export type ExpensePaymentMethod =
+  | "Cash"
+  | "Mobile Money"
+  | "Bank Transfer"
+  | "Cheque"
+  | "Card"
+  | "Other";
 
 export type ExpenseRecord = {
   id: string;
@@ -24,6 +45,12 @@ export type ExpenseRecord = {
   food: number;
   miscellaneous: number;
   notes: string;
+  category?: ExpenseCategory;
+  description?: string;
+  amount?: number;
+  paymentMethod?: ExpensePaymentMethod;
+  paidTo?: string;
+  receiptNumber?: string;
   totalExpenses: number;
   closingBalance: number;
   status: ExpenseStatus;
@@ -44,6 +71,18 @@ export type ExpenseInput = {
   food: number;
   miscellaneous: number;
   notes: string;
+};
+
+export type BusinessExpenseInput = {
+  amount: number;
+  category: ExpenseCategory;
+  date: string;
+  description: string;
+  notes: string;
+  paidTo: string;
+  paymentMethod: ExpensePaymentMethod;
+  receiptNumber: string;
+  status: ExpenseStatus;
 };
 
 const EXPENSE_RECORDS_KEY = "kingapp.expenseRecords";
@@ -144,6 +183,70 @@ export function submitExpenseRecord(
   };
 }
 
+export function submitBusinessExpenseRecord(
+  input: BusinessExpenseInput,
+  accountant: SessionUser,
+  existingRecord?: ExpenseRecord
+) {
+  const now = new Date().toISOString();
+  const amount = input.amount;
+  const categoryAmounts = mapCategoryToLegacyAmounts(input.category, amount);
+  const record: ExpenseRecord = existingRecord
+    ? {
+        ...existingRecord,
+        ...categoryAmounts,
+        amount,
+        category: input.category,
+        closingBalance: -amount,
+        date: input.date,
+        description: input.description,
+        locked: true,
+        notes: input.notes,
+        paidTo: input.paidTo,
+        paymentMethod: input.paymentMethod,
+        receiptNumber: input.receiptNumber,
+        status: input.status,
+        totalExpenses: amount,
+        accountantUsername: accountant.username,
+        accountantName: accountant.displayName,
+        submittedAt: now,
+        updatedAt: now
+      }
+    : {
+        id: `EXP-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase(),
+        cashRecordId: "",
+        date: input.date,
+        productName: "Business Expense",
+        marketerUsername: "",
+        marketerName: "",
+        expectedCash: 0,
+        cashReceived: 0,
+        cashVariance: 0,
+        ...categoryAmounts,
+        amount,
+        category: input.category,
+        closingBalance: -amount,
+        description: input.description,
+        locked: true,
+        notes: input.notes,
+        paidTo: input.paidTo,
+        paymentMethod: input.paymentMethod,
+        receiptNumber: input.receiptNumber,
+        status: input.status,
+        totalExpenses: amount,
+        accountantUsername: accountant.username,
+        accountantName: accountant.displayName,
+        submittedAt: now,
+        createdAt: now,
+        updatedAt: now
+      };
+
+  return {
+    record,
+    records: upsertExpenseRecord(record)
+  };
+}
+
 export function upsertExpenseRecord(record: ExpenseRecord) {
   const records = getExpenseRecords();
   const existingIndex = records.findIndex((item) => item.id === record.id);
@@ -201,5 +304,23 @@ export function getExpensesDashboardTotals(records: ExpenseRecord[]) {
       (total, record) => total + record.closingBalance,
       0
     )
+  };
+}
+
+function mapCategoryToLegacyAmounts(category: ExpenseCategory, amount: number) {
+  return {
+    fuel: category === "Fuel" ? amount : 0,
+    transport: category === "Transport" || category === "Car Rental" ? amount : 0,
+    loaderPayment: category === "Salaries" ? amount : 0,
+    commission: category === "Marketing" ? amount : 0,
+    airtime: category === "Phone" || category === "Internet" ? amount : 0,
+    food: 0,
+    miscellaneous:
+      category === "Other" ||
+      category === "Rent" ||
+      category === "Repairs" ||
+      category === "Office Costs"
+        ? amount
+        : 0
   };
 }
