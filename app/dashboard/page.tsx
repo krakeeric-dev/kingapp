@@ -38,8 +38,20 @@ import {
 } from "@/lib/inventory-data";
 import type { InventoryMovement, MinimumStock } from "@/lib/inventory-data";
 import { getSyncSummary } from "@/lib/offline-sync";
-import { getComplaints } from "@/lib/call-center-data";
-import type { ComplaintRecord } from "@/lib/call-center-data";
+import {
+  getCallbacks,
+  getCallLogs,
+  getComplaints,
+  getMissedCalls,
+  getPendingOrders
+} from "@/lib/call-center-data";
+import type {
+  CallbackItem,
+  CallLog,
+  ComplaintRecord,
+  MissedCall,
+  PendingOrder
+} from "@/lib/call-center-data";
 import { filterCompanyRecords } from "@/lib/companies-data";
 
 type DashboardStat = {
@@ -91,6 +103,15 @@ type OperationalTableRow = {
   status: string;
 };
 
+type CallCenterReportRow = {
+  complaints: number;
+  date: string;
+  followUpsPending: number;
+  missedCalls: number;
+  ordersRequested: number;
+  totalCalls: number;
+};
+
 const dashboardTabs: DashboardTab[] = [
   "Overall",
   "By Date",
@@ -126,6 +147,10 @@ function DashboardContent({ user }: { user: SessionUser }) {
   >([]);
   const [minimumStocks, setMinimumStocks] = useState<MinimumStock[]>([]);
   const [complaints, setComplaints] = useState<ComplaintRecord[]>([]);
+  const [callLogs, setCallLogs] = useState<CallLog[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
+  const [missedCalls, setMissedCalls] = useState<MissedCall[]>([]);
+  const [callbacks, setCallbacks] = useState<CallbackItem[]>([]);
   const [syncSummary, setSyncSummary] = useState({
     conflicts: 0,
     failed: 0,
@@ -144,6 +169,10 @@ function DashboardContent({ user }: { user: SessionUser }) {
     setInventoryMovements(getInventoryMovements());
     setMinimumStocks(getMinimumStocks());
     setComplaints(getComplaints());
+    setCallLogs(getCallLogs());
+    setPendingOrders(getPendingOrders());
+    setMissedCalls(getMissedCalls());
+    setCallbacks(getCallbacks());
     void getSyncSummary().then((summary) =>
       setSyncSummary({
         conflicts: summary.conflicts,
@@ -277,6 +306,34 @@ function DashboardContent({ user }: { user: SessionUser }) {
     const openComplaints = companyComplaints.filter(
       (record) => record.status !== "Closed"
     ).length;
+    const todayCallLogs = callLogs.filter((record) => record.date === selectedDate);
+    const todayComplaints = companyComplaints.filter((record) =>
+      getDatePart(record.createdAt) === selectedDate
+    );
+    const todayOrdersRequested = pendingOrders.filter((record) =>
+      getDatePart(record.createdAt) === selectedDate
+    );
+    const todayMissedCalls = missedCalls.filter((record) => record.date === selectedDate);
+    const todayCallbacks = callbacks.filter(
+      (record) => record.callbackDate === selectedDate && record.status === "Pending"
+    );
+    const managerCallCenterReport = getLastSevenDays(selectedDate).map((date) => ({
+      complaints: companyComplaints.filter((record) => getDatePart(record.createdAt) === date).length,
+      date,
+      followUpsPending: callbacks.filter(
+        (record) => record.callbackDate === date && record.status === "Pending"
+      ).length,
+      missedCalls: missedCalls.filter((record) => record.date === date).length,
+      ordersRequested: pendingOrders.filter((record) => getDatePart(record.createdAt) === date).length,
+      totalCalls: callLogs.filter((record) => record.date === date).length
+    }));
+    const managerCallCenterSummary = {
+      complaintsReceived: todayComplaints.length,
+      customersWhoPressedOrder: todayOrdersRequested.length,
+      followUpsPending: todayCallbacks.length,
+      missedCalls: todayMissedCalls.length,
+      totalCallsToday: todayCallLogs.length
+    };
     const syncStats: DashboardStat[] =
       user.role === "admin"
         ? [
@@ -560,6 +617,8 @@ function DashboardContent({ user }: { user: SessionUser }) {
       expectedReturns,
       overviewDays,
       marketerPerformance,
+      managerCallCenterReport,
+      managerCallCenterSummary,
       pending,
       rejected,
       stats,
@@ -583,10 +642,14 @@ function DashboardContent({ user }: { user: SessionUser }) {
     };
   }, [
     cashRecords,
+    callbacks,
+    callLogs,
     complaints,
     expenseRecords,
     inventoryMovements,
+    missedCalls,
     minimumStocks,
+    pendingOrders,
     records,
     returnRecords,
     salesRecords,
@@ -659,6 +722,13 @@ function DashboardContent({ user }: { user: SessionUser }) {
           <BeverageKpiCard key={metric.label} metric={metric} featured={index === 0} />
         ))}
       </section>
+
+      {user.role === "manager" ? (
+        <ManagerCallCenterReport
+          rows={dashboard.managerCallCenterReport}
+          summary={dashboard.managerCallCenterSummary}
+        />
+      ) : null}
 
       <section className="grid gap-4 xl:grid-cols-[1.25fr_0.9fr_0.9fr]">
         {isMarketerDashboard ? (
@@ -794,6 +864,79 @@ function BeverageKpiCard({ featured, metric }: { featured?: boolean; metric: Kpi
         Beverage Pro metric
       </p>
     </article>
+  );
+}
+
+function ManagerCallCenterReport({
+  rows,
+  summary
+}: {
+  rows: CallCenterReportRow[];
+  summary: {
+    complaintsReceived: number;
+    customersWhoPressedOrder: number;
+    followUpsPending: number;
+    missedCalls: number;
+    totalCallsToday: number;
+  };
+}) {
+  const cards = [
+    { label: "Total Calls Today", value: summary.totalCallsToday },
+    { label: "Complaints Received", value: summary.complaintsReceived },
+    { label: "Customers Who Pressed Order", value: summary.customersWhoPressedOrder },
+    { label: "Missed Calls", value: summary.missedCalls },
+    { label: "Follow-ups Pending", value: summary.followUpsPending }
+  ];
+
+  return (
+    <section className="rounded-xl border border-brand-100 bg-white p-4 shadow-[0_16px_45px_rgba(15,35,80,0.07)]">
+      <div className="mb-4">
+        <h3 className="text-sm font-black uppercase tracking-normal text-slate-950">
+          Call Center Summary Reports
+        </h3>
+        <p className="mt-1 text-xs font-bold text-slate-500">
+          Manager read-only view. Call center agents handle calls and admin controls settings.
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {cards.map((card) => (
+          <article className="rounded-lg border border-brand-100 bg-brand-50 p-4" key={card.label}>
+            <p className="text-xs font-black uppercase tracking-normal text-brand-800">
+              {card.label}
+            </p>
+            <p className="mt-2 text-2xl font-black text-brand-950">
+              {card.value.toLocaleString()}
+            </p>
+          </article>
+        ))}
+      </div>
+      <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
+        <table className="data-table min-w-[760px]">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Total Calls</th>
+              <th>Complaints</th>
+              <th>Orders Requested</th>
+              <th>Missed Calls</th>
+              <th>Follow-ups Pending</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.date}>
+                <td>{formatDate(row.date)}</td>
+                <td>{row.totalCalls.toLocaleString()}</td>
+                <td>{row.complaints.toLocaleString()}</td>
+                <td>{row.ordersRequested.toLocaleString()}</td>
+                <td>{row.missedCalls.toLocaleString()}</td>
+                <td>{row.followUpsPending.toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -1243,6 +1386,10 @@ function formatDateTimeShort(value: string) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function getDatePart(value: string) {
+  return value.includes("T") ? value.split("T")[0] : value;
 }
 
 function getSalesSoldCartons(record: SalesRecord) {
