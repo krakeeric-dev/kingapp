@@ -20,6 +20,7 @@ export type CashRecord = {
   expectedCash: number;
   cashReceived: number;
   cashVariance: number;
+  notes?: string;
   status: CashStatus;
   locked: boolean;
   accountantUsername: string;
@@ -69,16 +70,17 @@ export function submitCashRecord(
   salesRecord: SalesRecord,
   cashReceived: number,
   accountant: SessionUser,
-  existingRecord?: CashRecord
+  existingRecord?: CashRecord,
+  notes = ""
 ) {
   const now = new Date().toISOString();
-  const cashVariance =
-    cashReceived - (salesRecord.totalPaid ?? salesRecord.salesValue);
+  const cashVariance = salesRecord.salesValue - cashReceived;
   const record: CashRecord = existingRecord
     ? {
         ...existingRecord,
         cashReceived,
         cashVariance,
+        notes,
         status: "cash_submitted",
         locked: true,
         accountantUsername: accountant.username,
@@ -100,6 +102,7 @@ export function submitCashRecord(
         expectedCash: salesRecord.salesValue,
         cashReceived,
         cashVariance,
+        notes,
         status: "cash_submitted",
         locked: true,
         accountantUsername: accountant.username,

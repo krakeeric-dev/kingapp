@@ -19,6 +19,7 @@ import type { CashRecord } from "@/lib/cash-data";
 import { getPaymentFollowUps, type PaymentFollowUp } from "@/lib/call-center-data";
 
 type DraftCash = Record<string, string>;
+type DraftNotes = Record<string, string>;
 
 export default function CashPage() {
   return (
@@ -33,6 +34,7 @@ function CashContent({ user }: { user: SessionUser }) {
   const [cashRecords, setCashRecords] = useState<CashRecord[]>([]);
   const [paymentFollowUps, setPaymentFollowUps] = useState<PaymentFollowUp[]>([]);
   const [draftCash, setDraftCash] = useState<DraftCash>({});
+  const [draftNotes, setDraftNotes] = useState<DraftNotes>({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [filters, setFilters] = useState({
@@ -58,6 +60,12 @@ function CashContent({ user }: { user: SessionUser }) {
         return drafts;
       }, {})
     );
+    setDraftNotes(
+      cash.reduce<DraftNotes>((drafts, record) => {
+        drafts[record.salesRecordId] = record.notes ?? "";
+        return drafts;
+      }, {})
+    );
   }, []);
 
   const cashBySalesId = useMemo(() => {
@@ -66,8 +74,8 @@ function CashContent({ user }: { user: SessionUser }) {
     );
   }, [cashRecords]);
 
-  const groupedCashRows = useMemo(() => {
-    const filteredRecords = salesRecords.filter((record) => {
+  const cashRows = useMemo(() => {
+    return salesRecords.filter((record) => {
       const matchesDate = !filters.date || record.date === filters.date;
       const matchesMarketer =
         !filters.marketer ||
@@ -81,8 +89,6 @@ function CashContent({ user }: { user: SessionUser }) {
 
       return matchesDate && matchesMarketer && matchesProduct;
     });
-
-    return groupSalesByMarketerDate(filteredRecords);
   }, [filters, salesRecords]);
 
   function getDraftCashValue(salesRecord: SalesRecord) {
@@ -117,12 +123,17 @@ function CashContent({ user }: { user: SessionUser }) {
       salesRecord,
       cashReceived,
       user,
-      existingRecord
+      existingRecord,
+      draftNotes[salesRecord.id] ?? ""
     );
     setCashRecords(result.records);
     setDraftCash((current) => ({
       ...current,
       [salesRecord.id]: String(result.record.cashReceived)
+    }));
+    setDraftNotes((current) => ({
+      ...current,
+      [salesRecord.id]: result.record.notes ?? ""
     }));
     setMessage("Cash received submitted and locked.");
   }
@@ -222,27 +233,29 @@ function CashContent({ user }: { user: SessionUser }) {
             <tr>
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Marketer</th>
-              <th className="px-4 py-3 text-right">Total Loaded</th>
-              <th className="px-4 py-3 text-right">Total Sold</th>
+              <th className="px-4 py-3">Product</th>
+              <th className="px-4 py-3 text-right">Sold Cartons</th>
               <th className="px-4 py-3 text-right">Expected Cash</th>
-              <th className="px-4 py-3 text-right">Client Paid</th>
-              <th className="px-4 py-3 text-right">Unpaid Balance</th>
               <th className="px-4 py-3 text-right">Cash Received</th>
-              <th className="px-4 py-3 text-right">Variance</th>
+              <th className="px-4 py-3 text-right">Difference</th>
+              <th className="px-4 py-3 text-right">Collection Rate</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Notes</th>
               <th className="px-4 py-3">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {groupedCashRows.map((salesRecord) => (
+            {cashRows.map((salesRecord) => (
               <CashRow
                 cashRecord={cashBySalesId.get(salesRecord.id)}
                 draftCash={draftCash}
+                draftNotes={draftNotes}
                 getDraftCashValue={getDraftCashValue}
                 handleSubmitCash={handleSubmitCash}
                 key={salesRecord.id}
                 salesRecord={salesRecord}
                 setDraftCash={setDraftCash}
+                setDraftNotes={setDraftNotes}
                 setUnlockRecordId={setUnlockRecordId}
                 user={user}
               />
@@ -252,22 +265,24 @@ function CashContent({ user }: { user: SessionUser }) {
       </div>
 
       <div className="grid gap-3 xl:hidden">
-        {groupedCashRows.map((salesRecord) => (
+        {cashRows.map((salesRecord) => (
           <CashCard
             cashRecord={cashBySalesId.get(salesRecord.id)}
             draftCash={draftCash}
+            draftNotes={draftNotes}
             getDraftCashValue={getDraftCashValue}
             handleSubmitCash={handleSubmitCash}
             key={salesRecord.id}
             salesRecord={salesRecord}
             setDraftCash={setDraftCash}
+            setDraftNotes={setDraftNotes}
             setUnlockRecordId={setUnlockRecordId}
             user={user}
           />
         ))}
       </div>
 
-      {groupedCashRows.length === 0 ? (
+      {cashRows.length === 0 ? (
         <div className="rounded-lg border border-dashed border-brand-200 bg-white px-5 py-8 text-center text-sm font-semibold text-slate-500">
           No sales submitted records are ready for cash collection.
         </div>
@@ -354,10 +369,12 @@ function CashContent({ user }: { user: SessionUser }) {
 type CashDisplayProps = {
   cashRecord?: CashRecord;
   draftCash: DraftCash;
+  draftNotes: DraftNotes;
   getDraftCashValue: (salesRecord: SalesRecord) => number;
   handleSubmitCash: (salesRecord: SalesRecord) => void;
   salesRecord: SalesRecord;
   setDraftCash: React.Dispatch<React.SetStateAction<DraftCash>>;
+  setDraftNotes: React.Dispatch<React.SetStateAction<DraftNotes>>;
   setUnlockRecordId: (recordId: string) => void;
   user: SessionUser;
 };
@@ -366,35 +383,31 @@ function CashRow(props: CashDisplayProps) {
   const {
     cashRecord,
     draftCash,
+    draftNotes,
     getDraftCashValue,
     handleSubmitCash,
     salesRecord,
     setDraftCash,
+    setDraftNotes,
     setUnlockRecordId,
     user
   } = props;
   const cashReceived = getDraftCashValue(salesRecord);
-  const clientPaid = salesRecord.totalPaid ?? salesRecord.salesValue;
-  const unpaidBalance = salesRecord.totalUnpaidBalance ?? Math.max(0, salesRecord.salesValue - clientPaid);
-  const variance = cashReceived - clientPaid;
+  const expectedCash = salesRecord.salesValue;
+  const difference = expectedCash - cashReceived;
+  const collectionRate = expectedCash > 0 ? (cashReceived / expectedCash) * 100 : 0;
   const isLocked = Boolean(cashRecord?.locked);
 
   return (
     <tr>
       <td className="px-4 py-3 text-slate-700">{formatDate(salesRecord.date)}</td>
       <td className="px-4 py-3 text-slate-700">{salesRecord.marketerName}</td>
-      <td className="px-4 py-3 text-right">{salesRecord.loadedCartons}</td>
+      <td className="px-4 py-3 font-semibold text-slate-900">{salesRecord.productName}</td>
       <td className="px-4 py-3 text-right font-semibold">
         {salesRecord.soldCartons}
       </td>
       <td className="px-4 py-3 text-right font-semibold text-slate-950">
-        {formatMoney(salesRecord.salesValue)}
-      </td>
-      <td className="px-4 py-3 text-right font-semibold text-brand-800">
-        {formatMoney(clientPaid)}
-      </td>
-      <td className="px-4 py-3 text-right font-semibold text-red-700">
-        {formatMoney(unpaidBalance)}
+        {formatMoney(expectedCash)}
       </td>
       <td className="px-4 py-3">
         <input
@@ -413,13 +426,30 @@ function CashRow(props: CashDisplayProps) {
       </td>
       <td
         className={`px-4 py-3 text-right font-bold ${
-          variance < 0 ? "text-red-700" : "text-brand-800"
+          difference > 0 ? "text-red-700" : "text-brand-800"
         }`}
       >
-        {formatMoney(Number.isFinite(variance) ? variance : 0)}
+        {formatMoney(Number.isFinite(difference) ? difference : 0)}
+      </td>
+      <td className="px-4 py-3 text-right font-bold text-brand-800">
+        {Number.isFinite(collectionRate) ? `${collectionRate.toFixed(0)}%` : "0%"}
       </td>
       <td className="px-4 py-3">
         <CashStatusChip cashRecord={cashRecord} />
+      </td>
+      <td className="px-4 py-3">
+        <input
+          className="form-input min-w-44"
+          disabled={user.role !== "accountant" || isLocked}
+          onChange={(event) =>
+            setDraftNotes((current) => ({
+              ...current,
+              [salesRecord.id]: event.target.value
+            }))
+          }
+          placeholder="Optional note"
+          value={draftNotes[salesRecord.id] ?? ""}
+        />
       </td>
       <td className="px-4 py-3">
         <CashAction
@@ -530,7 +560,7 @@ function CashAction({
   setUnlockRecordId: (recordId: string) => void;
   user: SessionUser;
 }) {
-  if (user.role === "admin" || user.role === "supervisor") {
+  if (user.role === "admin") {
     if (cashRecord?.locked) {
       return (
         <button
@@ -547,6 +577,14 @@ function CashAction({
     return (
       <span className="text-xs font-semibold text-slate-500">
         {cashRecord ? "View only" : "No cash yet"}
+      </span>
+    );
+  }
+
+  if (user.role === "supervisor") {
+    return (
+      <span className="text-xs font-semibold text-slate-500">
+        View only
       </span>
     );
   }
