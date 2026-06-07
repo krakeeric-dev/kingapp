@@ -178,6 +178,57 @@ function DailyReportContent() {
       0
     );
     const cashVariance = cashReceived - expectedCash;
+    const totalDifference = Math.max(0, expectedCash - cashReceived);
+    const collectionRate = expectedCash > 0 ? (cashReceived / expectedCash) * 100 : 0;
+    const openingBalance = expenses.reduce(
+      (total, record) => total + (Number(record.openingCash) || 0),
+      0
+    );
+    const netCashAfterExpenses = cashReceived - expenseSummary.totalExpenses;
+    const closingBalance =
+      openingBalance + cashReceived - expenseSummary.totalExpenses;
+    const cashBySalesId = new Map(cash.map((record) => [record.salesRecordId, record]));
+    const cashRows = groupSalesByMarketerDate(sales).map((group) => {
+      const groupedCash = cashBySalesId.get(group.id);
+      const legacyCash = groupedCash
+        ? []
+        : cash.filter(
+            (record) =>
+              record.date === group.date &&
+              record.marketerUsername === group.marketerUsername
+          );
+      const received = groupedCash
+        ? groupedCash.cashReceived
+        : legacyCash.reduce((total, record) => total + record.cashReceived, 0);
+      const notes = groupedCash?.notes ?? legacyCash.map((record) => record.notes).filter(Boolean).join("; ");
+      const difference = group.salesValue - received;
+
+      return {
+        collectionRate: group.salesValue > 0 ? (received / group.salesValue) * 100 : 0,
+        date: group.date,
+        difference,
+        expectedCash: group.salesValue,
+        marketerName: group.marketerName,
+        notes,
+        received,
+        soldCartons: group.soldCartons,
+        status: groupedCash?.status ?? (legacyCash.length ? "cash_submitted" : "Pending")
+      };
+    });
+    const expenseRows = expenses.map((record) => ({
+      airtime: record.airtime,
+      commission: record.commission,
+      date: record.date,
+      food: record.food,
+      fuel: record.fuel,
+      loaderPayment: record.loaderPayment,
+      marketerName: record.marketerName || "Company",
+      miscellaneous: record.miscellaneous,
+      notes: record.notes,
+      totalExpenses: record.totalExpenses,
+      transport: record.transport
+    }));
+    const outstandingRows = cashRows.filter((row) => row.difference > 0);
 
     return {
       totalLoaded,
@@ -193,8 +244,16 @@ function DailyReportContent() {
       expectedCash,
       cashReceived,
       cashVariance,
+      ...expenseSummary,
+      cashRows,
+      closingBalance,
+      collectionRate,
+      expenseRows,
       inventorySummary,
-      ...expenseSummary
+      netCashAfterExpenses,
+      openingBalance,
+      outstandingRows,
+      totalDifference
     };
   }, [
     cashRecords,
@@ -285,6 +344,105 @@ function DailyReportContent() {
           </FilterField>
         </div>
       </div>
+
+      <section className="no-print grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <DailyFinancialCard
+          label="Expected Cash"
+          value={`${formatMoney(report.expectedCash)} RWF`}
+        />
+        <DailyFinancialCard
+          label="Cash Collected"
+          value={`${formatMoney(report.cashReceived)} RWF`}
+        />
+        <DailyFinancialCard
+          label="Difference"
+          tone={report.totalDifference > 0 ? "danger" : "default"}
+          value={`${formatMoney(report.totalDifference)} RWF`}
+        />
+        <DailyFinancialCard
+          label="Total Expenses"
+          value={`${formatMoney(report.totalExpenses)} RWF`}
+        />
+        <DailyFinancialCard
+          label="Net Cash After Expenses"
+          tone={report.netCashAfterExpenses < 0 ? "danger" : "default"}
+          value={`${formatMoney(report.netCashAfterExpenses)} RWF`}
+        />
+        <DailyFinancialCard
+          label="Collection Rate"
+          tone={report.collectionRate >= 95 ? "default" : "warning"}
+          value={`${report.collectionRate.toFixed(0)}%`}
+        />
+      </section>
+
+      <section className="no-print grid gap-4 xl:grid-cols-3">
+        <FinanceTable title="Cash Collected by Marketer">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Marketer</th>
+              <th>Sold</th>
+              <th>Expected</th>
+              <th>Collected</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.cashRows.map((row) => (
+              <tr key={`${row.date}-${row.marketerName}`}>
+                <td>{formatDate(row.date)}</td>
+                <td className="font-bold text-slate-950">{row.marketerName}</td>
+                <td>{row.soldCartons.toLocaleString()}</td>
+                <td>{formatMoney(row.expectedCash)}</td>
+                <td>{formatMoney(row.received)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </FinanceTable>
+
+        <FinanceTable title="Expenses Used Today">
+          <thead>
+            <tr>
+              <th>Marketer</th>
+              <th>Fuel</th>
+              <th>Transport</th>
+              <th>Loader</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.expenseRows.map((row) => (
+              <tr key={`${row.date}-${row.marketerName}-${row.totalExpenses}`}>
+                <td className="font-bold text-slate-950">{row.marketerName}</td>
+                <td>{formatMoney(row.fuel)}</td>
+                <td>{formatMoney(row.transport)}</td>
+                <td>{formatMoney(row.loaderPayment)}</td>
+                <td>{formatMoney(row.totalExpenses)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </FinanceTable>
+
+        <FinanceTable title="Outstanding Cash by Marketer">
+          <thead>
+            <tr>
+              <th>Marketer</th>
+              <th>Expected</th>
+              <th>Collected</th>
+              <th>Outstanding</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.outstandingRows.map((row) => (
+              <tr key={`${row.date}-${row.marketerName}-outstanding`}>
+                <td className="font-bold text-slate-950">{row.marketerName}</td>
+                <td>{formatMoney(row.expectedCash)}</td>
+                <td>{formatMoney(row.received)}</td>
+                <td className="font-bold text-red-700">{formatMoney(row.difference)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </FinanceTable>
+      </section>
 
       <article className="print-page rounded-lg border border-slate-200 bg-white p-5 shadow-executive sm:p-8">
         <header className="rounded-lg bg-gradient-to-r from-brand-950 to-brand-700 p-5 text-white">
@@ -502,6 +660,51 @@ function ReportLine({
   );
 }
 
+function DailyFinancialCard({
+  label,
+  tone = "default",
+  value
+}: {
+  label: string;
+  tone?: "danger" | "default" | "warning";
+  value: string;
+}) {
+  const toneClass =
+    tone === "danger"
+      ? "border-red-100 bg-red-50 text-red-800"
+      : tone === "warning"
+        ? "border-amber-100 bg-amber-50 text-amber-800"
+        : "border-brand-100 bg-white text-brand-900";
+
+  return (
+    <article className={`rounded-lg border p-4 shadow-sm ${toneClass}`}>
+      <p className="text-xs font-black uppercase tracking-normal text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-xl font-black">{value}</p>
+    </article>
+  );
+}
+
+function FinanceTable({
+  children,
+  title
+}: {
+  children: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <section className="overflow-hidden rounded-lg border border-brand-100 bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-4 py-3">
+        <h3 className="font-black text-slate-950">{title}</h3>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="data-table min-w-[520px]">{children}</table>
+      </div>
+    </section>
+  );
+}
+
 function VarianceAlert({
   isMoney = false,
   label,
@@ -548,6 +751,42 @@ function preferGroupedCashRecords(records: CashRecord[]) {
   );
 
   return groupedRecords.length > 0 ? groupedRecords : records;
+}
+
+function groupSalesByMarketerDate(records: SalesRecord[]) {
+  const groups = new Map<string, SalesRecord[]>();
+
+  records.forEach((record) => {
+    const key = `${record.date}::${record.marketerUsername}`;
+    groups.set(key, [...(groups.get(key) ?? []), record]);
+  });
+
+  return Array.from(groups.entries()).map(([key, groupRecords]) => {
+    const firstRecord = groupRecords[0];
+    const loadedCartons = groupRecords.reduce(
+      (total, record) => total + record.loadedCartons,
+      0
+    );
+    const soldCartons = groupRecords.reduce(
+      (total, record) => total + record.soldCartons,
+      0
+    );
+    const salesValue = groupRecords.reduce(
+      (total, record) => total + record.salesValue,
+      0
+    );
+
+    return {
+      ...firstRecord,
+      id: `CASH-GROUP-${key.replace(/[^a-z0-9]+/gi, "-").toUpperCase()}`,
+      itemCode: "GROUP",
+      loadedCartons,
+      pricePerCarton: 0,
+      productName: "All Products",
+      salesValue,
+      soldCartons
+    };
+  });
 }
 
 function stockLabel(value: number) {
