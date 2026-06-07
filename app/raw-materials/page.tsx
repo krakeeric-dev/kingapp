@@ -5,6 +5,7 @@ import { Factory, History, PackageMinus, PackagePlus, SlidersHorizontal } from "
 import { AppShell } from "@/components/AppShell";
 import type { SessionUser } from "@/lib/auth";
 import { formatDate } from "@/lib/loading-data";
+import { hasPermission } from "@/lib/permissions";
 import {
   addRawMaterialMovement,
   getRawMaterialMinimums,
@@ -79,8 +80,27 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
   );
 
   const totals = useMemo(() => getRawMaterialTotals(rows), [rows]);
-  const canRecordMovement = user.role === "admin" || user.role === "storekeeper";
-  const canSetMinimums = user.role === "admin" || user.role === "manager";
+  const todayDate = today();
+  const dailyUsage = useMemo(
+    () =>
+      movements
+        .filter((movement) => movement.date === todayDate && movement.movementType === "Raw Material Out")
+        .reduce((total, movement) => total + movement.quantity, 0),
+    [movements, todayDate]
+  );
+  const totalMinimumLevel = useMemo(
+    () => rows.reduce((total, row) => total + row.minimumLevel, 0),
+    [rows]
+  );
+  const reorderAlertCount = totals.lowStockAlerts + totals.reorderRequired;
+  const daysRemaining =
+    dailyUsage > 0
+      ? Math.floor(totals.remainingStock / dailyUsage)
+      : totals.remainingStock > 0
+        ? 999
+        : 0;
+  const canRecordMovement = hasPermission(user, "rawmaterials.update");
+  const canSetMinimums = hasPermission(user, "rawmaterials.edit");
 
   function updateMovement(field: keyof MovementForm, value: string) {
     setMovementForm((current) => ({ ...current, [field]: value }));
@@ -181,7 +201,7 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
             </div>
           </div>
           <span className="w-fit rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-black uppercase tracking-normal text-brand-800">
-            Storekeeper updates, Manager/Admin planning
+            Storekeeper updates, Manager monitors, Admin controls
           </span>
         </div>
       </section>
@@ -197,13 +217,21 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
         </div>
       ) : null}
 
+      {reorderAlertCount > 0 ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-black uppercase tracking-normal text-red-700">
+          LOW STOCK ALERT: {reorderAlertCount.toLocaleString()} raw material item{reorderAlertCount === 1 ? "" : "s"} need attention.
+        </div>
+      ) : null}
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <SummaryCard label="Raw Material In" value={totals.rawMaterialIn} />
         <SummaryCard label="Raw Material Out" value={totals.rawMaterialOut} tone="amber" />
         <SummaryCard label="Remaining Stock" value={totals.remainingStock} tone="green" />
-        <SummaryCard label="Daily Usage" value={totals.dailyUsage} tone="purple" />
+        <SummaryCard label="Minimum Stock Level" value={totalMinimumLevel} tone="blue" />
+        <SummaryCard label="Reorder Alert" value={reorderAlertCount} tone={reorderAlertCount > 0 ? "red" : "green"} />
+        <SummaryCard label="Days Remaining" value={daysRemaining >= 999 ? "Stable" : daysRemaining} tone={daysRemaining <= 3 ? "red" : daysRemaining <= 7 ? "amber" : "green"} />
+        <SummaryCard label="Daily Usage" value={dailyUsage} tone="purple" />
         <SummaryCard label="Low Stock Alerts" value={totals.lowStockAlerts} tone={totals.lowStockAlerts > 0 ? "red" : "green"} />
-        <SummaryCard label="Reorder Required" value={totals.reorderRequired} tone={totals.reorderRequired > 0 ? "red" : "green"} />
       </section>
 
       {(canRecordMovement || canSetMinimums) ? (
@@ -464,7 +492,7 @@ function SummaryCard({
 }: {
   label: string;
   tone?: "blue" | "green" | "amber" | "red" | "purple";
-  value: number;
+  value: number | string;
 }) {
   const toneClass = {
     amber: "bg-amber-50 text-amber-800",
@@ -478,7 +506,7 @@ function SummaryCard({
     <article className="rounded-lg border border-brand-100 bg-white p-4 shadow-sm">
       <p className="text-xs font-black uppercase tracking-normal text-slate-500">{label}</p>
       <p className={`mt-3 rounded-lg px-3 py-2 text-2xl font-black ${toneClass}`}>
-        {formatNumber(value)}
+        {typeof value === "number" ? formatNumber(value) : value}
       </p>
     </article>
   );

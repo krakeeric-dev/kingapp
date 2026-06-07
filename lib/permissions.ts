@@ -14,6 +14,8 @@ export type PermissionKey =
   | "inventory.price.change"
   | "rawmaterials.view"
   | "rawmaterials.update"
+  | "rawmaterials.edit"
+  | "rawmaterials.unlock"
   | "sales.view"
   | "sales.create"
   | "sales.edit"
@@ -85,7 +87,9 @@ export const permissionGroups: PermissionGroup[] = [
       { key: "inventory.product.edit", label: "Edit Product" },
       { key: "inventory.price.change", label: "Change Price" },
       { key: "rawmaterials.view", label: "View Raw Materials" },
-      { key: "rawmaterials.update", label: "Update Raw Materials" }
+      { key: "rawmaterials.update", label: "Update Raw Materials" },
+      { key: "rawmaterials.edit", label: "Edit Raw Material Records" },
+      { key: "rawmaterials.unlock", label: "Unlock Raw Material Records" }
     ]
   },
   {
