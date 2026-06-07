@@ -89,6 +89,10 @@ type KpiMetric = {
   value: string;
 };
 
+type StorePlanningMetric = KpiMetric & {
+  helper: string;
+};
+
 type OperationalTableRow = {
   cashReceived: number;
   confirmed: number;
@@ -614,6 +618,84 @@ function DashboardContent({ user }: { user: SessionUser }) {
         .filter((movement) => movement.date === day.date && movement.quantity < 0)
         .reduce((total, movement) => total + Math.abs(movement.quantity), 0)
     }));
+    const todayStockMovement = stockInOut.find((day) => day.date === selectedDate) ?? {
+      date: selectedDate,
+      stockIn: 0,
+      stockOut: 0
+    };
+    const reorderNeeded = inventoryRows.filter((row) => row.stockStatus !== "Available").length;
+    const averageDailySales =
+      overviewDays.length > 0
+        ? overviewDays.reduce((total, day) => total + day.sold, 0) / overviewDays.length
+        : 0;
+    const daysOfStockRemaining =
+      averageDailySales > 0
+        ? Math.floor(inventoryTotals.totalWarehouseStock / averageDailySales)
+        : inventoryTotals.totalWarehouseStock > 0
+          ? 999
+          : 0;
+    const storePlanning: StorePlanningMetric[] = [
+      {
+        helper: "Finished goods ready for loading",
+        label: "Finished Goods Stock",
+        tone: "green",
+        value: inventoryTotals.totalWarehouseStock.toLocaleString()
+      },
+      {
+        helper: "Raw materials identified in stock movements",
+        label: "Raw Materials Stock",
+        tone: "slate",
+        value: Math.max(0, rawMaterialsAvailable).toLocaleString()
+      },
+      {
+        helper: "Factory receipts and actual returns today",
+        label: "Stock In",
+        tone: "blue",
+        value: todayStockMovement.stockIn.toLocaleString()
+      },
+      {
+        helper: "Cartons loaded out today",
+        label: "Stock Out",
+        tone: "amber",
+        value: todayStockMovement.stockOut.toLocaleString()
+      },
+      {
+        helper: "Total cartons assigned to marketers",
+        label: "Cartons Loaded",
+        tone: "blue",
+        value: totalLoaded.toLocaleString()
+      },
+      {
+        helper: "Actual stock returned to store",
+        label: "Returns",
+        tone: "amber",
+        value: actualReturns.toLocaleString()
+      },
+      {
+        helper: "Shortage or damaged cartons recorded",
+        label: "Damages",
+        tone: damages > 0 ? "red" : "green",
+        value: damages.toLocaleString()
+      },
+      {
+        helper: "Products below minimum stock",
+        label: "Low Stock Alerts",
+        tone: inventoryTotals.lowStockItems > 0 ? "red" : "green",
+        value: inventoryTotals.lowStockItems.toLocaleString()
+      },
+      {
+        helper: "Products needing replenishment",
+        label: "Reorder Needed",
+        tone: reorderNeeded > 0 ? "amber" : "green",
+        value: reorderNeeded.toLocaleString()
+      },
+      {
+        helper: "Based on recent seven-day sales pace",
+        label: "Days of Stock Remaining",
+        tone: daysOfStockRemaining <= 3 ? "red" : daysOfStockRemaining <= 7 ? "amber" : "green",
+        value: daysOfStockRemaining >= 999 ? "Stable" : daysOfStockRemaining.toLocaleString()
+      }
+    ];
     const salesByLoad = new Map(todaySales.map((record) => [record.loadingRecordId, record]));
     const cashBySale = new Map(todayCash.map((record) => [record.salesRecordId, record]));
     const returnsBySale = new Map(todayReturns.map((record) => [record.salesRecordId, record]));
@@ -723,6 +805,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
       revenueProfit,
       returnsByDay,
       salesValue,
+      storePlanning,
       stockInOut,
       damagesByDay,
       totalProfit
@@ -750,6 +833,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
 
   const isMarketerDashboard = user.role === "marketer";
   const isStorekeeperDashboard = user.role === "storekeeper";
+  const canViewStorePlanning = user.role === "admin" || user.role === "manager";
   const visibleDashboardTabs = isStorekeeperDashboard
     ? storekeeperDashboardTabs
     : dashboardTabs;
@@ -813,6 +897,8 @@ function DashboardContent({ user }: { user: SessionUser }) {
           <BeverageKpiCard key={metric.label} metric={metric} featured={index === 0} />
         ))}
       </section>
+
+      {canViewStorePlanning ? <StorePlanningSection metrics={dashboard.storePlanning} /> : null}
 
       {user.role === "manager" ? (
         <ManagerCallCenterReport
@@ -993,6 +1079,44 @@ function BeverageKpiCard({ featured, metric }: { featured?: boolean; metric: Kpi
         Beverage Pro metric
       </p>
     </article>
+  );
+}
+
+function StorePlanningSection({ metrics }: { metrics: StorePlanningMetric[] }) {
+  return (
+    <section className="rounded-xl border border-brand-100 bg-white p-4 shadow-[0_16px_45px_rgba(15,35,80,0.07)]">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h3 className="text-sm font-black uppercase tracking-normal text-slate-950">
+            Store Planning
+          </h3>
+          <p className="mt-1 text-xs font-bold text-slate-500">
+            Finished goods, raw materials, stock movement, and reorder visibility for production planning.
+          </p>
+        </div>
+        <span className="w-fit rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-[11px] font-black uppercase tracking-normal text-brand-800">
+          Manager / Admin
+        </span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {metrics.map((metric) => {
+          const tone = getBeverageTone(metric.tone);
+
+          return (
+            <article
+              className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+              key={metric.label}
+            >
+              <p className="text-[11px] font-black uppercase tracking-normal text-slate-500">
+                {metric.label}
+              </p>
+              <p className={`mt-2 text-2xl font-black ${tone.text}`}>{metric.value}</p>
+              <p className="mt-2 text-xs font-bold text-slate-500">{metric.helper}</p>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
