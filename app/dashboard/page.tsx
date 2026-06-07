@@ -425,18 +425,24 @@ function DashboardContent({ user }: { user: SessionUser }) {
       (total, record) => total + Math.max(0, Number(record.stockVariance) || 0),
       0
     );
-    const kpiMetrics: KpiMetric[] = [
-      { label: "Total Revenue", tone: "blue", value: `${formatMoney(salesValue)} RWF` },
-      { label: "Total Profit", tone: "green", value: `${formatMoney(totalProfit)} RWF` },
+    const marketerKpiMetrics: KpiMetric[] = [
       { label: "Cartons Loaded", tone: "slate", value: totalLoaded.toLocaleString() },
       { label: "Cartons Sold", tone: "blue", value: totalSold.toLocaleString() },
       { label: "Returns", tone: "amber", value: actualReturns.toLocaleString() },
       { label: "Damages", tone: damages > 0 ? "red" : "green", value: damages.toLocaleString() },
       { label: "Cash Expected", tone: "purple", value: `${formatMoney(expectedCash)} RWF` },
-      { label: "Cash Received", tone: "green", value: `${formatMoney(cashReceived)} RWF` },
+      { label: "Cash Given", tone: "green", value: `${formatMoney(cashReceived)} RWF` },
       { label: "Outstanding Cash", tone: outstandingCash > 0 ? "red" : "green", value: `${formatMoney(outstandingCash)} RWF` },
       { label: "Collection Rate", tone: collectionRate >= 95 ? "green" : collectionRate >= 70 ? "amber" : "red", value: `${collectionRate}%` }
     ];
+    const executiveKpiMetrics: KpiMetric[] = [
+      { label: "Total Revenue", tone: "blue", value: `${formatMoney(salesValue)} RWF` },
+      { label: "Total Profit", tone: "green", value: `${formatMoney(totalProfit)} RWF` },
+      ...marketerKpiMetrics.map((metric) =>
+        metric.label === "Cash Given" ? { ...metric, label: "Cash Received" } : metric
+      )
+    ];
+    const kpiMetrics = user.role === "marketer" ? marketerKpiMetrics : executiveKpiMetrics;
 
     const revenueProfit = overviewDays.map((day) => {
       const dayExpenses = roleExpenseRecords
@@ -592,6 +598,8 @@ function DashboardContent({ user }: { user: SessionUser }) {
     user.username
   ]);
 
+  const isMarketerDashboard = user.role === "marketer";
+
   return (
     <div className="space-y-5">
       <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-[0_16px_45px_rgba(15,35,80,0.07)] sm:p-5">
@@ -601,10 +609,14 @@ function DashboardContent({ user }: { user: SessionUser }) {
               {roleLabels[user.role]} Dashboard
             </p>
             <h2 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">
-              Regional Sales Management Dashboard
+              {isMarketerDashboard
+                ? "Field Salesperson Dashboard"
+                : "Regional Sales Management Dashboard"}
             </h2>
             <p className="mt-1 max-w-4xl text-sm font-semibold text-slate-500">
-              Beverage distribution, outsourcing operations, call center follow-up, stock movement, and cash collection control.
+              {isMarketerDashboard
+                ? "Your assigned loads, confirmed sales, returns, cash given, and collection progress."
+                : "Beverage distribution, outsourcing operations, call center follow-up, stock movement, and cash collection control."}
             </p>
           </div>
           <label className="block w-full max-w-xs">
@@ -649,17 +661,31 @@ function DashboardContent({ user }: { user: SessionUser }) {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.25fr_0.9fr_0.9fr]">
-        <DashboardPanel title="Revenue vs Profit" subtitle="Daily financial comparison">
-          <DualBarChart
-            data={dashboard.revenueProfit}
-            firstColor="bg-blue-600"
-            firstKey="revenue"
-            firstLabel="Revenue"
-            secondColor="bg-emerald-500"
-            secondKey="profit"
-            secondLabel="Profit"
-          />
-        </DashboardPanel>
+        {isMarketerDashboard ? (
+          <DashboardPanel title="Cash Expected vs Cash Given" subtitle="Your cash collection control">
+            <DualBarChart
+              data={dashboard.cashComparison}
+              firstColor="bg-amber-500"
+              firstKey="expected"
+              firstLabel="Expected"
+              secondColor="bg-blue-600"
+              secondKey="cash"
+              secondLabel="Given"
+            />
+          </DashboardPanel>
+        ) : (
+          <DashboardPanel title="Revenue vs Profit" subtitle="Daily financial comparison">
+            <DualBarChart
+              data={dashboard.revenueProfit}
+              firstColor="bg-blue-600"
+              firstKey="revenue"
+              firstLabel="Revenue"
+              secondColor="bg-emerald-500"
+              secondKey="profit"
+              secondLabel="Profit"
+            />
+          </DashboardPanel>
+        )}
         <DashboardPanel title="Daily Cartons Sold" subtitle="Cartons sold by date">
           <SingleBarChart data={dashboard.overviewDays} valueKey="sold" color="bg-blue-500" />
         </DashboardPanel>
@@ -668,21 +694,25 @@ function DashboardContent({ user }: { user: SessionUser }) {
         </DashboardPanel>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1fr_1fr_1fr]">
-        <DashboardPanel title="Cash Expected vs Cash Received" subtitle="Collection control">
-          <DualBarChart
-            data={dashboard.cashComparison}
-            firstColor="bg-amber-500"
-            firstKey="expected"
-            firstLabel="Expected"
-            secondColor="bg-blue-600"
-            secondKey="cash"
-            secondLabel="Received"
-          />
-        </DashboardPanel>
-        <DashboardPanel title="Top Marketers" subtitle="Ranked by sales value">
-          <HorizontalRanking rows={dashboard.marketerPerformance} />
-        </DashboardPanel>
+      <section className={`grid gap-4 ${isMarketerDashboard ? "xl:grid-cols-1" : "xl:grid-cols-[1fr_1fr_1fr]"}`}>
+        {!isMarketerDashboard ? (
+          <>
+            <DashboardPanel title="Cash Expected vs Cash Received" subtitle="Collection control">
+              <DualBarChart
+                data={dashboard.cashComparison}
+                firstColor="bg-amber-500"
+                firstKey="expected"
+                firstLabel="Expected"
+                secondColor="bg-blue-600"
+                secondKey="cash"
+                secondLabel="Received"
+              />
+            </DashboardPanel>
+            <DashboardPanel title="Top Marketers" subtitle="Ranked by sales value">
+              <HorizontalRanking rows={dashboard.marketerPerformance} />
+            </DashboardPanel>
+          </>
+        ) : null}
         <DashboardPanel title="Loaded vs Sold vs Returned" subtitle="Stock movement flow">
           <TripleBarChart data={dashboard.loadedSoldReturned} />
         </DashboardPanel>
