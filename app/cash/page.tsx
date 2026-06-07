@@ -89,6 +89,37 @@ function CashContent({ user }: { user: SessionUser }) {
     return groupSalesByMarketerDate(filteredRecords);
   }, [filters, salesRecords]);
 
+  const cashSummary = useMemo(() => {
+    return cashRows.reduce(
+      (summary, salesRecord) => {
+        const cashRecord = cashBySalesId.get(salesRecord.id);
+        const cashReceived = cashRecord?.cashReceived ?? getDraftCashValue(salesRecord);
+        const expectedCash = salesRecord.salesValue;
+        const difference = Math.max(0, expectedCash - cashReceived);
+
+        return {
+          expectedCash: summary.expectedCash + expectedCash,
+          pending: summary.pending + (cashRecord?.locked ? 0 : 1),
+          submitted: summary.submitted + (cashRecord?.locked ? 1 : 0),
+          totalCashCollected: summary.totalCashCollected + cashReceived,
+          totalDifference: summary.totalDifference + difference
+        };
+      },
+      {
+        expectedCash: 0,
+        pending: 0,
+        submitted: 0,
+        totalCashCollected: 0,
+        totalDifference: 0
+      }
+    );
+  }, [cashBySalesId, cashRows, draftCash]);
+
+  const overallCollectionRate =
+    cashSummary.expectedCash > 0
+      ? (cashSummary.totalCashCollected / cashSummary.expectedCash) * 100
+      : 0;
+
   function getDraftCashValue(salesRecord: SalesRecord) {
     const existingRecord = cashBySalesId.get(salesRecord.id);
     const rawValue =
@@ -211,6 +242,28 @@ function CashContent({ user }: { user: SessionUser }) {
           {message}
         </div>
       ) : null}
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <CashSummaryCard
+          label="Total Cash Collected"
+          value={`${formatMoney(cashSummary.totalCashCollected)} RWF`}
+        />
+        <CashSummaryCard
+          label="Total Difference"
+          tone={cashSummary.totalDifference > 0 ? "danger" : "default"}
+          value={`${formatMoney(cashSummary.totalDifference)} RWF`}
+        />
+        <CashSummaryCard
+          label="Overall Collection Rate"
+          tone={overallCollectionRate >= 95 ? "default" : "warning"}
+          value={`${overallCollectionRate.toFixed(0)}%`}
+        />
+        <CashSummaryCard
+          label="Marketers Submitted / Pending"
+          tone={cashSummary.pending > 0 ? "warning" : "default"}
+          value={`${cashSummary.submitted.toLocaleString()} / ${cashSummary.pending.toLocaleString()}`}
+        />
+      </section>
 
       <div className="hidden overflow-hidden rounded-lg border border-brand-100 bg-white shadow-sm xl:block">
         <table className="w-full border-collapse text-left text-sm">
@@ -628,6 +681,32 @@ function CashStatusChip({ cashRecord }: { cashRecord?: CashRecord }) {
     >
       {cashRecord.locked ? "Cash Submitted" : "Unlocked"}
     </span>
+  );
+}
+
+function CashSummaryCard({
+  label,
+  tone = "default",
+  value
+}: {
+  label: string;
+  tone?: "danger" | "default" | "warning";
+  value: string;
+}) {
+  const toneClass =
+    tone === "danger"
+      ? "border-red-100 bg-red-50 text-red-800"
+      : tone === "warning"
+        ? "border-amber-100 bg-amber-50 text-amber-800"
+        : "border-brand-100 bg-white text-brand-900";
+
+  return (
+    <article className={`rounded-lg border p-4 shadow-sm ${toneClass}`}>
+      <p className="text-xs font-black uppercase tracking-normal text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-black">{value}</p>
+    </article>
   );
 }
 
