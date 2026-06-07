@@ -58,6 +58,50 @@ type Activity = {
   status: string;
 };
 
+type DashboardTab =
+  | "Overall"
+  | "By Date"
+  | "By Product"
+  | "By Marketer"
+  | "By Region"
+  | "Cash Collection"
+  | "Returns"
+  | "Damages";
+
+type KpiMetric = {
+  label: string;
+  tone: "blue" | "green" | "amber" | "red" | "purple" | "slate";
+  value: string;
+};
+
+type OperationalTableRow = {
+  cashReceived: number;
+  confirmed: number;
+  damaged: number;
+  date: string;
+  difference: number;
+  expectedCash: number;
+  loaded: number;
+  marketer: string;
+  product: string;
+  region: string;
+  returned: number;
+  revenue: number;
+  sold: number;
+  status: string;
+};
+
+const dashboardTabs: DashboardTab[] = [
+  "Overall",
+  "By Date",
+  "By Product",
+  "By Marketer",
+  "By Region",
+  "Cash Collection",
+  "Returns",
+  "Damages"
+];
+
 const roleSummaries: Partial<Record<UserRole, string>> = {
   admin: "Executive overview of stock movement, cash performance, variances, and operational activity.",
   supervisor: "Review performance, variances, and correction priorities from one clean control room.",
@@ -89,6 +133,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
   });
   const [selectedDate, setSelectedDate] = useState(getTodayIsoDate());
   const [permissionMessage, setPermissionMessage] = useState("");
+  const [activeTab, setActiveTab] = useState<DashboardTab>("Overall");
 
   function loadDashboardData() {
     setRecords(getLoadingRecords());
@@ -373,6 +418,89 @@ function DashboardContent({ user }: { user: SessionUser }) {
       .sort((first, second) => second.value - first.value)
       .slice(0, 5);
 
+    const totalProfit = Math.max(0, salesValue - totalExpenses);
+    const outstandingCash = Math.max(0, expectedCash - cashReceived);
+    const collectionRate = expectedCash > 0 ? Math.round((cashReceived / expectedCash) * 100) : 0;
+    const damages = todayReturns.reduce(
+      (total, record) => total + Math.max(0, Number(record.stockVariance) || 0),
+      0
+    );
+    const kpiMetrics: KpiMetric[] = [
+      { label: "Total Revenue", tone: "blue", value: `${formatMoney(salesValue)} RWF` },
+      { label: "Total Profit", tone: "green", value: `${formatMoney(totalProfit)} RWF` },
+      { label: "Cartons Loaded", tone: "slate", value: totalLoaded.toLocaleString() },
+      { label: "Cartons Sold", tone: "blue", value: totalSold.toLocaleString() },
+      { label: "Returns", tone: "amber", value: actualReturns.toLocaleString() },
+      { label: "Damages", tone: damages > 0 ? "red" : "green", value: damages.toLocaleString() },
+      { label: "Cash Expected", tone: "purple", value: `${formatMoney(expectedCash)} RWF` },
+      { label: "Cash Received", tone: "green", value: `${formatMoney(cashReceived)} RWF` },
+      { label: "Outstanding Cash", tone: outstandingCash > 0 ? "red" : "green", value: `${formatMoney(outstandingCash)} RWF` },
+      { label: "Collection Rate", tone: collectionRate >= 95 ? "green" : collectionRate >= 70 ? "amber" : "red", value: `${collectionRate}%` }
+    ];
+
+    const revenueProfit = overviewDays.map((day) => {
+      const dayExpenses = roleExpenseRecords
+        .filter((record) => record.date === day.date)
+        .reduce((total, record) => total + record.totalExpenses, 0);
+      return {
+        date: day.date,
+        profit: Math.max(0, day.cash - dayExpenses),
+        revenue: day.cash
+      };
+    });
+    const cashComparison = overviewDays.map((day) => {
+      const expected = roleSalesRecords
+        .filter((record) => record.date === day.date && record.status === "sales_submitted")
+        .reduce((total, record) => total + getSalesValue(record), 0);
+      return { cash: day.cash, date: day.date, expected };
+    });
+    const productDistribution = Array.from(
+      todaySales.reduce((map, record) => {
+        const current = map.get(record.productName) ?? 0;
+        map.set(record.productName, current + getSalesValue(record));
+        return map;
+      }, new Map<string, number>())
+    )
+      .map(([label, value]) => ({ label, value }))
+      .sort((first, second) => second.value - first.value);
+    const loadedSoldReturned = overviewDays.map((day) => {
+      const returned = roleReturnRecords
+        .filter((record) => record.date === day.date)
+        .reduce((total, record) => total + record.actualReturnCartons, 0);
+      return { ...day, returned };
+    });
+    const salesByLoad = new Map(todaySales.map((record) => [record.loadingRecordId, record]));
+    const cashBySale = new Map(todayCash.map((record) => [record.salesRecordId, record]));
+    const returnsBySale = new Map(todayReturns.map((record) => [record.salesRecordId, record]));
+    const operationRows: OperationalTableRow[] = todayLoads.map((record) => {
+      const sale = salesByLoad.get(record.id);
+      const cash = sale ? cashBySale.get(sale.id) : undefined;
+      const returnRecord = sale ? returnsBySale.get(sale.id) : undefined;
+      const sold = sale ? getSalesSoldCartons(sale) : 0;
+      const revenue = sale ? getSalesValue(sale) : 0;
+      const expected = sale ? getSalesValue(sale) : 0;
+      const received = cash?.cashReceived ?? 0;
+      const returned = returnRecord?.actualReturnCartons ?? 0;
+      const damaged = Math.max(0, returnRecord?.stockVariance ?? 0);
+
+      return {
+        cashReceived: received,
+        confirmed: record.status === "confirmed" || !!sale ? record.loadedCartons : 0,
+        damaged,
+        date: record.date,
+        difference: received - expected,
+        expectedCash: expected,
+        loaded: record.loadedCartons,
+        marketer: record.marketerName,
+        product: record.productName,
+        region: (record as { companyName?: string }).companyName ?? user.companyName ?? "Main Region",
+        returned,
+        revenue,
+        sold,
+        status: cash?.status ?? sale?.status ?? record.status
+      };
+    });
+
     const alerts = [
       {
         label: "Cash variance",
@@ -436,7 +564,16 @@ function DashboardContent({ user }: { user: SessionUser }) {
       totalSold,
       actualReturns,
       cashReceived,
-      salesValue
+      cashComparison,
+      collectionRate,
+      damages,
+      kpiMetrics,
+      loadedSoldReturned,
+      operationRows,
+      productDistribution,
+      revenueProfit,
+      salesValue,
+      totalProfit
     };
   }, [
     cashRecords,
@@ -456,36 +593,48 @@ function DashboardContent({ user }: { user: SessionUser }) {
   ]);
 
   return (
-    <div className="space-y-6">
-      <div className="enterprise-panel overflow-hidden p-5 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-5">
+      <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-[0_16px_45px_rgba(15,35,80,0.07)] sm:p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-normal text-brand-700">
+            <p className="text-xs font-black uppercase tracking-wide text-blue-700">
               {roleLabels[user.role]} Dashboard
             </p>
-            <h2 className="mt-2 text-2xl font-black text-slate-950 sm:text-4xl">
-              Beverage Operations Control Room
+            <h2 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">
+              Regional Sales Management Dashboard
             </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              {roleSummaries[user.role] ?? "Manage your KingApp workspace."}
+            <p className="mt-1 max-w-4xl text-sm font-semibold text-slate-500">
+              Beverage distribution, outsourcing operations, call center follow-up, stock movement, and cash collection control.
             </p>
           </div>
-          <div className="rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-black text-brand-900 shadow-sm">
-            {user.displayName} - {user.username}
-          </div>
+          <label className="block w-full max-w-xs">
+            <span className="mb-1 block text-xs font-black uppercase text-slate-500">Dashboard Date</span>
+            <input
+              className="form-input"
+              onChange={(event) => setSelectedDate(event.target.value)}
+              type="date"
+              value={selectedDate}
+            />
+          </label>
         </div>
-        <label className="mt-5 block max-w-xs">
-          <span className="mb-1 block text-xs font-bold uppercase tracking-normal text-slate-500">
-            Dashboard Date
-          </span>
-          <input
-            className="form-input"
-            onChange={(event) => setSelectedDate(event.target.value)}
-            type="date"
-            value={selectedDate}
-          />
-        </label>
-      </div>
+
+        <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+          {dashboardTabs.map((tab) => (
+            <button
+              className={`shrink-0 rounded-lg border px-3.5 py-2 text-xs font-black transition ${
+                activeTab === tab
+                  ? "border-blue-700 bg-blue-700 text-white shadow-sm"
+                  : "border-blue-100 bg-blue-50 text-blue-800 hover:bg-blue-100"
+              }`}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              type="button"
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      </section>
 
       {permissionMessage ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
@@ -493,126 +642,55 @@ function DashboardContent({ user }: { user: SessionUser }) {
         </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        {dashboard.stats.map((stat, index) => {
-          const Icon = stat.icon;
-          const toneClass = getStatToneClass(stat.tone);
-          const featured = index === 0;
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {dashboard.kpiMetrics.map((metric, index) => (
+          <BeverageKpiCard key={metric.label} metric={metric} featured={index === 0} />
+        ))}
+      </section>
 
-          return (
-            <article
-              className={featured ? "enterprise-kpi enterprise-kpi-featured" : "enterprise-kpi"}
-              key={stat.label}
-            >
-              <div className={`absolute right-0 top-0 h-24 w-24 rounded-full ${featured ? "bg-white/10" : "bg-brand-50"} translate-x-8 -translate-y-8`} />
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className={`text-sm font-black ${featured ? "text-emerald-50" : "text-slate-600"}`}>{stat.label}</p>
-                  <p className={`mt-3 text-4xl font-black ${featured ? "text-white" : toneClass.text}`}>
-                    {stat.value}
-                  </p>
-                  <p className={`mt-4 inline-flex rounded-full px-2.5 py-1 text-xs font-black ${featured ? "bg-white/15 text-emerald-50" : "bg-slate-50 text-slate-500"}`}>
-                    {stat.trend ?? "Operational metric"}
-                  </p>
-                </div>
-                <div
-                  className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${featured ? "bg-white text-brand-800" : toneClass.icon}`}
-                >
-                  <Icon className="h-6 w-6" />
-                </div>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.95fr]">
-        <ExecutiveSection
-          icon={BarChart3}
-          subtitle="Last seven days"
-          title="Stock & Cash Overview"
-        >
-          <StockCashOverview days={dashboard.overviewDays} />
-        </ExecutiveSection>
-
-        <ExecutiveSection
-          icon={AlertTriangle}
-          subtitle="Exception control"
-          title="Variance Alerts"
-        >
-          <div className="grid gap-3">
-            {dashboard.alerts.map((alert) => (
-              <div
-                className={`rounded-lg border px-4 py-3 ${getAlertClass(
-                  alert.tone
-                )}`}
-                key={alert.label}
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm font-bold">{alert.label}</span>
-                  <span className="text-right text-sm font-black">
-                    {alert.value}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </ExecutiveSection>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
-        <ExecutiveSection
-          icon={ClipboardCheck}
-          subtitle="Latest submitted and updated records"
-          title="Recent Activities"
-        >
-          <RecentActivities activities={dashboard.activities} />
-        </ExecutiveSection>
-
-        <ExecutiveSection
-          icon={TrendingUp}
-          subtitle="Ranked by sales value"
-          title="Marketer Performance"
-        >
-          <MarketerPerformance rows={dashboard.marketerPerformance} />
-        </ExecutiveSection>
-      </div>
-
-      <ExecutiveSection
-        icon={WalletCards}
-        subtitle={formatDate(selectedDate)}
-        title="Today's Closing Summary"
-      >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <SummaryTile label="Loaded" value={dashboard.totalLoaded} />
-          <SummaryTile label="Sold" value={dashboard.totalSold} />
-          <SummaryTile label="Expected Returns" value={dashboard.expectedReturns} />
-          <SummaryTile label="Actual Returns" value={dashboard.actualReturns} />
-          <SummaryTile
-            label="Expected Cash"
-            value={`${formatMoney(dashboard.expectedCash)} RWF`}
+      <section className="grid gap-4 xl:grid-cols-[1.25fr_0.9fr_0.9fr]">
+        <DashboardPanel title="Revenue vs Profit" subtitle="Daily financial comparison">
+          <DualBarChart
+            data={dashboard.revenueProfit}
+            firstColor="bg-blue-600"
+            firstKey="revenue"
+            firstLabel="Revenue"
+            secondColor="bg-emerald-500"
+            secondKey="profit"
+            secondLabel="Profit"
           />
-          <SummaryTile
-            label="Cash Received"
-            value={`${formatMoney(dashboard.cashReceived)} RWF`}
+        </DashboardPanel>
+        <DashboardPanel title="Daily Cartons Sold" subtitle="Cartons sold by date">
+          <SingleBarChart data={dashboard.overviewDays} valueKey="sold" color="bg-blue-500" />
+        </DashboardPanel>
+        <DashboardPanel title="Product Sales Distribution" subtitle="Revenue by product">
+          <DistributionChart data={dashboard.productDistribution} />
+        </DashboardPanel>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1fr_1fr_1fr]">
+        <DashboardPanel title="Cash Expected vs Cash Received" subtitle="Collection control">
+          <DualBarChart
+            data={dashboard.cashComparison}
+            firstColor="bg-amber-500"
+            firstKey="expected"
+            firstLabel="Expected"
+            secondColor="bg-blue-600"
+            secondKey="cash"
+            secondLabel="Received"
           />
-          <SummaryTile
-            label="Total Expenses"
-            value={`${formatMoney(dashboard.totalExpenses)} RWF`}
-          />
-          <SummaryTile
-            label="Closing Balance"
-            value={`${formatMoney(dashboard.closingBalance)} RWF`}
-          />
-          <SummaryTile label="Pending Confirmations" value={dashboard.pending} />
-          <SummaryTile label="Confirmed Loads" value={dashboard.confirmed} />
-          <SummaryTile label="Rejected Loads" value={dashboard.rejected} />
-          <SummaryTile
-            label="Stock Variance"
-            value={dashboard.stockVariance.toLocaleString()}
-          />
-        </div>
-      </ExecutiveSection>
+        </DashboardPanel>
+        <DashboardPanel title="Top Marketers" subtitle="Ranked by sales value">
+          <HorizontalRanking rows={dashboard.marketerPerformance} />
+        </DashboardPanel>
+        <DashboardPanel title="Loaded vs Sold vs Returned" subtitle="Stock movement flow">
+          <TripleBarChart data={dashboard.loadedSoldReturned} />
+        </DashboardPanel>
+      </section>
+
+      <DashboardPanel title="Beverage Distribution Operations Table" subtitle="Storekeeper → Marketer Confirmation → Sales → Returns → Accountant Cash Entry → Admin Reports">
+        <OperationsTable rows={dashboard.operationRows} />
+      </DashboardPanel>
     </div>
   );
 }
@@ -642,6 +720,273 @@ function ExecutiveSection({
       {children}
     </section>
   );
+}
+
+function DashboardPanel({
+  children,
+  subtitle,
+  title
+}: {
+  children: React.ReactNode;
+  subtitle: string;
+  title: string;
+}) {
+  return (
+    <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-[0_16px_45px_rgba(15,35,80,0.07)]">
+      <div className="mb-4">
+        <h3 className="text-sm font-black uppercase tracking-normal text-slate-950">{title}</h3>
+        <p className="mt-1 text-xs font-bold text-slate-500">{subtitle}</p>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function BeverageKpiCard({ featured, metric }: { featured?: boolean; metric: KpiMetric }) {
+  const tone = getBeverageTone(metric.tone);
+
+  return (
+    <article
+      className={`relative overflow-hidden rounded-xl border p-4 shadow-[0_14px_35px_rgba(15,35,80,0.07)] ${
+        featured
+          ? "border-blue-700 bg-gradient-to-br from-blue-700 to-blue-500 text-white"
+          : "border-blue-100 bg-white text-slate-950"
+      }`}
+    >
+      <div className={`absolute right-0 top-0 h-20 w-20 translate-x-7 -translate-y-7 rounded-full ${featured ? "bg-white/15" : tone.bg}`} />
+      <p className={`relative text-xs font-black uppercase tracking-normal ${featured ? "text-blue-50" : "text-slate-500"}`}>
+        {metric.label}
+      </p>
+      <p className={`relative mt-3 text-2xl font-black ${featured ? "text-white" : tone.text}`}>
+        {metric.value}
+      </p>
+      <p className={`relative mt-3 text-[11px] font-black ${featured ? "text-blue-50" : "text-slate-400"}`}>
+        Beverage Pro metric
+      </p>
+    </article>
+  );
+}
+
+function DualBarChart<T extends { date: string }>({
+  data,
+  firstColor,
+  firstKey,
+  firstLabel,
+  secondColor,
+  secondKey,
+  secondLabel
+}: {
+  data: T[];
+  firstColor: string;
+  firstKey: keyof T;
+  firstLabel: string;
+  secondColor: string;
+  secondKey: keyof T;
+  secondLabel: string;
+}) {
+  const maxValue = Math.max(
+    1,
+    ...data.map((row) => Math.max(Number(row[firstKey]) || 0, Number(row[secondKey]) || 0))
+  );
+
+  return (
+    <div className="space-y-4">
+      <ChartLegend items={[{ color: firstColor, label: firstLabel }, { color: secondColor, label: secondLabel }]} />
+      <div className="grid grid-cols-7 gap-2">
+        {data.map((row) => (
+          <div className="space-y-2" key={row.date}>
+            <div className="flex h-44 items-end justify-center gap-1 rounded-lg border border-blue-50 bg-slate-50 px-2 py-3">
+              <span className={`w-4 rounded-t ${firstColor}`} style={{ height: `${Math.max(5, ((Number(row[firstKey]) || 0) / maxValue) * 100)}%` }} />
+              <span className={`w-4 rounded-t ${secondColor}`} style={{ height: `${Math.max(5, ((Number(row[secondKey]) || 0) / maxValue) * 100)}%` }} />
+            </div>
+            <p className="text-center text-[11px] font-black text-slate-500">{formatShortDate(row.date)}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SingleBarChart<T extends { date: string }>({
+  color,
+  data,
+  valueKey
+}: {
+  color: string;
+  data: T[];
+  valueKey: keyof T;
+}) {
+  const maxValue = Math.max(1, ...data.map((row) => Number(row[valueKey]) || 0));
+
+  return (
+    <div className="grid grid-cols-7 gap-2">
+      {data.map((row) => (
+        <div className="space-y-2" key={row.date}>
+          <div className="flex h-44 items-end rounded-lg border border-blue-50 bg-slate-50 px-3 py-3">
+            <span className={`w-full rounded-t ${color}`} style={{ height: `${Math.max(5, ((Number(row[valueKey]) || 0) / maxValue) * 100)}%` }} />
+          </div>
+          <p className="text-center text-[11px] font-black text-slate-500">{formatShortDate(row.date)}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TripleBarChart({ data }: { data: Array<{ date: string; loaded: number; returned: number; sold: number }> }) {
+  const maxValue = Math.max(1, ...data.map((row) => Math.max(row.loaded, row.sold, row.returned)));
+
+  return (
+    <div className="space-y-4">
+      <ChartLegend items={[{ color: "bg-blue-600", label: "Loaded" }, { color: "bg-emerald-500", label: "Sold" }, { color: "bg-amber-500", label: "Returned" }]} />
+      <div className="grid grid-cols-7 gap-2">
+        {data.map((row) => (
+          <div className="space-y-2" key={row.date}>
+            <div className="flex h-44 items-end justify-center gap-1 rounded-lg border border-blue-50 bg-slate-50 px-2 py-3">
+              <span className="w-3 rounded-t bg-blue-600" style={{ height: `${Math.max(5, (row.loaded / maxValue) * 100)}%` }} />
+              <span className="w-3 rounded-t bg-emerald-500" style={{ height: `${Math.max(5, (row.sold / maxValue) * 100)}%` }} />
+              <span className="w-3 rounded-t bg-amber-500" style={{ height: `${Math.max(5, (row.returned / maxValue) * 100)}%` }} />
+            </div>
+            <p className="text-center text-[11px] font-black text-slate-500">{formatShortDate(row.date)}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DistributionChart({ data }: { data: Array<{ label: string; value: number }> }) {
+  const total = data.reduce((sum, row) => sum + row.value, 0) || 1;
+  const colors = ["bg-blue-600", "bg-cyan-500", "bg-emerald-500", "bg-amber-500", "bg-purple-500"];
+
+  if (!data.length) {
+    return <EmptyChart label="No product sales submitted for this date." />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {data.slice(0, 5).map((row, index) => (
+        <div key={row.label}>
+          <div className="mb-1 flex items-center justify-between text-xs font-black">
+            <span className="text-slate-700">{row.label}</span>
+            <span className="text-slate-500">{Math.round((row.value / total) * 100)}%</span>
+          </div>
+          <div className="h-3 rounded-full bg-slate-100">
+            <div className={`h-3 rounded-full ${colors[index % colors.length]}`} style={{ width: `${Math.max(4, (row.value / total) * 100)}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HorizontalRanking({ rows }: { rows: { marketer: string; sold: number; value: number }[] }) {
+  const maxValue = Math.max(1, ...rows.map((row) => row.value));
+
+  if (!rows.length) {
+    return <EmptyChart label="No marketer sales submitted yet." />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {rows.map((row, index) => (
+        <div key={row.marketer}>
+          <div className="mb-1 flex items-center justify-between text-xs font-black">
+            <span className="text-slate-700">{index + 1}. {row.marketer}</span>
+            <span className="text-blue-700">{row.sold.toLocaleString()} cartons</span>
+          </div>
+          <div className="h-3 rounded-full bg-slate-100">
+            <div className="h-3 rounded-full bg-blue-600" style={{ width: `${Math.max(6, (row.value / maxValue) * 100)}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OperationsTable({ rows }: { rows: OperationalTableRow[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="data-table min-w-[1320px]">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Region</th>
+            <th>Marketer</th>
+            <th>Product</th>
+            <th>Loaded</th>
+            <th>Confirmed</th>
+            <th>Sold</th>
+            <th>Returned</th>
+            <th>Damaged</th>
+            <th>Revenue</th>
+            <th>Expected Cash</th>
+            <th>Cash Received</th>
+            <th>Difference</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={`${row.date}-${row.marketer}-${row.product}-${row.loaded}`}>
+              <td>{formatDate(row.date)}</td>
+              <td>{row.region}</td>
+              <td className="font-bold text-slate-950">{row.marketer}</td>
+              <td>{row.product}</td>
+              <td>{row.loaded.toLocaleString()}</td>
+              <td>{row.confirmed.toLocaleString()}</td>
+              <td>{row.sold.toLocaleString()}</td>
+              <td>{row.returned.toLocaleString()}</td>
+              <td>{row.damaged.toLocaleString()}</td>
+              <td>{formatMoney(row.revenue)}</td>
+              <td>{formatMoney(row.expectedCash)}</td>
+              <td>{formatMoney(row.cashReceived)}</td>
+              <td className={row.difference < 0 ? "font-black text-red-600" : "font-black text-emerald-700"}>{formatMoney(row.difference)}</td>
+              <td><span className="status-badge border-blue-100 bg-blue-50 text-blue-700">{row.status.replace(/_/g, " ")}</span></td>
+            </tr>
+          ))}
+          {!rows.length ? (
+            <tr>
+              <td className="text-center text-slate-500" colSpan={14}>No beverage operations recorded for this date.</td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ChartLegend({ items }: { items: Array<{ color: string; label: string }> }) {
+  return (
+    <div className="flex flex-wrap gap-3 text-xs font-black text-slate-500">
+      {items.map((item) => (
+        <span className="inline-flex items-center gap-2" key={item.label}>
+          <span className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
+          {item.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function EmptyChart({ label }: { label: string }) {
+  return (
+    <div className="flex min-h-44 items-center justify-center rounded-lg border border-dashed border-blue-100 bg-blue-50/40 px-4 text-center text-sm font-bold text-slate-500">
+      {label}
+    </div>
+  );
+}
+
+function getBeverageTone(tone: KpiMetric["tone"]) {
+  const styles = {
+    amber: { bg: "bg-amber-50", text: "text-amber-700" },
+    blue: { bg: "bg-blue-50", text: "text-blue-700" },
+    green: { bg: "bg-emerald-50", text: "text-emerald-700" },
+    purple: { bg: "bg-purple-50", text: "text-purple-700" },
+    red: { bg: "bg-red-50", text: "text-red-700" },
+    slate: { bg: "bg-slate-50", text: "text-slate-800" }
+  };
+
+  return styles[tone];
 }
 
 function StockCashOverview({
