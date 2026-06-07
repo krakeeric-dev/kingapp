@@ -45,6 +45,7 @@ export type ExpenseRecord = {
   food: number;
   miscellaneous: number;
   notes: string;
+  openingCash?: number;
   category?: ExpenseCategory;
   description?: string;
   amount?: number;
@@ -83,6 +84,14 @@ export type BusinessExpenseInput = {
   paymentMethod: ExpensePaymentMethod;
   receiptNumber: string;
   status: ExpenseStatus;
+};
+
+export type GeneralExpenseInput = ExpenseInput & {
+  cashReceived: number;
+  date: string;
+  marketerName: string;
+  marketerUsername: string;
+  openingCash: number;
 };
 
 const EXPENSE_RECORDS_KEY = "kingapp.expenseRecords";
@@ -234,6 +243,77 @@ export function submitBusinessExpenseRecord(
         receiptNumber: input.receiptNumber,
         status: input.status,
         totalExpenses: amount,
+        accountantUsername: accountant.username,
+        accountantName: accountant.displayName,
+        submittedAt: now,
+        createdAt: now,
+        updatedAt: now
+      };
+
+  return {
+    record,
+    records: upsertExpenseRecord(record)
+  };
+}
+
+export function submitGeneralExpenseRecord(
+  input: GeneralExpenseInput,
+  accountant: SessionUser,
+  existingRecord?: ExpenseRecord
+) {
+  const now = new Date().toISOString();
+  const totalExpenses = calculateTotalExpenses(input);
+  const closingBalance = input.openingCash + input.cashReceived - totalExpenses;
+  const record: ExpenseRecord = existingRecord
+    ? {
+        ...existingRecord,
+        fuel: input.fuel,
+        transport: input.transport,
+        loaderPayment: input.loaderPayment,
+        commission: input.commission,
+        airtime: input.airtime,
+        food: input.food,
+        miscellaneous: input.miscellaneous,
+        notes: input.notes,
+        cashReceived: input.cashReceived,
+        closingBalance,
+        date: input.date,
+        expectedCash: input.cashReceived,
+        locked: true,
+        marketerName: input.marketerName,
+        marketerUsername: input.marketerUsername,
+        openingCash: input.openingCash,
+        productName: "General Operations",
+        status: "expenses_submitted",
+        totalExpenses,
+        accountantUsername: accountant.username,
+        accountantName: accountant.displayName,
+        submittedAt: now,
+        updatedAt: now
+      }
+    : {
+        id: `EXP-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase(),
+        cashRecordId: `GENERAL-${input.date}-${input.marketerUsername || "all"}`,
+        date: input.date,
+        productName: "General Operations",
+        marketerUsername: input.marketerUsername,
+        marketerName: input.marketerName,
+        expectedCash: input.cashReceived,
+        cashReceived: input.cashReceived,
+        cashVariance: 0,
+        fuel: input.fuel,
+        transport: input.transport,
+        loaderPayment: input.loaderPayment,
+        commission: input.commission,
+        airtime: input.airtime,
+        food: input.food,
+        miscellaneous: input.miscellaneous,
+        notes: input.notes,
+        closingBalance,
+        locked: true,
+        openingCash: input.openingCash,
+        status: "expenses_submitted",
+        totalExpenses,
         accountantUsername: accountant.username,
         accountantName: accountant.displayName,
         submittedAt: now,
