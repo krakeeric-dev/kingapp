@@ -78,7 +78,10 @@ type DashboardTab =
   | "By Region"
   | "Cash Collection"
   | "Returns"
-  | "Damages";
+  | "Damages"
+  | "Loading"
+  | "Inventory"
+  | "Raw Materials";
 
 type KpiMetric = {
   label: string;
@@ -121,6 +124,15 @@ const dashboardTabs: DashboardTab[] = [
   "Cash Collection",
   "Returns",
   "Damages"
+];
+
+const storekeeperDashboardTabs: DashboardTab[] = [
+  "Overall",
+  "Loading",
+  "Inventory",
+  "Returns",
+  "Damages",
+  "Raw Materials"
 ];
 
 const roleSummaries: Partial<Record<UserRole, string>> = {
@@ -492,6 +504,28 @@ function DashboardContent({ user }: { user: SessionUser }) {
       { label: "Outstanding Cash", tone: outstandingCash > 0 ? "red" : "green", value: `${formatMoney(outstandingCash)} RWF` },
       { label: "Collection Rate", tone: collectionRate >= 95 ? "green" : collectionRate >= 70 ? "amber" : "red", value: `${collectionRate}%` }
     ];
+    const rawMaterialMovements = inventoryMovements.filter((movement) =>
+      `${movement.productName} ${movement.itemCode} ${movement.notes ?? ""}`
+        .toLowerCase()
+        .includes("raw")
+    );
+    const rawMaterialsAvailable = rawMaterialMovements.reduce(
+      (total, movement) => total + movement.quantity,
+      0
+    );
+    const rawMaterialsUsed = rawMaterialMovements
+      .filter((movement) => movement.quantity < 0)
+      .reduce((total, movement) => total + Math.abs(movement.quantity), 0);
+    const storekeeperKpiMetrics: KpiMetric[] = [
+      { label: "Available Stock", tone: "green", value: inventoryTotals.totalWarehouseStock.toLocaleString() },
+      { label: "Cartons Loaded", tone: "blue", value: totalLoaded.toLocaleString() },
+      { label: "Stock Returned", tone: "amber", value: actualReturns.toLocaleString() },
+      { label: "Damages", tone: damages > 0 ? "red" : "green", value: damages.toLocaleString() },
+      { label: "Raw Materials Available", tone: "slate", value: Math.max(0, rawMaterialsAvailable).toLocaleString() },
+      { label: "Raw Materials Used", tone: "purple", value: rawMaterialsUsed.toLocaleString() },
+      { label: "Low Stock Alerts", tone: inventoryTotals.lowStockItems > 0 ? "amber" : "green", value: inventoryTotals.lowStockItems.toLocaleString() },
+      { label: "Pending Confirmations", tone: pending > 0 ? "amber" : "green", value: pending.toLocaleString() }
+    ];
     const executiveKpiMetrics: KpiMetric[] = [
       { label: "Total Revenue", tone: "blue", value: `${formatMoney(salesValue)} RWF` },
       { label: "Total Profit", tone: "green", value: `${formatMoney(totalProfit)} RWF` },
@@ -499,7 +533,12 @@ function DashboardContent({ user }: { user: SessionUser }) {
         metric.label === "Cash Given" ? { ...metric, label: "Cash Received" } : metric
       )
     ];
-    const kpiMetrics = user.role === "marketer" ? marketerKpiMetrics : executiveKpiMetrics;
+    const kpiMetrics =
+      user.role === "storekeeper"
+        ? storekeeperKpiMetrics
+        : user.role === "marketer"
+          ? marketerKpiMetrics
+          : executiveKpiMetrics;
 
     const revenueProfit = overviewDays.map((day) => {
       const dayExpenses = roleExpenseRecords
@@ -532,6 +571,49 @@ function DashboardContent({ user }: { user: SessionUser }) {
         .reduce((total, record) => total + record.actualReturnCartons, 0);
       return { ...day, returned };
     });
+    const stockInOut = overviewDays.map((day) => {
+      const stockIn =
+        inventoryMovements
+          .filter((movement) => movement.date === day.date && movement.movementType === "Stock Received")
+          .reduce((total, movement) => total + movement.quantity, 0) +
+        roleReturnRecords
+          .filter((record) => record.date === day.date)
+          .reduce((total, record) => total + record.actualReturnCartons, 0);
+      const stockOut = roleRecords
+        .filter((record) => record.date === day.date && record.status !== "draft")
+        .reduce((total, record) => total + record.loadedCartons, 0);
+
+      return { date: day.date, stockIn, stockOut };
+    });
+    const loadedByMarketer = Array.from(
+      todayLoads.reduce((map, record) => {
+        const current = map.get(record.marketerName) ?? {
+          marketer: record.marketerName,
+          sold: 0,
+          value: 0
+        };
+        current.sold += record.loadedCartons;
+        current.value += record.loadedCartons;
+        map.set(record.marketerName, current);
+        return map;
+      }, new Map<string, { marketer: string; sold: number; value: number }>())
+    ).map(([, value]) => value);
+    const returnsByDay = loadedSoldReturned.map((day) => ({
+      date: day.date,
+      returned: day.returned
+    }));
+    const damagesByDay = overviewDays.map((day) => ({
+      date: day.date,
+      damaged: roleReturnRecords
+        .filter((record) => record.date === day.date)
+        .reduce((total, record) => total + Math.max(0, record.stockVariance), 0)
+    }));
+    const rawMaterialsUsage = overviewDays.map((day) => ({
+      date: day.date,
+      used: rawMaterialMovements
+        .filter((movement) => movement.date === day.date && movement.quantity < 0)
+        .reduce((total, movement) => total + Math.abs(movement.quantity), 0)
+    }));
     const salesByLoad = new Map(todaySales.map((record) => [record.loadingRecordId, record]));
     const cashBySale = new Map(todayCash.map((record) => [record.salesRecordId, record]));
     const returnsBySale = new Map(todayReturns.map((record) => [record.salesRecordId, record]));
@@ -633,11 +715,16 @@ function DashboardContent({ user }: { user: SessionUser }) {
       collectionRate,
       damages,
       kpiMetrics,
+      loadedByMarketer,
       loadedSoldReturned,
       operationRows,
       productDistribution,
+      rawMaterialsUsage,
       revenueProfit,
+      returnsByDay,
       salesValue,
+      stockInOut,
+      damagesByDay,
       totalProfit
     };
   }, [
@@ -662,6 +749,10 @@ function DashboardContent({ user }: { user: SessionUser }) {
   ]);
 
   const isMarketerDashboard = user.role === "marketer";
+  const isStorekeeperDashboard = user.role === "storekeeper";
+  const visibleDashboardTabs = isStorekeeperDashboard
+    ? storekeeperDashboardTabs
+    : dashboardTabs;
 
   return (
     <div className="space-y-5">
@@ -694,7 +785,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
         </div>
 
         <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
-          {dashboardTabs.map((tab) => (
+          {visibleDashboardTabs.map((tab) => (
             <button
               className={`shrink-0 rounded-lg border px-3.5 py-2 text-xs font-black transition ${
                 activeTab === tab
@@ -730,8 +821,40 @@ function DashboardContent({ user }: { user: SessionUser }) {
         />
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-[1.25fr_0.9fr_0.9fr]">
-        {isMarketerDashboard ? (
+      {isStorekeeperDashboard ? (
+        <>
+          <section className="grid gap-4 xl:grid-cols-[1.25fr_0.9fr_0.9fr]">
+            <DashboardPanel title="Stock In vs Stock Out" subtitle="Warehouse stock movement">
+              <DualBarChart
+                data={dashboard.stockInOut}
+                firstColor="bg-emerald-500"
+                firstKey="stockIn"
+                firstLabel="Stock In"
+                secondColor="bg-blue-600"
+                secondKey="stockOut"
+                secondLabel="Stock Out"
+              />
+            </DashboardPanel>
+            <DashboardPanel title="Cartons Loaded by Marketer" subtitle="Today loading activity">
+              <HorizontalRanking rows={dashboard.loadedByMarketer} />
+            </DashboardPanel>
+            <DashboardPanel title="Returns Received" subtitle="Daily returned cartons">
+              <SingleBarChart data={dashboard.returnsByDay} valueKey="returned" color="bg-amber-500" />
+            </DashboardPanel>
+          </section>
+          <section className="grid gap-4 xl:grid-cols-2">
+            <DashboardPanel title="Damages Recorded" subtitle="Daily damaged/short cartons">
+              <SingleBarChart data={dashboard.damagesByDay} valueKey="damaged" color="bg-red-500" />
+            </DashboardPanel>
+            <DashboardPanel title="Raw Materials Usage" subtitle="Daily raw material movement">
+              <SingleBarChart data={dashboard.rawMaterialsUsage} valueKey="used" color="bg-purple-500" />
+            </DashboardPanel>
+          </section>
+        </>
+      ) : (
+        <>
+          <section className="grid gap-4 xl:grid-cols-[1.25fr_0.9fr_0.9fr]">
+            {isMarketerDashboard ? (
           <DashboardPanel title="Cash Expected vs Cash Given" subtitle="Your cash collection control">
             <DualBarChart
               data={dashboard.cashComparison}
@@ -755,41 +878,47 @@ function DashboardContent({ user }: { user: SessionUser }) {
               secondLabel="Profit"
             />
           </DashboardPanel>
-        )}
-        <DashboardPanel title="Daily Cartons Sold" subtitle="Cartons sold by date">
-          <SingleBarChart data={dashboard.overviewDays} valueKey="sold" color="bg-blue-500" />
-        </DashboardPanel>
-        <DashboardPanel title="Product Sales Distribution" subtitle="Revenue by product">
-          <DistributionChart data={dashboard.productDistribution} />
-        </DashboardPanel>
-      </section>
+            )}
+            <DashboardPanel title="Daily Cartons Sold" subtitle="Cartons sold by date">
+              <SingleBarChart data={dashboard.overviewDays} valueKey="sold" color="bg-blue-500" />
+            </DashboardPanel>
+            <DashboardPanel title="Product Sales Distribution" subtitle="Revenue by product">
+              <DistributionChart data={dashboard.productDistribution} />
+            </DashboardPanel>
+          </section>
 
-      <section className={`grid gap-4 ${isMarketerDashboard ? "xl:grid-cols-1" : "xl:grid-cols-[1fr_1fr_1fr]"}`}>
-        {!isMarketerDashboard ? (
-          <>
-            <DashboardPanel title="Cash Expected vs Cash Received" subtitle="Collection control">
-              <DualBarChart
-                data={dashboard.cashComparison}
-                firstColor="bg-amber-500"
-                firstKey="expected"
-                firstLabel="Expected"
-                secondColor="bg-blue-600"
-                secondKey="cash"
-                secondLabel="Received"
-              />
+          <section className={`grid gap-4 ${isMarketerDashboard ? "xl:grid-cols-1" : "xl:grid-cols-[1fr_1fr_1fr]"}`}>
+            {!isMarketerDashboard ? (
+              <>
+                <DashboardPanel title="Cash Expected vs Cash Received" subtitle="Collection control">
+                  <DualBarChart
+                    data={dashboard.cashComparison}
+                    firstColor="bg-amber-500"
+                    firstKey="expected"
+                    firstLabel="Expected"
+                    secondColor="bg-blue-600"
+                    secondKey="cash"
+                    secondLabel="Received"
+                  />
+                </DashboardPanel>
+                <DashboardPanel title="Top Marketers" subtitle="Ranked by sales value">
+                  <HorizontalRanking rows={dashboard.marketerPerformance} />
+                </DashboardPanel>
+              </>
+            ) : null}
+            <DashboardPanel title="Loaded vs Sold vs Returned" subtitle="Stock movement flow">
+              <TripleBarChart data={dashboard.loadedSoldReturned} />
             </DashboardPanel>
-            <DashboardPanel title="Top Marketers" subtitle="Ranked by sales value">
-              <HorizontalRanking rows={dashboard.marketerPerformance} />
-            </DashboardPanel>
-          </>
-        ) : null}
-        <DashboardPanel title="Loaded vs Sold vs Returned" subtitle="Stock movement flow">
-          <TripleBarChart data={dashboard.loadedSoldReturned} />
-        </DashboardPanel>
-      </section>
+          </section>
+        </>
+      )}
 
       <DashboardPanel title="Beverage Distribution Operations Table" subtitle="Storekeeper → Marketer Confirmation → Sales → Returns → Accountant Cash Entry → Admin Reports">
-        <OperationsTable rows={dashboard.operationRows} />
+        {isStorekeeperDashboard ? (
+          <StorekeeperOperationsTable rows={dashboard.operationRows} />
+        ) : (
+          <OperationsTable rows={dashboard.operationRows} />
+        )}
       </DashboardPanel>
     </div>
   );
@@ -1120,6 +1249,56 @@ function OperationsTable({ rows }: { rows: OperationalTableRow[] }) {
           {!rows.length ? (
             <tr>
               <td className="text-center text-slate-500" colSpan={14}>No beverage operations recorded for this date.</td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function StorekeeperOperationsTable({ rows }: { rows: OperationalTableRow[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="data-table min-w-[920px]">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Region</th>
+            <th>Marketer</th>
+            <th>Product</th>
+            <th>Loaded</th>
+            <th>Confirmed</th>
+            <th>Returned</th>
+            <th>Damaged</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={`${row.date}-${row.marketer}-${row.product}-${row.loaded}`}>
+              <td>{formatDate(row.date)}</td>
+              <td>{row.region}</td>
+              <td className="font-bold text-slate-950">{row.marketer}</td>
+              <td>{row.product}</td>
+              <td>{row.loaded.toLocaleString()}</td>
+              <td>{row.confirmed.toLocaleString()}</td>
+              <td>{row.returned.toLocaleString()}</td>
+              <td className={row.damaged > 0 ? "font-black text-red-700" : ""}>
+                {row.damaged.toLocaleString()}
+              </td>
+              <td>
+                <span className="status-badge border-brand-100 bg-brand-50 text-brand-800">
+                  {row.status.replace(/_/g, " ")}
+                </span>
+              </td>
+            </tr>
+          ))}
+          {!rows.length ? (
+            <tr>
+              <td className="text-center text-slate-500" colSpan={9}>
+                No store operations recorded for this date.
+              </td>
             </tr>
           ) : null}
         </tbody>
