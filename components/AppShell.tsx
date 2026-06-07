@@ -12,6 +12,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   Download,
+  Factory,
   FileText,
   Home,
   LayoutDashboard,
@@ -136,6 +137,12 @@ const navItems: NavItem[] = [
     label: "Inventory",
     icon: Boxes,
     roles: getAllowedRoles("/inventory")
+  },
+  {
+    href: "/raw-materials",
+    label: "Raw Materials",
+    icon: Factory,
+    roles: getAllowedRoles("/raw-materials")
   },
   {
     href: "/price-management",
@@ -744,6 +751,7 @@ function getMobileNavItems(visibleNav: NavItem[]) {
     "/cash",
     "/returns",
     "/inventory",
+    "/raw-materials",
     "/expenses",
     "/daily-report",
     "/reports"

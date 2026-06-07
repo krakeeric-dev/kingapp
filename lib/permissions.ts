@@ -12,6 +12,8 @@ export type PermissionKey =
   | "inventory.adjust"
   | "inventory.product.edit"
   | "inventory.price.change"
+  | "rawmaterials.view"
+  | "rawmaterials.update"
   | "sales.view"
   | "sales.create"
   | "sales.edit"
@@ -81,7 +83,9 @@ export const permissionGroups: PermissionGroup[] = [
       { key: "inventory.receive", label: "Receive Stock" },
       { key: "inventory.adjust", label: "Adjust Stock" },
       { key: "inventory.product.edit", label: "Edit Product" },
-      { key: "inventory.price.change", label: "Change Price" }
+      { key: "inventory.price.change", label: "Change Price" },
+      { key: "rawmaterials.view", label: "View Raw Materials" },
+      { key: "rawmaterials.update", label: "Update Raw Materials" }
     ]
   },
   {
@@ -184,6 +188,7 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "dashboard.view",
     "loading.view",
     "inventory.view",
+    "rawmaterials.view",
     "sales.view",
     "cash.view",
     "returns.view",
@@ -217,6 +222,8 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "returns.receive",
     "inventory.view",
     "inventory.receive",
+    "rawmaterials.view",
+    "rawmaterials.update",
     "sync.view"
   ],
   marketer: [
@@ -277,6 +284,7 @@ export const routePermissions: Record<string, PermissionKey[]> = {
   "/supplier-dashboard": ["supplier.view"],
   "/loading": ["loading.view"],
   "/inventory": ["inventory.view"],
+  "/raw-materials": ["rawmaterials.view"],
   "/price-management": ["inventory.price.change"],
   "/confirm-loading": ["loading.confirm"],
   "/sales": ["sales.view"],
@@ -319,6 +327,7 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/supplier-dashboard": ["admin", "manager", "supplier"],
   "/loading": ["admin", "supervisor", "storekeeper"],
   "/inventory": ["admin", "manager", "supervisor", "storekeeper"],
+  "/raw-materials": ["admin", "manager", "storekeeper"],
   "/price-management": ["admin"],
   "/confirm-loading": ["admin", "supervisor", "marketer"],
   "/sales": ["admin", "manager", "supervisor", "marketer", "accountant"],
