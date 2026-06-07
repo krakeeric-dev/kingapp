@@ -39,8 +39,7 @@ function CashContent({ user }: { user: SessionUser }) {
   const [error, setError] = useState("");
   const [filters, setFilters] = useState({
     date: "",
-    marketer: "",
-    product: ""
+    marketer: ""
   });
   const [unlockRecordId, setUnlockRecordId] = useState("");
   const [unlockReason, setUnlockReason] = useState("");
@@ -75,7 +74,7 @@ function CashContent({ user }: { user: SessionUser }) {
   }, [cashRecords]);
 
   const cashRows = useMemo(() => {
-    return salesRecords.filter((record) => {
+    const filteredRecords = salesRecords.filter((record) => {
       const matchesDate = !filters.date || record.date === filters.date;
       const matchesMarketer =
         !filters.marketer ||
@@ -83,12 +82,11 @@ function CashContent({ user }: { user: SessionUser }) {
         record.marketerUsername
           .toLowerCase()
           .includes(filters.marketer.toLowerCase());
-      const matchesProduct =
-        !filters.product ||
-        record.productName.toLowerCase().includes(filters.product.toLowerCase());
 
-      return matchesDate && matchesMarketer && matchesProduct;
+      return matchesDate && matchesMarketer;
     });
+
+    return groupSalesByMarketerDate(filteredRecords);
   }, [filters, salesRecords]);
 
   function getDraftCashValue(salesRecord: SalesRecord) {
@@ -176,7 +174,7 @@ function CashContent({ user }: { user: SessionUser }) {
           <Search className="h-4 w-4 text-brand-700" />
           Filter cash records
         </div>
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2">
           <FilterField label="Date">
             <input
               className="form-input"
@@ -200,19 +198,6 @@ function CashContent({ user }: { user: SessionUser }) {
               value={filters.marketer}
             />
           </FilterField>
-          <FilterField label="Product">
-            <input
-              className="form-input"
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  product: event.target.value
-                }))
-              }
-              placeholder="Search product"
-              value={filters.product}
-            />
-          </FilterField>
         </div>
       </div>
 
@@ -233,7 +218,6 @@ function CashContent({ user }: { user: SessionUser }) {
             <tr>
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Marketer</th>
-              <th className="px-4 py-3">Product</th>
               <th className="px-4 py-3 text-right">Sold Cartons</th>
               <th className="px-4 py-3 text-right">Expected Cash</th>
               <th className="px-4 py-3 text-right">Cash Received</th>
@@ -402,9 +386,8 @@ function CashRow(props: CashDisplayProps) {
     <tr>
       <td className="px-4 py-3 text-slate-700">{formatDate(salesRecord.date)}</td>
       <td className="px-4 py-3 text-slate-700">{salesRecord.marketerName}</td>
-      <td className="px-4 py-3 font-semibold text-slate-900">{salesRecord.productName}</td>
       <td className="px-4 py-3 text-right font-semibold">
-        {salesRecord.soldCartons}
+        {salesRecord.soldCartons.toLocaleString()}
       </td>
       <td className="px-4 py-3 text-right font-semibold text-slate-950">
         {formatMoney(expectedCash)}
@@ -469,18 +452,19 @@ function CashCard(props: CashDisplayProps) {
   const {
     cashRecord,
     draftCash,
+    draftNotes,
     getDraftCashValue,
     handleSubmitCash,
     salesRecord,
     setDraftCash,
+    setDraftNotes,
     setUnlockRecordId,
     user
   } = props;
   const cashReceived = getDraftCashValue(salesRecord);
-  const clientPaid = salesRecord.totalPaid ?? salesRecord.salesValue;
-  const unpaidBalance =
-    salesRecord.totalUnpaidBalance ?? Math.max(0, salesRecord.salesValue - clientPaid);
-  const variance = cashReceived - clientPaid;
+  const expectedCash = salesRecord.salesValue;
+  const difference = expectedCash - cashReceived;
+  const collectionRate = expectedCash > 0 ? (cashReceived / expectedCash) * 100 : 0;
   const isLocked = Boolean(cashRecord?.locked);
 
   return (
@@ -496,16 +480,15 @@ function CashCard(props: CashDisplayProps) {
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <Info label="Marketer" value={salesRecord.marketerName} />
-        <Info label="Loaded" value={salesRecord.loadedCartons.toLocaleString()} />
-        <Info label="Sold" value={salesRecord.soldCartons.toLocaleString()} />
-        <Info label="Expected Cash" value={formatMoney(salesRecord.salesValue)} />
+        <Info label="Total Sold Cartons" value={salesRecord.soldCartons.toLocaleString()} />
+        <Info label="Expected Cash" value={formatMoney(expectedCash)} />
         <Info
-          label="Client Paid"
-          value={formatMoney(clientPaid)}
+          label="Difference"
+          value={formatMoney(difference)}
         />
         <Info
-          label="Unpaid"
-          value={formatMoney(unpaidBalance)}
+          label="Collection Rate"
+          value={Number.isFinite(collectionRate) ? `${collectionRate.toFixed(0)}%` : "0%"}
         />
       </div>
       <label className="mt-4 block">
@@ -526,10 +509,27 @@ function CashCard(props: CashDisplayProps) {
           value={draftCash[salesRecord.id] ?? ""}
         />
       </label>
+      <label className="mt-4 block">
+        <span className="mb-2 block text-sm font-semibold text-slate-700">
+          Notes
+        </span>
+        <input
+          className="form-input"
+          disabled={user.role !== "accountant" || isLocked}
+          onChange={(event) =>
+            setDraftNotes((current) => ({
+              ...current,
+              [salesRecord.id]: event.target.value
+            }))
+          }
+          placeholder="Optional note"
+          value={draftNotes[salesRecord.id] ?? ""}
+        />
+      </label>
       <div className="mt-4 grid grid-cols-3 gap-2">
-        <Metric label="Client Paid" value={formatMoney(clientPaid)} />
+        <Metric label="Expected" value={formatMoney(expectedCash)} />
         <Metric label="Received" value={formatMoney(cashReceived)} />
-        <Metric label="Variance" value={formatMoney(variance)} warning={variance < 0} />
+        <Metric label="Difference" value={formatMoney(difference)} warning={difference > 0} />
       </div>
       <div className="mt-4">
         <CashAction
