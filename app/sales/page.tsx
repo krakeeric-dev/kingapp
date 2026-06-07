@@ -7,6 +7,7 @@ import type { SessionUser } from "@/lib/auth";
 import {
   formatDate,
   getLoadingRecords,
+  getTodayIsoDate,
   statusChipClass
 } from "@/lib/loading-data";
 import type { LoadingRecord } from "@/lib/loading-data";
@@ -29,6 +30,7 @@ type ClientSaleDraft = {
   clientLocation: string;
   saleDate: string;
   marketerName: string;
+  productKey: ProductGridKey;
   quantities: Record<ProductGridKey, string>;
   paymentStatus: PaymentStatus;
   amountPaid: string;
@@ -161,12 +163,13 @@ function SalesContent({ user }: { user: SessionUser }) {
 
   function createDraftClient(load: LoadingRecord): ClientSaleDraft {
     return {
-      id: `CLIENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase(),
+      id: `SALE-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase(),
       clientName: "",
       clientPhone: "",
       clientLocation: "",
-      saleDate: load.date,
-      marketerName: load.marketerName,
+      saleDate: getTodayIsoDate(),
+      marketerName: user.displayName || user.username || load.marketerName,
+      productKey: "500ml",
       quantities: {
         "500ml": "",
         "1L": "",
@@ -217,6 +220,23 @@ function SalesContent({ user }: { user: SessionUser }) {
           };
         }
 
+        if (field === "productKey") {
+          const nextProductKey = value as ProductGridKey;
+          const currentQuantity = row.quantities[row.productKey] ?? "";
+
+          return {
+            ...row,
+            productKey: nextProductKey,
+            quantities: {
+              "500ml": "",
+              "1L": "",
+              "1.5L": "",
+              "5L": "",
+              [nextProductKey]: currentQuantity
+            }
+          };
+        }
+
         return {
           ...row,
           [field]: field === "paymentStatus" ? (value as PaymentStatus) : value
@@ -258,6 +278,10 @@ function SalesContent({ user }: { user: SessionUser }) {
       const quantityCartons = getRowTotalCartons(row);
       const totalAmount = getRowTotalAmount(row, products);
       const amountPaid = toNumber(row.amountPaid);
+      const selectedProduct = productGrid.find(
+        (product) => product.key === row.productKey
+      );
+      const pricePerCarton = getProductPrice(row.productKey, products);
 
       return {
         id: row.id,
@@ -266,12 +290,12 @@ function SalesContent({ user }: { user: SessionUser }) {
         clientLocation: row.clientLocation.trim(),
         saleDate: row.saleDate,
         marketerName: row.marketerName,
-        productName: "Mixed Products",
-        itemCode: "MIXED",
+        productName: selectedProduct?.productName ?? "Water 500ml",
+        itemCode: selectedProduct?.itemCode ?? "WT-500",
         productQuantities,
         productAmounts,
         quantityCartons,
-        pricePerCarton: 0,
+        pricePerCarton,
         totalAmount,
         paymentStatus: normalizePaymentStatus(row.paymentStatus),
         amountPaid,
@@ -600,9 +624,28 @@ function SalesLoadPanel({
               {totals.clientsServed.toLocaleString()} client(s) served
             </p>
           </div>
+          {canEdit ? (
+            <button
+              className="primary-button w-full sm:w-auto"
+              onClick={() => addClientRow(load)}
+              type="button"
+            >
+              <Plus className="h-4 w-4" />
+              + Add Row
+            </button>
+          ) : null}
         </div>
 
-        {draftRows.length ? (
+        <SalesEntryTable
+          canEdit={canEdit}
+          draftRows={draftRows}
+          load={load}
+          products={products}
+          removeClientRow={removeClientRow}
+          updateClientRow={updateClientRow}
+        />
+
+        {false ? (
           <div className="grid gap-3">
             {draftRows.map((row, index) => (
               <ClientSaleCard
@@ -645,7 +688,7 @@ function SalesLoadPanel({
               type="button"
             >
               <Plus className="h-4 w-4" />
-              + Add Client
+              + Add Row
             </button>
           ) : null}
           <SalesAction
@@ -660,6 +703,311 @@ function SalesLoadPanel({
         </div>
       </div>
     </article>
+  );
+}
+
+function SalesEntryTable({
+  canEdit,
+  draftRows,
+  load,
+  products,
+  removeClientRow,
+  updateClientRow
+}: {
+  canEdit: boolean;
+  draftRows: ClientSaleDraft[];
+  load: LoadingRecord;
+  products: ProductMaster[];
+  removeClientRow: (loadId: string, rowId: string) => void;
+  updateClientRow: (
+    load: LoadingRecord,
+    rowId: string,
+    field: keyof ClientSaleDraft,
+    value: string,
+    productKey?: ProductGridKey
+  ) => void;
+}) {
+  if (!draftRows.length) {
+    return (
+      <div className="rounded-lg border border-dashed border-slate-200 px-4 py-6 text-center text-sm font-semibold text-slate-500">
+        {canEdit
+          ? "No sales rows yet. Click + Add Row to start."
+          : "No sales rows yet."}
+      </div>
+    );
+  }
+
+  const totalQuantity = draftRows.reduce(
+    (total, row) => total + toNumber(row.quantities[row.productKey]),
+    0
+  );
+  const totalAmount = draftRows.reduce(
+    (total, row) =>
+      total +
+      toNumber(row.quantities[row.productKey]) *
+        getProductPrice(row.productKey, products),
+    0
+  );
+
+  return (
+    <div>
+      <div className="hidden overflow-x-auto rounded-lg border border-slate-200 bg-white md:block">
+        <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
+          <thead className="bg-brand-50 text-xs font-black uppercase tracking-normal text-brand-900">
+            <tr>
+              <th className="border-b border-brand-100 px-3 py-3">Client Name</th>
+              <th className="border-b border-brand-100 px-3 py-3">Phone Number</th>
+              <th className="border-b border-brand-100 px-3 py-3">Location/Area</th>
+              <th className="border-b border-brand-100 px-3 py-3">Date</th>
+              <th className="border-b border-brand-100 px-3 py-3">Marketer</th>
+              <th className="border-b border-brand-100 px-3 py-3">Product</th>
+              <th className="border-b border-brand-100 px-3 py-3 text-right">Quantity</th>
+              <th className="border-b border-brand-100 px-3 py-3 text-right">Unit Price</th>
+              <th className="border-b border-brand-100 px-3 py-3 text-right">Amount</th>
+              {canEdit ? <th className="border-b border-brand-100 px-3 py-3" /> : null}
+            </tr>
+          </thead>
+          <tbody>
+            {draftRows.map((row) => {
+              const price = getProductPrice(row.productKey, products);
+              const quantity = toNumber(row.quantities[row.productKey]);
+              const amount = quantity * price;
+
+              return (
+                <tr className="border-b border-slate-100 last:border-b-0" key={row.id}>
+                  <td className="px-2 py-2">
+                    <input
+                      className="form-input min-w-36"
+                      disabled={!canEdit}
+                      onChange={(event) =>
+                        updateClientRow(load, row.id, "clientName", event.target.value)
+                      }
+                      placeholder="Jean"
+                      value={row.clientName}
+                    />
+                  </td>
+                  <td className="px-2 py-2">
+                    <input
+                      className="form-input min-w-32"
+                      disabled={!canEdit}
+                      onChange={(event) =>
+                        updateClientRow(load, row.id, "clientPhone", event.target.value)
+                      }
+                      placeholder="078..."
+                      value={row.clientPhone}
+                    />
+                  </td>
+                  <td className="px-2 py-2">
+                    <input
+                      className="form-input min-w-32"
+                      disabled={!canEdit}
+                      onChange={(event) =>
+                        updateClientRow(load, row.id, "clientLocation", event.target.value)
+                      }
+                      placeholder="Kigali"
+                      value={row.clientLocation}
+                    />
+                  </td>
+                  <td className="px-2 py-2">
+                    <input
+                      className="form-input min-w-36"
+                      disabled={!canEdit}
+                      onChange={(event) =>
+                        updateClientRow(load, row.id, "saleDate", event.target.value)
+                      }
+                      type="date"
+                      value={row.saleDate}
+                    />
+                  </td>
+                  <td className="px-2 py-2">
+                    <input className="form-input min-w-36" disabled value={row.marketerName} />
+                  </td>
+                  <td className="px-2 py-2">
+                    <select
+                      className="form-input min-w-40"
+                      disabled={!canEdit}
+                      onChange={(event) =>
+                        updateClientRow(load, row.id, "productKey", event.target.value)
+                      }
+                      value={row.productKey}
+                    >
+                      {productGrid.map((product) => (
+                        <option key={product.key} value={product.key}>
+                          {product.productName}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-2 py-2">
+                    <input
+                      className="form-input min-w-24 text-right"
+                      disabled={!canEdit}
+                      min="0"
+                      onChange={(event) =>
+                        updateClientRow(
+                          load,
+                          row.id,
+                          "quantities",
+                          event.target.value,
+                          row.productKey
+                        )
+                      }
+                      placeholder="0"
+                      type="number"
+                      value={row.quantities[row.productKey] ?? ""}
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-right font-bold text-slate-700">
+                    {formatMoney(price)} RWF
+                  </td>
+                  <td className="px-3 py-2 text-right font-black text-brand-800">
+                    {formatMoney(amount)} RWF
+                  </td>
+                  {canEdit ? (
+                    <td className="px-2 py-2 text-right">
+                      <button
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 bg-white text-red-700 hover:bg-red-50"
+                        onClick={() => removeClientRow(load.id, row.id)}
+                        title="Remove row"
+                        type="button"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot className="bg-brand-50">
+            <tr>
+              <td className="px-3 py-3 font-black text-brand-900" colSpan={6}>
+                Totals
+              </td>
+              <td className="px-3 py-3 text-right font-black text-brand-900">
+                {totalQuantity.toLocaleString()}
+              </td>
+              <td />
+              <td className="px-3 py-3 text-right font-black text-brand-900">
+                {formatMoney(totalAmount)} RWF
+              </td>
+              {canEdit ? <td /> : null}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div className="grid gap-3 md:hidden">
+        {draftRows.map((row) => {
+          const price = getProductPrice(row.productKey, products);
+          const quantity = toNumber(row.quantities[row.productKey]);
+          const amount = quantity * price;
+
+          return (
+            <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm" key={row.id}>
+              <div className="grid gap-3">
+                <Field label="Client Name">
+                  <input
+                    className="form-input"
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      updateClientRow(load, row.id, "clientName", event.target.value)
+                    }
+                    value={row.clientName}
+                  />
+                </Field>
+                <Field label="Phone">
+                  <input
+                    className="form-input"
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      updateClientRow(load, row.id, "clientPhone", event.target.value)
+                    }
+                    value={row.clientPhone}
+                  />
+                </Field>
+                <Field label="Location">
+                  <input
+                    className="form-input"
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      updateClientRow(load, row.id, "clientLocation", event.target.value)
+                    }
+                    value={row.clientLocation}
+                  />
+                </Field>
+                <Field label="Date">
+                  <input
+                    className="form-input"
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      updateClientRow(load, row.id, "saleDate", event.target.value)
+                    }
+                    type="date"
+                    value={row.saleDate}
+                  />
+                </Field>
+                <Field label="Marketer">
+                  <input className="form-input" disabled value={row.marketerName} />
+                </Field>
+                <Field label="Product">
+                  <select
+                    className="form-input"
+                    disabled={!canEdit}
+                    onChange={(event) =>
+                      updateClientRow(load, row.id, "productKey", event.target.value)
+                    }
+                    value={row.productKey}
+                  >
+                    {productGrid.map((product) => (
+                      <option key={product.key} value={product.key}>
+                        {product.productName}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Qty">
+                  <input
+                    className="form-input"
+                    disabled={!canEdit}
+                    min="0"
+                    onChange={(event) =>
+                      updateClientRow(
+                        load,
+                        row.id,
+                        "quantities",
+                        event.target.value,
+                        row.productKey
+                      )
+                    }
+                    type="number"
+                    value={row.quantities[row.productKey] ?? ""}
+                  />
+                </Field>
+                <div className="grid grid-cols-2 gap-2">
+                  <Metric label="Unit Price" value={`${formatMoney(price)} RWF`} />
+                  <Metric label="Amount" value={`${formatMoney(amount)} RWF`} />
+                </div>
+                {canEdit ? (
+                  <button
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-700 hover:bg-red-50"
+                    onClick={() => removeClientRow(load.id, row.id)}
+                    type="button"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Remove row
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+        <div className="grid grid-cols-2 gap-2">
+          <Metric label="Total Quantity" value={totalQuantity.toLocaleString()} />
+          <Metric label="Total Amount" value={`${formatMoney(totalAmount)} RWF`} />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1033,14 +1381,20 @@ function clientLineToDraft(line: ClientSaleLine): ClientSaleDraft {
     "1.5L": line.itemCode === "WT-1500" ? line.quantityCartons : 0,
     "5L": line.itemCode === "WT-5000" ? line.quantityCartons : 0
   };
+  const productKey =
+    productGrid.find((product) => Number(productQuantities[product.key]) > 0)
+      ?.key ??
+    productGrid.find((product) => product.itemCode === line.itemCode)?.key ??
+    "500ml";
 
   return {
     id: line.id,
     clientName: line.clientName,
     clientPhone: line.clientPhone,
     clientLocation: line.clientLocation,
-    saleDate: line.saleDate ?? "",
+    saleDate: line.saleDate ?? getTodayIsoDate(),
     marketerName: line.marketerName ?? "",
+    productKey,
     quantities: {
       "500ml": String(productQuantities["500ml"] ?? ""),
       "1L": String(productQuantities["1L"] ?? ""),
