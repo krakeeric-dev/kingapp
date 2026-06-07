@@ -22,6 +22,11 @@ import {
   type PaymentStatus,
   type SalesRecord
 } from "@/lib/sales-data";
+import {
+  getVisibleMarketerClients,
+  upsertClientsFromSales,
+  type MarketerClient
+} from "@/lib/marketer-clients-data";
 
 type ClientSaleDraft = {
   id: string;
@@ -88,6 +93,7 @@ function SalesContent({ user }: { user: SessionUser }) {
   const [loadingRecords, setLoadingRecords] = useState<LoadingRecord[]>([]);
   const [salesRecords, setSalesRecords] = useState<SalesRecord[]>([]);
   const [products, setProducts] = useState<ProductMaster[]>([]);
+  const [savedClients, setSavedClients] = useState<MarketerClient[]>([]);
   const [draftClientRows, setDraftClientRows] = useState<DraftClientRows>({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -107,6 +113,7 @@ function SalesContent({ user }: { user: SessionUser }) {
     setLoadingRecords(loads);
     setSalesRecords(sales);
     setProducts(productMaster);
+    setSavedClients(getVisibleMarketerClients(user));
 
     const initialDrafts = sales.reduce<DraftClientRows>((drafts, record) => {
       if (record.clientSales?.length) {
@@ -116,7 +123,7 @@ function SalesContent({ user }: { user: SessionUser }) {
       return drafts;
     }, {});
     setDraftClientRows(initialDrafts);
-  }, []);
+  }, [user]);
 
   const salesByLoadId = useMemo(() => {
     return new Map(
@@ -245,6 +252,22 @@ function SalesContent({ user }: { user: SessionUser }) {
     }));
   }
 
+  function applySavedClient(load: LoadingRecord, rowId: string, client: MarketerClient) {
+    setDraftClientRows((current) => ({
+      ...current,
+      [load.id]: (current[load.id] ?? []).map((row) =>
+        row.id === rowId
+          ? {
+              ...row,
+              clientLocation: client.location,
+              clientName: client.clientName,
+              clientPhone: client.phoneNumber
+            }
+          : row
+      )
+    }));
+  }
+
   function getTotals(rows: ClientSaleDraft[]) {
     return rows.reduce(
       (total, row) => {
@@ -359,12 +382,26 @@ function SalesContent({ user }: { user: SessionUser }) {
       existingRecord,
       clientSales
     );
+    const updatedClients = upsertClientsFromSales({
+      clientSales,
+      companyId: user.companyId,
+      marketerName: load.marketerName,
+      marketerUsername: load.marketerUsername,
+      user
+    });
     setSalesRecords(result.records);
+    setSavedClients(
+      user.role === "admin" || user.role === "manager"
+        ? updatedClients
+        : updatedClients.filter(
+            (client) => client.assignedMarketerUsername === user.username
+          )
+    );
     setDraftClientRows((current) => ({
       ...current,
       [load.id]: clientSales.map(clientLineToDraft)
     }));
-    setMessage("Client sales submitted and locked.");
+    setMessage("Client sales submitted, locked, and client list updated.");
   }
 
   function handleUnlock(event: FormEvent<HTMLFormElement>) {
@@ -480,7 +517,9 @@ function SalesContent({ user }: { user: SessionUser }) {
               products={products}
               removeClientRow={removeClientRow}
               salesRecord={salesRecord}
+              savedClients={savedClients}
               setUnlockRecordId={setUnlockRecordId}
+              applySavedClient={applySavedClient}
               updateClientRow={updateClientRow}
               user={user}
             />
@@ -537,6 +576,7 @@ function SalesContent({ user }: { user: SessionUser }) {
 
 function SalesLoadPanel({
   addClientRow,
+  applySavedClient,
   draftRows,
   getTotals,
   handleSubmitSales,
@@ -544,11 +584,13 @@ function SalesLoadPanel({
   products,
   removeClientRow,
   salesRecord,
+  savedClients,
   setUnlockRecordId,
   updateClientRow,
   user
 }: {
   addClientRow: (load: LoadingRecord) => void;
+  applySavedClient: (load: LoadingRecord, rowId: string, client: MarketerClient) => void;
   draftRows: ClientSaleDraft[];
   getTotals: (rows: ClientSaleDraft[]) => {
     clientsServed: number;
@@ -562,6 +604,7 @@ function SalesLoadPanel({
   products: ProductMaster[];
   removeClientRow: (loadId: string, rowId: string) => void;
   salesRecord?: SalesRecord;
+  savedClients: MarketerClient[];
   setUnlockRecordId: (recordId: string) => void;
   updateClientRow: (
     load: LoadingRecord,
@@ -636,12 +679,14 @@ function SalesLoadPanel({
           ) : null}
         </div>
 
-        <SalesEntryTable
+          <SalesEntryTable
+          applySavedClient={applySavedClient}
           canEdit={canEdit}
           draftRows={draftRows}
           load={load}
           products={products}
           removeClientRow={removeClientRow}
+          savedClients={savedClients}
           updateClientRow={updateClientRow}
         />
 
@@ -656,6 +701,8 @@ function SalesLoadPanel({
                 products={products}
                 removeClientRow={removeClientRow}
                 row={row}
+                savedClients={savedClients}
+                applySavedClient={applySavedClient}
                 updateClientRow={updateClientRow}
               />
             ))}
@@ -707,18 +754,22 @@ function SalesLoadPanel({
 }
 
 function SalesEntryTable({
+  applySavedClient,
   canEdit,
   draftRows,
   load,
   products,
   removeClientRow,
+  savedClients,
   updateClientRow
 }: {
+  applySavedClient: (load: LoadingRecord, rowId: string, client: MarketerClient) => void;
   canEdit: boolean;
   draftRows: ClientSaleDraft[];
   load: LoadingRecord;
   products: ProductMaster[];
   removeClientRow: (loadId: string, rowId: string) => void;
+  savedClients: MarketerClient[];
   updateClientRow: (
     load: LoadingRecord,
     rowId: string,
@@ -748,9 +799,24 @@ function SalesEntryTable({
         getProductPrice(row.productKey, products),
     0
   );
+  const datalistId = `saved-clients-${load.id}`;
+
+  function handleClientLookup(
+    row: ClientSaleDraft,
+    field: "clientLocation" | "clientName" | "clientPhone",
+    value: string
+  ) {
+    updateClientRow(load, row.id, field, value);
+    const matchedClient = findSavedClient(value, savedClients);
+
+    if (matchedClient) {
+      applySavedClient(load, row.id, matchedClient);
+    }
+  }
 
   return (
     <div>
+      <SavedClientDatalists clients={savedClients} id={datalistId} />
       <div className="hidden overflow-x-auto rounded-lg border border-slate-200 bg-white md:block">
         <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
           <thead className="bg-brand-50 text-xs font-black uppercase tracking-normal text-brand-900">
@@ -778,9 +844,10 @@ function SalesEntryTable({
                   <td className="px-2 py-2">
                     <input
                       className="form-input min-w-36"
+                      list={`${datalistId}-names`}
                       disabled={!canEdit}
                       onChange={(event) =>
-                        updateClientRow(load, row.id, "clientName", event.target.value)
+                        handleClientLookup(row, "clientName", event.target.value)
                       }
                       placeholder="Jean"
                       value={row.clientName}
@@ -789,9 +856,10 @@ function SalesEntryTable({
                   <td className="px-2 py-2">
                     <input
                       className="form-input min-w-32"
+                      list={`${datalistId}-phones`}
                       disabled={!canEdit}
                       onChange={(event) =>
-                        updateClientRow(load, row.id, "clientPhone", event.target.value)
+                        handleClientLookup(row, "clientPhone", event.target.value)
                       }
                       placeholder="078..."
                       value={row.clientPhone}
@@ -800,9 +868,10 @@ function SalesEntryTable({
                   <td className="px-2 py-2">
                     <input
                       className="form-input min-w-32"
+                      list={`${datalistId}-locations`}
                       disabled={!canEdit}
                       onChange={(event) =>
-                        updateClientRow(load, row.id, "clientLocation", event.target.value)
+                        handleClientLookup(row, "clientLocation", event.target.value)
                       }
                       placeholder="Kigali"
                       value={row.clientLocation}
@@ -909,9 +978,10 @@ function SalesEntryTable({
                 <Field label="Client Name">
                   <input
                     className="form-input"
+                    list={`${datalistId}-names`}
                     disabled={!canEdit}
                     onChange={(event) =>
-                      updateClientRow(load, row.id, "clientName", event.target.value)
+                      handleClientLookup(row, "clientName", event.target.value)
                     }
                     value={row.clientName}
                   />
@@ -919,9 +989,10 @@ function SalesEntryTable({
                 <Field label="Phone">
                   <input
                     className="form-input"
+                    list={`${datalistId}-phones`}
                     disabled={!canEdit}
                     onChange={(event) =>
-                      updateClientRow(load, row.id, "clientPhone", event.target.value)
+                      handleClientLookup(row, "clientPhone", event.target.value)
                     }
                     value={row.clientPhone}
                   />
@@ -929,9 +1000,10 @@ function SalesEntryTable({
                 <Field label="Location">
                   <input
                     className="form-input"
+                    list={`${datalistId}-locations`}
                     disabled={!canEdit}
                     onChange={(event) =>
-                      updateClientRow(load, row.id, "clientLocation", event.target.value)
+                      handleClientLookup(row, "clientLocation", event.target.value)
                     }
                     value={row.clientLocation}
                   />
@@ -1012,20 +1084,24 @@ function SalesEntryTable({
 }
 
 function ClientSaleCard({
+  applySavedClient,
   canEdit,
   index,
   load,
   products,
   removeClientRow,
   row,
+  savedClients,
   updateClientRow
 }: {
+  applySavedClient: (load: LoadingRecord, rowId: string, client: MarketerClient) => void;
   canEdit: boolean;
   index: number;
   load: LoadingRecord;
   products: ProductMaster[];
   removeClientRow: (loadId: string, rowId: string) => void;
   row: ClientSaleDraft;
+  savedClients: MarketerClient[];
   updateClientRow: (
     load: LoadingRecord,
     rowId: string,
@@ -1038,9 +1114,23 @@ function ClientSaleCard({
   const totalAmount = getRowTotalAmount(row, products);
   const amountPaid = toNumber(row.amountPaid);
   const balance = totalAmount - amountPaid;
+  const datalistId = `saved-client-card-${load.id}-${row.id}`;
+
+  function handleClientLookup(
+    field: "clientLocation" | "clientName" | "clientPhone",
+    value: string
+  ) {
+    updateClientRow(load, row.id, field, value);
+    const matchedClient = findSavedClient(value, savedClients);
+
+    if (matchedClient) {
+      applySavedClient(load, row.id, matchedClient);
+    }
+  }
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <SavedClientDatalists clients={savedClients} id={datalistId} />
       <div className="mb-4 flex items-center justify-between gap-3">
         <h5 className="text-sm font-black text-slate-950">
           Client {index + 1}
@@ -1050,9 +1140,10 @@ function ClientSaleCard({
         <Field label="Client Name">
           <input
             className="form-input"
+            list={`${datalistId}-names`}
             disabled={!canEdit}
             onChange={(event) =>
-              updateClientRow(load, row.id, "clientName", event.target.value)
+              handleClientLookup("clientName", event.target.value)
             }
             placeholder="Customer name"
             value={row.clientName}
@@ -1061,9 +1152,10 @@ function ClientSaleCard({
         <Field label="Phone Number">
           <input
             className="form-input"
+            list={`${datalistId}-phones`}
             disabled={!canEdit}
             onChange={(event) =>
-              updateClientRow(load, row.id, "clientPhone", event.target.value)
+              handleClientLookup("clientPhone", event.target.value)
             }
             placeholder="Phone number"
             value={row.clientPhone}
@@ -1072,9 +1164,10 @@ function ClientSaleCard({
         <Field label="Location / Area">
           <input
             className="form-input"
+            list={`${datalistId}-locations`}
             disabled={!canEdit}
             onChange={(event) =>
-              updateClientRow(load, row.id, "clientLocation", event.target.value)
+              handleClientLookup("clientLocation", event.target.value)
             }
             placeholder="Client location"
             value={row.clientLocation}
@@ -1309,6 +1402,62 @@ function SalesStatusChip({ salesRecord }: { salesRecord?: SalesRecord }) {
       {salesRecord.locked ? "Sales Submitted" : "Unlocked"}
     </span>
   );
+}
+
+function SavedClientDatalists({
+  clients,
+  id
+}: {
+  clients: MarketerClient[];
+  id: string;
+}) {
+  return (
+    <>
+      <datalist id={`${id}-names`}>
+        {clients.map((client) => (
+          <option
+            key={`${client.id}-name`}
+            value={client.clientName}
+          >{`${client.phoneNumber || "No phone"} - ${client.location || "No location"}`}</option>
+        ))}
+      </datalist>
+      <datalist id={`${id}-phones`}>
+        {clients
+          .filter((client) => client.phoneNumber)
+          .map((client) => (
+            <option
+              key={`${client.id}-phone`}
+              value={client.phoneNumber}
+            >{`${client.clientName} - ${client.location || "No location"}`}</option>
+          ))}
+      </datalist>
+      <datalist id={`${id}-locations`}>
+        {Array.from(new Set(clients.map((client) => client.location).filter(Boolean))).map(
+          (location) => (
+            <option key={location} value={location} />
+          )
+        )}
+      </datalist>
+    </>
+  );
+}
+
+function findSavedClient(query: string, clients: MarketerClient[]) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const phoneQuery = query.replace(/\D/g, "");
+
+  if (!normalizedQuery) {
+    return undefined;
+  }
+
+  return clients.find((client) => {
+    const nameMatch = client.clientName.trim().toLowerCase() === normalizedQuery;
+    const locationMatch = client.location.trim().toLowerCase() === normalizedQuery;
+    const phoneMatch =
+      phoneQuery.length > 0 && client.phoneNumber.replace(/\D/g, "") === phoneQuery;
+
+    return nameMatch || phoneMatch || locationMatch;
+  });
 }
 
 function FilterField({
