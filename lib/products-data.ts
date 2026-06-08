@@ -2,10 +2,17 @@ import type { SessionUser } from "@/lib/auth";
 import { upsertSupabaseRows } from "@/lib/supabase";
 
 export type ProductMaster = {
+  id?: string;
+  companyId?: string;
+  companyName?: string;
   name: string;
   itemCode: string;
   unit: string;
   category: string;
+  costPrice?: number;
+  cartonSize?: number;
+  status?: "Active" | "Inactive";
+  deletedAt?: string;
   minimumStock: number;
   openingStock: number;
   pricePerCarton: number;
@@ -30,39 +37,59 @@ const AUDIT_LOG_KEY = "kingapp.auditLog";
 export const defaultProducts: ProductMaster[] = [
   {
     name: "Water 500ml",
+    companyId: "COMP-AGAHOZO",
+    companyName: "Agahozo Water",
     itemCode: "WT-500",
     unit: "Cartons",
     category: "Bottled Water",
     minimumStock: 100,
     openingStock: 500,
-    pricePerCarton: 1999
+    pricePerCarton: 1999,
+    costPrice: 1200,
+    cartonSize: 24,
+    status: "Active"
   },
   {
     name: "Water 1L",
+    companyId: "COMP-AGAHOZO",
+    companyName: "Agahozo Water",
     itemCode: "WT-1000",
     unit: "Cartons",
     category: "Bottled Water",
     minimumStock: 80,
     openingStock: 300,
-    pricePerCarton: 2500
+    pricePerCarton: 2500,
+    costPrice: 1600,
+    cartonSize: 12,
+    status: "Active"
   },
   {
     name: "Water 1.5L",
+    companyId: "COMP-AGAHOZO",
+    companyName: "Agahozo Water",
     itemCode: "WT-1500",
     unit: "Cartons",
     category: "Bottled Water",
     minimumStock: 60,
     openingStock: 200,
-    pricePerCarton: 3000
+    pricePerCarton: 3000,
+    costPrice: 1900,
+    cartonSize: 12,
+    status: "Active"
   },
   {
     name: "Water 5L",
+    companyId: "COMP-AGAHOZO",
+    companyName: "Agahozo Water",
     itemCode: "WT-5000",
     unit: "Cartons",
     category: "Bottled Water",
     minimumStock: 40,
     openingStock: 0,
-    pricePerCarton: 5000
+    pricePerCarton: 5000,
+    costPrice: 3200,
+    cartonSize: 4,
+    status: "Active"
   }
 ];
 
@@ -110,24 +137,45 @@ export function productMasterKey(productName: string, itemCode: string) {
   return `${productName.trim().toLowerCase()}::${itemCode.trim().toLowerCase()}`;
 }
 
+function productId(product: Pick<ProductMaster, "companyId" | "itemCode" | "name">) {
+  return `${product.companyId ?? "COMP-AGAHOZO"}::${product.itemCode || product.name}`.toUpperCase();
+}
+
+function normalizeProduct(product: ProductMaster): ProductMaster {
+  const defaultProduct = defaultProducts.find(
+    (item) => item.itemCode === product.itemCode || item.name === product.name
+  );
+
+  return {
+    ...product,
+    id: product.id ?? productId(product),
+    companyId: product.companyId ?? defaultProduct?.companyId ?? "COMP-AGAHOZO",
+    companyName: product.companyName ?? defaultProduct?.companyName ?? "Agahozo Water",
+    costPrice: product.costPrice ?? defaultProduct?.costPrice ?? 0,
+    cartonSize: product.cartonSize ?? defaultProduct?.cartonSize ?? 1,
+    status: product.status ?? "Active"
+  };
+}
+
 export function ensureDefaultProducts() {
   const currentProducts = readJson<ProductMaster[]>(
     PRODUCT_MASTER_KEY,
     defaultProducts
   );
-  const mergedProducts = [...currentProducts];
+  const mergedProducts = currentProducts.map(normalizeProduct);
   let changed = false;
 
   defaultProducts.forEach((defaultProduct) => {
+    const normalizedDefault = normalizeProduct(defaultProduct);
     const existingIndex = mergedProducts.findIndex(
-      (product) => product.itemCode === defaultProduct.itemCode
+      (product) => productId(product) === productId(normalizedDefault)
     );
 
     if (existingIndex >= 0) {
       return;
     }
 
-    mergedProducts.push(defaultProduct);
+    mergedProducts.push(normalizedDefault);
     changed = true;
   });
 
@@ -139,7 +187,64 @@ export function ensureDefaultProducts() {
 }
 
 export function getProducts() {
+  return ensureDefaultProducts().filter(
+    (product) => !product.deletedAt && product.status !== "Inactive"
+  );
+}
+
+export function getAllProducts() {
   return ensureDefaultProducts();
+}
+
+export function getProductsForCompany(companyId?: string, includeInactive = false) {
+  return ensureDefaultProducts().filter((product) => {
+    if (product.deletedAt) return false;
+    if (companyId && companyId !== "all" && product.companyId !== companyId) return false;
+    if (!includeInactive && product.status === "Inactive") return false;
+    return true;
+  });
+}
+
+export function saveProducts(products: ProductMaster[]) {
+  writeJson(PRODUCT_MASTER_KEY, products.map(normalizeProduct));
+  void upsertSupabaseRows(
+    "products",
+    products.map(normalizeProduct),
+    (record) => record.id ?? productId(record),
+    (record) => `${record.name}-${record.itemCode}-${record.status ?? "Active"}`
+  );
+  return products.map(normalizeProduct);
+}
+
+export function upsertProduct(product: ProductMaster) {
+  const normalizedProduct = normalizeProduct(product);
+  const products = getAllProducts();
+  const existingIndex = products.findIndex((item) => productId(item) === productId(normalizedProduct));
+
+  if (existingIndex >= 0) {
+    products[existingIndex] = {
+      ...products[existingIndex],
+      ...normalizedProduct
+    };
+  } else {
+    products.unshift(normalizedProduct);
+  }
+
+  return saveProducts(products);
+}
+
+export function softDeleteProduct(product: ProductMaster) {
+  return upsertProduct({
+    ...product,
+    status: "Inactive",
+    deletedAt: new Date().toISOString()
+  });
+}
+
+export function hardDeleteProduct(product: ProductMaster) {
+  return saveProducts(
+    getAllProducts().filter((item) => productId(item) !== productId(product))
+  );
 }
 
 export function getPriceHistory() {
@@ -153,7 +258,7 @@ export function getActivePrice(
 ) {
   const productKey = productMasterKey(productName, itemCode);
   const defaultPrice =
-    defaultProducts.find(
+    getAllProducts().find(
       (product) => productMasterKey(product.name, product.itemCode) === productKey
     )?.pricePerCarton ?? 0;
 

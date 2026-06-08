@@ -20,6 +20,7 @@ import {
   Menu,
   MessageSquare,
   PackageCheck,
+  PackagePlus,
   PhoneCall,
   Plus,
   ReceiptText,
@@ -144,6 +145,12 @@ const navItems: NavItem[] = [
     label: "Raw Materials",
     icon: Factory,
     roles: getAllowedRoles("/raw-materials")
+  },
+  {
+    href: "/product-management",
+    label: "Products",
+    icon: PackagePlus,
+    roles: getAllowedRoles("/product-management")
   },
   {
     href: "/price-management",
@@ -758,6 +765,7 @@ function getMobileNavItems(visibleNav: NavItem[]) {
     "/cash",
     "/returns",
     "/inventory",
+    "/product-management",
     "/raw-materials",
     "/expenses",
     "/daily-report",

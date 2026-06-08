@@ -24,7 +24,8 @@ import type {
   InventoryRow,
   MinimumStock
 } from "@/lib/inventory-data";
-import { getProducts, type ProductMaster } from "@/lib/products-data";
+import { getCompanyWorkspaceId } from "@/lib/companies-data";
+import { getProductsForCompany, type ProductMaster } from "@/lib/products-data";
 
 type StockForm = {
   date: string;
@@ -85,12 +86,12 @@ function InventoryContent({ user }: { user: SessionUser }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setProducts(getProducts());
+    setProducts(getProductsForCompany(getCompanyWorkspaceId(user)));
     setLoadingRecords(getLoadingRecords());
     setReturnRecords(getReturnRecords());
     setManualMovements(getInventoryMovements());
     setMinimumStocks(getMinimumStocks());
-  }, []);
+  }, [user]);
 
   const rows = useMemo(
     () =>

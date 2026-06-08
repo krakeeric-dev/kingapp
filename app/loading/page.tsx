@@ -15,9 +15,10 @@ import {
 } from "@/lib/loading-data";
 import {
   getActivePrice,
-  getProducts,
+  getProductsForCompany,
   type ProductMaster
 } from "@/lib/products-data";
+import { getCompanyWorkspaceId } from "@/lib/companies-data";
 import { getPendingOrders, type PendingOrder } from "@/lib/call-center-data";
 import { getClientOrders, type ClientPortalOrder } from "@/lib/client-portal-data";
 
@@ -65,7 +66,7 @@ function LoadingContent({ user }: { user: SessionUser }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const productMaster = getProducts();
+    const productMaster = getProductsForCompany(getCompanyWorkspaceId(user));
     setProducts(productMaster);
     setForm((current) => {
       if (current.productName || productMaster.length === 0) {
@@ -88,7 +89,7 @@ function LoadingContent({ user }: { user: SessionUser }) {
     setRecords(getLoadingRecords());
     setPendingOrders(getPendingOrders());
     setClientOrders(getClientOrders().filter((order) => order.status === "Approved"));
-  }, []);
+  }, [user]);
 
   const visibleRecords = useMemo(() => {
     if (user.role === "admin" || user.role === "supervisor") {
