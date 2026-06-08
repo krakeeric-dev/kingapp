@@ -170,7 +170,7 @@ const seedAnnouncements: TeamAnnouncement[] = [
 ];
 
 export function getMessages() {
-  const messages = readJson<InternalMessage[]>(MESSAGES_KEY, seedMessages);
+  const messages = readJson<InternalMessage[]>(MESSAGES_KEY, []);
   writeJson(MESSAGES_KEY, messages);
   return messages;
 }
@@ -225,46 +225,7 @@ export function sendConversationMessage(
 
 export function getConversations(): Conversation[] {
   const messages = getMessages();
-  const fallback: Conversation[] = [
-    {
-      id: "CONV-001",
-      companyId: "COMP-AGAHOZO",
-      title: "Kigali Mart",
-      company: "Agahozo Water",
-      clientName: "Kigali Mart",
-      phone: "0788000001",
-      pinned: true,
-      unreadCount: 1,
-      lastMessage: "Client promised to pay before Friday afternoon delivery.",
-      updatedAt: "2026-06-02T08:45:00.000Z"
-    },
-    {
-      id: "CONV-002",
-      companyId: "COMP-AGAHOZO",
-      title: "Manager Desk",
-      company: "Agahozo Water",
-      clientName: "Internal",
-      phone: "Extension 100",
-      pinned: true,
-      unreadCount: 2,
-      lastMessage: "Please prioritize stores with unpaid balances.",
-      updatedAt: "2026-06-02T09:10:00.000Z"
-    },
-    {
-      id: "CONV-003",
-      companyId: "COMP-TEJU",
-      title: "Teju Juice Orders",
-      company: "Teju Juice",
-      clientName: "Green Valley Bar",
-      phone: "0788000004",
-      pinned: false,
-      unreadCount: 0,
-      lastMessage: "Delivery dispatch confirmed.",
-      updatedAt: "2026-06-02T09:30:00.000Z"
-    }
-  ];
-
-  const derived = new Map(fallback.map((conversation) => [conversation.id, conversation]));
+  const derived = new Map<string, Conversation>();
   messages.forEach((message) => {
     const id = message.conversationId ?? "CONV-GENERAL";
     const existing = derived.get(id);
@@ -341,7 +302,7 @@ export function markMessageRead(messageId: string) {
 }
 
 export function getAnnouncements() {
-  const announcements = readJson<TeamAnnouncement[]>(ANNOUNCEMENTS_KEY, seedAnnouncements);
+  const announcements = readJson<TeamAnnouncement[]>(ANNOUNCEMENTS_KEY, []);
   writeJson(ANNOUNCEMENTS_KEY, announcements);
   return announcements;
 }

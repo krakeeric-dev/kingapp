@@ -454,7 +454,7 @@ function createId(prefix: string) {
 }
 
 export function getCallCenterClients() {
-  const clients = readJson<CallCenterClient[]>(CLIENTS_KEY, defaultClients);
+  const clients = readJson<CallCenterClient[]>(CLIENTS_KEY, []);
   writeJson(CLIENTS_KEY, clients);
   return clients;
 }
@@ -579,7 +579,7 @@ export function addScheduledFollowUp(
 }
 
 export function getAgents() {
-  const agents = readJson<CallCenterAgent[]>(AGENTS_KEY, defaultAgents);
+  const agents = readJson<CallCenterAgent[]>(AGENTS_KEY, []);
   writeJson(AGENTS_KEY, agents);
   return agents;
 }
@@ -597,7 +597,7 @@ export function updateAgentStatus(agentId: string, status: AgentStatus) {
 }
 
 export function getQueueCalls() {
-  const calls = readJson<QueueCall[]>(QUEUE_CALLS_KEY, defaultQueueCalls);
+  const calls = readJson<QueueCall[]>(QUEUE_CALLS_KEY, []);
   writeJson(QUEUE_CALLS_KEY, calls);
   return calls;
 }
@@ -608,7 +608,7 @@ export function saveQueueCalls(calls: QueueCall[]) {
 }
 
 export function getMissedCalls() {
-  const calls = readJson<MissedCall[]>(MISSED_CALLS_KEY, defaultMissedCalls);
+  const calls = readJson<MissedCall[]>(MISSED_CALLS_KEY, []);
   writeJson(MISSED_CALLS_KEY, calls);
   return calls;
 }
@@ -619,7 +619,7 @@ export function saveMissedCalls(calls: MissedCall[]) {
 }
 
 export function getCallbacks() {
-  const callbacks = readJson<CallbackItem[]>(CALLBACKS_KEY, defaultCallbacks);
+  const callbacks = readJson<CallbackItem[]>(CALLBACKS_KEY, []);
   writeJson(CALLBACKS_KEY, callbacks);
   return callbacks;
 }

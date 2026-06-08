@@ -64,7 +64,7 @@ const emptyMinimumForm: MinimumForm = {
 
 export default function RawMaterialsPage() {
   return (
-    <AppShell allowedRoles={["admin", "manager", "storekeeper"]}>
+    <AppShell allowedRoles={["admin", "manager", "storekeeper", "accountant"]}>
       {(user) => <RawMaterialsContent user={user} />}
     </AppShell>
   );
@@ -242,10 +242,10 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-slate-950">
-                Raw Materials Management
+                Raw Materials Store
               </h2>
               <p className="mt-1 text-sm text-slate-600">
-                Plan production inputs, monitor usage, and trigger reorder decisions.
+                Separate production-material inventory for planning inputs, monitoring usage, and triggering reorder decisions.
               </p>
             </div>
           </div>
@@ -475,6 +475,7 @@ function RawMaterialsTable({ rows }: { rows: RawMaterialRow[] }) {
             <th>Minimum Stock Level</th>
             <th>Reorder Level</th>
             <th>Status</th>
+            <th>Last Updated</th>
           </tr>
         </thead>
         <tbody>
@@ -491,6 +492,7 @@ function RawMaterialsTable({ rows }: { rows: RawMaterialRow[] }) {
               <td>{formatNumber(row.minimumLevel)}</td>
               <td>{formatNumber(row.reorderLevel)}</td>
               <td><StatusBadge status={row.status} /></td>
+              <td>{row.lastUpdated ? formatDate(row.lastUpdated) : "Not updated"}</td>
             </tr>
           ))}
         </tbody>

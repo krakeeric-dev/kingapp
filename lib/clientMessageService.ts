@@ -203,7 +203,7 @@ export function getLinkedMessageCompaniesForClient(client: PortalClient) {
 }
 
 export function getClientMessages() {
-  const messages = readJson<ClientMessage[]>(CLIENT_MESSAGES_KEY, seedMessages);
+  const messages = readJson<ClientMessage[]>(CLIENT_MESSAGES_KEY, []);
   writeJson(CLIENT_MESSAGES_KEY, messages);
   return messages;
 }

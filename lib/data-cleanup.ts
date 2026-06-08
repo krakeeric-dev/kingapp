@@ -1,5 +1,3 @@
-import { defaultProducts } from "@/lib/products-data";
-
 const STORAGE_KEYS = {
   productMaster: "kingapp.productMaster",
   loadingRecords: "kingapp.loadingRecords",
@@ -8,7 +6,22 @@ const STORAGE_KEYS = {
   returnRecords: "kingapp.returnRecords",
   expenseRecords: "kingapp.expenseRecords",
   inventoryMovements: "kingapp.inventoryMovements",
-  minimumStock: "kingapp.minimumStock"
+  minimumStock: "kingapp.minimumStock",
+  callCenterClients: "kingapp.callCenter.clients",
+  callCenterAgents: "kingapp.callCenter.agents",
+  callCenterQueueCalls: "kingapp.callCenter.queueCalls",
+  callCenterMissedCalls: "kingapp.callCenter.missedCalls",
+  callCenterCallbacks: "kingapp.callCenter.callbacks",
+  callCenterMessages: "kingapp.callCenter.messages",
+  callCenterAnnouncements: "kingapp.callCenter.announcements",
+  callCenterChatMessages: "kingapp.callCenter.chatMessages",
+  clientPortalClients: "kingapp.clientPortal.clients",
+  clientPortalSuppliers: "kingapp.clientPortal.suppliers",
+  clientPortalSupplierClients: "kingapp.clientPortal.supplierClients",
+  clientPortalOrders: "kingapp.clientPortal.orders",
+  clientPortalMessages: "kingapp.clientPortal.messages",
+  rawMaterialMovements: "kingapp.rawMaterialMovements",
+  telephonyRecordings: "kingapp.telephony.recordings"
 };
 
 type ProductLike = {
@@ -64,7 +77,6 @@ function removeLegacyRows<T extends ProductLike>(key: string) {
 }
 
 export function cleanupLegacyDemoProductData() {
-  writeJson(STORAGE_KEYS.productMaster, defaultProducts);
   removeLegacyRows(STORAGE_KEYS.loadingRecords);
   removeLegacyRows(STORAGE_KEYS.salesRecords);
   removeLegacyRows(STORAGE_KEYS.cashRecords);
@@ -72,4 +84,57 @@ export function cleanupLegacyDemoProductData() {
   removeLegacyRows(STORAGE_KEYS.expenseRecords);
   removeLegacyRows(STORAGE_KEYS.inventoryMovements);
   removeLegacyRows(STORAGE_KEYS.minimumStock);
+  cleanupKnownMockBusinessData();
+}
+
+function idStartsWith(record: unknown, prefixes: string[]) {
+  const id = String((record as { id?: string }).id ?? "");
+  return prefixes.some((prefix) => id.startsWith(prefix));
+}
+
+function isKnownMockCallCenterClient(record: unknown) {
+  return idStartsWith(record, ["CL-00"]) || /^07880000\d{2}$/.test(String((record as { phone?: string }).phone ?? ""));
+}
+
+function isKnownMockClientPortalRecord(record: unknown) {
+  return idStartsWith(record, ["PORTAL-CL-00", "SUP-00", "LINK-00", "CPO-DEMO", "CLMSG-00", "CLTH-00"]);
+}
+
+function isKnownMockMessage(record: unknown) {
+  return idStartsWith(record, ["MSG-00", "ANN-00", "CHAT-00", "CLMSG-00"]);
+}
+
+function isKnownMockInventoryMovement(record: unknown) {
+  const id = String((record as { id?: string }).id ?? "");
+  const user = String((record as { user?: string }).user ?? "");
+  const reference = String((record as { reference?: string }).reference ?? "");
+  return id.startsWith("DEFAULT-OPENING-") || id.startsWith("DEFAULT-RAW-") || (user === "System" && reference.includes("Default"));
+}
+
+function removeKnownRows<T>(key: string, predicate: (record: T) => boolean) {
+  const records = readJson<T[]>(key, []);
+  const filteredRecords = records.filter((record) => !predicate(record));
+
+  if (filteredRecords.length !== records.length) {
+    writeJson(key, filteredRecords);
+  }
+}
+
+export function cleanupKnownMockBusinessData() {
+  removeKnownRows(STORAGE_KEYS.inventoryMovements, isKnownMockInventoryMovement);
+  removeKnownRows(STORAGE_KEYS.rawMaterialMovements, isKnownMockInventoryMovement);
+  removeKnownRows(STORAGE_KEYS.callCenterClients, isKnownMockCallCenterClient);
+  removeKnownRows(STORAGE_KEYS.callCenterAgents, (record) => idStartsWith(record, ["AG-00"]));
+  removeKnownRows(STORAGE_KEYS.callCenterQueueCalls, (record) => idStartsWith(record, ["QCALL-00"]));
+  removeKnownRows(STORAGE_KEYS.callCenterMissedCalls, (record) => idStartsWith(record, ["MIS-00"]));
+  removeKnownRows(STORAGE_KEYS.callCenterCallbacks, (record) => idStartsWith(record, ["CB-00"]));
+  removeKnownRows(STORAGE_KEYS.callCenterMessages, isKnownMockMessage);
+  removeKnownRows(STORAGE_KEYS.callCenterAnnouncements, isKnownMockMessage);
+  removeKnownRows(STORAGE_KEYS.callCenterChatMessages, isKnownMockMessage);
+  removeKnownRows(STORAGE_KEYS.clientPortalClients, isKnownMockClientPortalRecord);
+  removeKnownRows(STORAGE_KEYS.clientPortalSuppliers, isKnownMockClientPortalRecord);
+  removeKnownRows(STORAGE_KEYS.clientPortalSupplierClients, isKnownMockClientPortalRecord);
+  removeKnownRows(STORAGE_KEYS.clientPortalOrders, isKnownMockClientPortalRecord);
+  removeKnownRows(STORAGE_KEYS.clientPortalMessages, isKnownMockClientPortalRecord);
+  removeKnownRows(STORAGE_KEYS.telephonyRecordings, (record) => idStartsWith(record, ["REC-"]));
 }

@@ -1,6 +1,6 @@
 import { getCallbacks, getCallLogs, getComplaints, getQueueCalls } from "@/lib/call-center-data";
 import { getCashRecords } from "@/lib/cash-data";
-import { defaultCompanies, getCompanies, setActiveCompanyId, type Company } from "@/lib/companies-data";
+import { getCompanies, setActiveCompanyId, type Company } from "@/lib/companies-data";
 import { getExpenseRecords } from "@/lib/expenses-data";
 import { getInventoryMovements } from "@/lib/inventory-data";
 import { getReturnRecords } from "@/lib/returns-data";
@@ -27,28 +27,6 @@ export type ExecutiveCompanyMetric = {
 
 function today() {
   return new Date().toISOString().slice(0, 10);
-}
-
-function companyIndex(companyId: string) {
-  return Math.max(0, defaultCompanies.findIndex((company) => company.id === companyId));
-}
-
-function fallbackMetric(company: Company, field: "sales" | "cash" | "orders" | "debt" | "calls" | "complaints" | "deliveries" | "returns" | "inventory" | "expenses" | "payables") {
-  const index = companyIndex(company.id) + 1;
-  const base = {
-    sales: 1_100_000,
-    cash: 960_000,
-    orders: 18,
-    debt: 140_000,
-    calls: 52,
-    complaints: 2,
-    deliveries: 12,
-    returns: 7,
-    inventory: 2_400_000,
-    expenses: 180_000,
-    payables: 90_000
-  }[field];
-  return base * index;
 }
 
 function byCompany<T extends object>(records: T[], companyId: string) {
@@ -82,18 +60,18 @@ export function getExecutiveCompanyMetrics(): ExecutiveCompanyMetric[] {
     const companyInventory = byCompany(inventory, company.id);
     const companyExpenses = byCompany(expenses, company.id).filter((record) => record.date === date);
 
-    const salesToday = companySales.reduce((sum, record) => sum + (Number(record.salesValue) || 0), 0) || fallbackMetric(company, "sales");
-    const cashCollected = companyCash.reduce((sum, record) => sum + (Number(record.cashReceived) || 0), 0) || fallbackMetric(company, "cash");
-    const ordersToday = companyOrders.length || fallbackMetric(company, "orders");
-    const returnsToday = companyReturns.reduce((sum, record) => sum + (Number(record.actualReturnCartons) || 0), 0) || fallbackMetric(company, "returns");
-    const complaintsOpen = companyComplaints.length || fallbackMetric(company, "complaints");
-    const callsToday = companyCalls.length || fallbackMetric(company, "calls");
-    const inventoryValue = companyInventory.reduce((sum, record) => sum + Math.max(0, Number(record.quantity) || 0) * 2000, 0) || fallbackMetric(company, "inventory");
-    const outstandingDebt = Math.max(0, salesToday - cashCollected) || fallbackMetric(company, "debt");
-    const deliveries = companyOrders.filter((order) => order.status === "Delivered" || order.status === "Out for Delivery").length || fallbackMetric(company, "deliveries");
-    const staffOnline = Math.max(2, callbacks.filter((callback) => callback.status === "Pending").length + companyIndex(company.id) + 3);
-    const expensesToday = companyExpenses.reduce((sum, record) => sum + (Number(record.totalExpenses) || 0), 0) || fallbackMetric(company, "expenses");
-    const payables = fallbackMetric(company, "payables");
+    const salesToday = companySales.reduce((sum, record) => sum + (Number(record.salesValue) || 0), 0);
+    const cashCollected = companyCash.reduce((sum, record) => sum + (Number(record.cashReceived) || 0), 0);
+    const ordersToday = companyOrders.length;
+    const returnsToday = companyReturns.reduce((sum, record) => sum + (Number(record.actualReturnCartons) || 0), 0);
+    const complaintsOpen = companyComplaints.length;
+    const callsToday = companyCalls.length;
+    const inventoryValue = companyInventory.reduce((sum, record) => sum + Math.max(0, Number(record.quantity) || 0) * 2000, 0);
+    const outstandingDebt = Math.max(0, salesToday - cashCollected);
+    const deliveries = companyOrders.filter((order) => order.status === "Delivered" || order.status === "Out for Delivery").length;
+    const staffOnline = callbacks.filter((callback) => callback.status === "Pending").length;
+    const expensesToday = companyExpenses.reduce((sum, record) => sum + (Number(record.totalExpenses) || 0), 0);
+    const payables = 0;
     const profitToday = Math.max(0, cashCollected - expensesToday - payables);
     const performance = salesToday > 0 ? Math.round((cashCollected / salesToday) * 100) : 0;
 

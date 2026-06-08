@@ -177,8 +177,9 @@ export function getCompanyCallbacks(user?: SessionUser) {
 export function getCompanyRecordings(user?: SessionUser): Array<CallRecording & { date: string; outcome: string }> {
   const calls = getCompanyQueueCalls(user);
   const callIds = new Set(calls.map((call) => call.id));
+  if (callIds.size === 0) return [];
   return getCallRecordings()
-    .filter((recording) => callIds.size === 0 || callIds.has(recording.callId))
+    .filter((recording) => callIds.has(recording.callId))
     .map((recording, index) => ({
       ...recording,
       date: new Date(Date.now() - index * 86_400_000).toISOString().slice(0, 10),
@@ -195,15 +196,14 @@ export function getPerformanceRows(user?: SessionUser) {
   const todayDate = today();
   const weekStart = Date.now() - 6 * 86_400_000;
 
-  return agents.map((agent, index) => {
+  return agents.map((agent) => {
     const agentLogs = logs.filter((log) => log.agent === agent.name);
-    const callsToday = agentLogs.filter((log) => log.date === todayDate).length + (index === 0 ? 8 : 4);
-    const callsThisWeek = agentLogs.filter((log) => new Date(log.date).getTime() >= weekStart).length + 25 - index * 2;
-    const ordersTaken = orders.filter((order) => order.createdBy === agent.name).length + 5 - Math.min(index, 4);
+    const callsToday = agentLogs.filter((log) => log.date === todayDate).length;
+    const callsThisWeek = agentLogs.filter((log) => new Date(log.date).getTime() >= weekStart).length;
+    const ordersTaken = orders.filter((order) => order.createdBy === agent.name).length;
     const complaintsResolved =
-      complaints.filter((complaint) => complaint.agent === agent.name && ["Resolved", "Closed"].includes(complaint.status)).length +
-      Math.max(1, 4 - index);
-    const paymentFollowUps = payments.filter((payment) => payment.agent === agent.name).length + Math.max(1, 7 - index);
+      complaints.filter((complaint) => complaint.agent === agent.name && ["Resolved", "Closed"].includes(complaint.status)).length;
+    const paymentFollowUps = payments.filter((payment) => payment.agent === agent.name).length;
     const performance = Math.min(99, Math.round((ordersTaken * 8 + callsToday * 4 + complaintsResolved * 10 + paymentFollowUps * 3) / 2));
 
     return {
@@ -213,7 +213,7 @@ export function getPerformanceRows(user?: SessionUser) {
       ordersTaken,
       complaintsResolved,
       paymentFollowUps,
-      averageCallTime: `${3 + index}:2${index}`,
+      averageCallTime: "0:00",
       performance
     };
   });

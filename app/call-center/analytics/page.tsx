@@ -44,7 +44,7 @@ function AnalyticsContent({ user }: { user: SessionUser }) {
     totalCalls: todaysLogs.length + calls.filter((call) => call.startedAt.slice(0, 10) === today()).length,
     answered: todaysLogs.filter((log) => log.outcome === "Closed").length + calls.filter((call) => call.status === "Active").length,
     missed: calls.filter((call) => call.status === "Missed").length,
-    avgTalk: "4m 18s",
+    avgTalk: secondsLabel(0),
     avgWait: secondsLabel(getAverageWaitSeconds(calls)),
     orders: orders.filter((order) => order.createdAt.slice(0, 10) === today()).length,
     promises: payments.filter((payment) => payment.createdAt.slice(0, 10) === today()).length,
@@ -76,9 +76,9 @@ function AnalyticsContent({ user }: { user: SessionUser }) {
                     <td className="font-bold text-slate-950">{agent.name}</td>
                     <td>{agent.extension}</td>
                     <td>{agent.status}</td>
-                    <td>{Math.max(1, todaysLogs.filter((log) => log.agent === agent.name).length + index)}</td>
-                    <td>{Math.max(0, metrics.orders - index)}</td>
-                    <td>{Math.max(0, metrics.promises - index)}</td>
+                    <td>{todaysLogs.filter((log) => log.agent === agent.name).length}</td>
+                    <td>{orders.filter((order) => order.createdBy === agent.name && order.createdAt.slice(0, 10) === today()).length}</td>
+                    <td>{payments.filter((payment) => payment.agent === agent.name && payment.createdAt.slice(0, 10) === today()).length}</td>
                   </tr>
                 ))}
               </tbody>

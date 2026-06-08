@@ -57,6 +57,7 @@ export type RawMaterialRow = {
   minimumLevel: number;
   reorderLevel: number;
   status: "Sufficient" | "Low Stock" | "Reorder Immediately";
+  lastUpdated?: string;
 };
 
 const RAW_MATERIAL_MOVEMENTS_KEY = "kingapp.rawMaterialMovements";
@@ -202,37 +203,11 @@ export function ensureDefaultRawMaterials() {
   defaultRawMaterials.forEach((material) => {
     const normalizedMaterial = normalizeMaster(material);
     const key = masterKey(normalizedMaterial);
-    const openingId = `DEFAULT-RAW-${key.replace(/[^A-Z0-9]+/g, "-")}`;
     const masterExists = seededMaster.some((record) => masterKey(record) === key);
 
     if (!masterExists) {
       seededMaster.push(normalizedMaterial);
       masterChanged = true;
-    }
-
-    const hasOpening = seededMovements.some(
-      (movement) =>
-        movement.id === openingId ||
-        (movement.movementType === "Opening Stock" &&
-          (movement.materialCode === normalizedMaterial.materialCode ||
-            (movement.companyId === normalizedMaterial.companyId && materialKey(movement.materialName) === materialKey(normalizedMaterial.materialName))))
-    );
-
-    if (!hasOpening) {
-      seededMovements.push({
-        id: openingId,
-        date: new Date().toISOString().slice(0, 10),
-        companyId: normalizedMaterial.companyId,
-        materialCode: normalizedMaterial.materialCode,
-        materialName: normalizedMaterial.materialName,
-        unit: normalizedMaterial.unit,
-        movementType: "Opening Stock",
-        quantity: normalizedMaterial.openingStock,
-        reference: "Default Raw Material Master",
-        user: "System",
-        notes: "Seeded for production planning"
-      });
-      movementsChanged = true;
     }
 
     const minimumIndex = seededMinimums.findIndex(
@@ -330,7 +305,7 @@ export function upsertRawMaterialMaster(material: RawMaterialMaster) {
       movement.movementType === "Opening Stock"
   );
 
-  if (!hasOpening && normalizedMaterial.openingStock > 0) {
+  if (!hasOpening && normalizedMaterial.openingStock > 0 && !material.id) {
     addRawMaterialMovement({
       date: new Date().toISOString().slice(0, 10),
       companyId: normalizedMaterial.companyId,
@@ -435,7 +410,8 @@ export function getRawMaterialRows({
         remainingStock: 0,
         minimumLevel: minimum?.minimumLevel ?? 0,
         reorderLevel: minimum?.reorderLevel ?? Math.floor((minimum?.minimumLevel ?? 0) / 2),
-        status: "Sufficient"
+        status: "Sufficient",
+        lastUpdated: undefined
       });
     }
 
@@ -493,6 +469,10 @@ export function getRawMaterialRows({
       } else {
         row.rawMaterialOut += Math.abs(movement.quantity);
       }
+    }
+
+    if (!row.lastUpdated || movement.date > row.lastUpdated) {
+      row.lastUpdated = movement.date;
     }
   });
 

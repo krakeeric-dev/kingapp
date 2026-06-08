@@ -223,7 +223,7 @@ function activeClient(client: PortalClient) {
 }
 
 export function getSuppliers() {
-  const suppliers = readJson<PortalSupplier[]>(SUPPLIERS_KEY, defaultSuppliers);
+  const suppliers = readJson<PortalSupplier[]>(SUPPLIERS_KEY, []);
   writeJson(SUPPLIERS_KEY, suppliers);
   return suppliers;
 }
@@ -234,7 +234,7 @@ export function saveSuppliers(suppliers: PortalSupplier[]) {
 }
 
 export function getPortalClients() {
-  const clients = readJson<PortalClient[]>(CLIENTS_KEY, defaultClients);
+  const clients = readJson<PortalClient[]>(CLIENTS_KEY, []);
   writeJson(CLIENTS_KEY, clients);
   return clients;
 }
@@ -245,7 +245,7 @@ export function savePortalClients(clients: PortalClient[]) {
 }
 
 export function getSupplierClientLinks() {
-  const links = readJson<SupplierClientLink[]>(LINKS_KEY, defaultLinks);
+  const links = readJson<SupplierClientLink[]>(LINKS_KEY, []);
   writeJson(LINKS_KEY, links);
   return links;
 }

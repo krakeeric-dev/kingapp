@@ -107,41 +107,12 @@ export function getMinimumStocks() {
 }
 
 export function ensureDefaultInventorySetup() {
-  const existingMovements = readJson<InventoryMovement[]>(
-    INVENTORY_MOVEMENTS_KEY,
-    []
-  );
   const existingMinimums = readJson<MinimumStock[]>(MINIMUM_STOCK_KEY, []);
-  let movementsChanged = false;
   let minimumsChanged = false;
-  const seededMovements = [...existingMovements];
   const seededMinimums = [...existingMinimums];
 
   defaultProducts.forEach((product) => {
     const key = productKey(product.name, product.itemCode);
-    const openingId = `DEFAULT-OPENING-${product.itemCode}`;
-    const hasOpeningStock = seededMovements.some(
-      (movement) =>
-        movement.id === openingId ||
-        (movement.movementType === "Opening Stock" &&
-          productKey(movement.productName, movement.itemCode) === key)
-    );
-
-    if (!hasOpeningStock) {
-      seededMovements.push({
-        id: openingId,
-        date: new Date().toISOString().slice(0, 10),
-        productName: product.name,
-        itemCode: product.itemCode,
-        movementType: "Opening Stock",
-        quantity: product.openingStock,
-        reference: "Default Product Master",
-        user: "System",
-        notes: `${product.unit} - ${product.category}`
-      });
-      movementsChanged = true;
-    }
-
     const minimumIndex = seededMinimums.findIndex(
       (item) => item.productKey === key
     );
@@ -164,10 +135,6 @@ export function ensureDefaultInventorySetup() {
       minimumsChanged = true;
     }
   });
-
-  if (movementsChanged) {
-    writeJson(INVENTORY_MOVEMENTS_KEY, seededMovements);
-  }
 
   if (minimumsChanged) {
     writeJson(MINIMUM_STOCK_KEY, seededMinimums);

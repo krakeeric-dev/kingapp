@@ -29,16 +29,16 @@ export type ChatChannel = {
 const CHAT_KEY = "kingapp.callCenter.chatMessages";
 
 export const chatChannels: ChatChannel[] = [
-  { id: "management", name: "#management", onlineCount: 5, unreadCount: 2 },
-  { id: "dispatch", name: "#dispatch", onlineCount: 4, unreadCount: 1 },
-  { id: "loading", name: "#loading", onlineCount: 6, unreadCount: 0 },
-  { id: "storekeepers", name: "#storekeepers", onlineCount: 3, unreadCount: 1 },
-  { id: "accounting", name: "#accounting", onlineCount: 2, unreadCount: 0 },
-  { id: "call-center", name: "#call-center", onlineCount: 8, unreadCount: 4 },
-  { id: "agahozo-water", name: "#agahozo-water", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", onlineCount: 7, unreadCount: 3 },
-  { id: "teju-juice", name: "#teju-juice", companyId: "COMP-TEJU", companyName: "Teju Juice", onlineCount: 4, unreadCount: 1 },
-  { id: "king-honey", name: "#king-honey", companyId: "COMP-KING-HONEY", companyName: "King Honey", onlineCount: 3, unreadCount: 0 },
-  { id: "king-eggs", name: "#king-eggs", companyId: "COMP-KING-EGGS", companyName: "King Eggs", onlineCount: 3, unreadCount: 2 }
+  { id: "management", name: "#management", onlineCount: 0, unreadCount: 0 },
+  { id: "dispatch", name: "#dispatch", onlineCount: 0, unreadCount: 0 },
+  { id: "loading", name: "#loading", onlineCount: 0, unreadCount: 0 },
+  { id: "storekeepers", name: "#storekeepers", onlineCount: 0, unreadCount: 0 },
+  { id: "accounting", name: "#accounting", onlineCount: 0, unreadCount: 0 },
+  { id: "call-center", name: "#call-center", onlineCount: 0, unreadCount: 0 },
+  { id: "agahozo-water", name: "#agahozo-water", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", onlineCount: 0, unreadCount: 0 },
+  { id: "teju-juice", name: "#teju-juice", companyId: "COMP-TEJU", companyName: "Teju Juice", onlineCount: 0, unreadCount: 0 },
+  { id: "king-honey", name: "#king-honey", companyId: "COMP-KING-HONEY", companyName: "King Honey", onlineCount: 0, unreadCount: 0 },
+  { id: "king-eggs", name: "#king-eggs", companyId: "COMP-KING-EGGS", companyName: "King Eggs", onlineCount: 0, unreadCount: 0 }
 ];
 
 const seedMessages: ChatMessage[] = [
@@ -91,7 +91,7 @@ function makeId(prefix: string) {
 }
 
 export function getChatMessages() {
-  const messages = readJson<ChatMessage[]>(CHAT_KEY, seedMessages);
+  const messages = readJson<ChatMessage[]>(CHAT_KEY, []);
   writeJson(CHAT_KEY, messages);
   return messages;
 }
