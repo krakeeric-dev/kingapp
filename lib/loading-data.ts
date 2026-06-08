@@ -42,7 +42,9 @@ export type AuditLogEntry = {
     | "user_edited"
     | "user_deactivated"
     | "user_password_reset"
-    | "user_removed";
+    | "user_removed"
+    | "historical_data_delete"
+    | "business_data_reset";
   reason: string;
   performedBy: string;
   performedByRole: string;

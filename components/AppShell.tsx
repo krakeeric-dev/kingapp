@@ -201,7 +201,7 @@ const navItems: NavItem[] = [
   },
   {
     href: "/admin/reset-data",
-    label: "Reset Data",
+    label: "Historical Data",
     icon: RotateCcw,
     roles: getAllowedRoles("/admin/reset-data")
   },
