@@ -1,7 +1,7 @@
 import type { SessionUser } from "@/lib/auth";
 import type { CashRecord } from "@/lib/cash-data";
 import { mirrorRecordsToSupabase } from "@/lib/live-data";
-import { appendAuditLog, getTodayIsoDate } from "@/lib/loading-data";
+import { appendAuditLog, getTodayIsoDate, logAuditEvent } from "@/lib/loading-data";
 import { dedupeById } from "@/lib/record-utils";
 
 export type ExpenseStatus = "Pending" | "Paid" | "Submitted" | "expenses_submitted";
@@ -186,10 +186,21 @@ export function submitExpenseRecord(
         updatedAt: now
       };
 
-  return {
-    record,
-    records: upsertExpenseRecord(record)
-  };
+  const records = upsertExpenseRecord(record);
+  logAuditEvent({
+    action: "expenses_submitted",
+    companyId: accountant.companyId,
+    companyName: accountant.companyName,
+    module: "Expenses",
+    newValue: record,
+    oldValue: existingRecord,
+    recordId: record.id,
+    reason: "Expenses submitted",
+    status: "success",
+    user: accountant
+  });
+
+  return { record, records };
 }
 
 export function submitBusinessExpenseRecord(
@@ -250,10 +261,21 @@ export function submitBusinessExpenseRecord(
         updatedAt: now
       };
 
-  return {
-    record,
-    records: upsertExpenseRecord(record)
-  };
+  const records = upsertExpenseRecord(record);
+  logAuditEvent({
+    action: "expenses_submitted",
+    companyId: accountant.companyId,
+    companyName: accountant.companyName,
+    module: "Expenses",
+    newValue: record,
+    oldValue: existingRecord,
+    recordId: record.id,
+    reason: "Business expense submitted",
+    status: "success",
+    user: accountant
+  });
+
+  return { record, records };
 }
 
 export function submitGeneralExpenseRecord(
@@ -321,10 +343,21 @@ export function submitGeneralExpenseRecord(
         updatedAt: now
       };
 
-  return {
-    record,
-    records: upsertExpenseRecord(record)
-  };
+  const records = upsertExpenseRecord(record);
+  logAuditEvent({
+    action: "expenses_submitted",
+    companyId: accountant.companyId,
+    companyName: accountant.companyName,
+    module: "Expenses",
+    newValue: record,
+    oldValue: existingRecord,
+    recordId: record.id,
+    reason: "General expense submitted",
+    status: "success",
+    user: accountant
+  });
+
+  return { record, records };
 }
 
 export function upsertExpenseRecord(record: ExpenseRecord) {

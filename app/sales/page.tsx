@@ -379,7 +379,8 @@ function SalesContent({ user }: { user: SessionUser }) {
       load,
       soldCartons,
       existingRecord,
-      clientSales
+      clientSales,
+      user
     );
     const updatedClients = upsertClientsFromSales({
       clientSales,

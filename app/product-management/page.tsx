@@ -13,6 +13,7 @@ import {
 import {
   formatMoney
 } from "@/lib/sales-data";
+import { logAuditEvent } from "@/lib/loading-data";
 import {
   getProductsForCompany,
   hardDeleteProduct,
@@ -155,7 +156,7 @@ function ProductManagementContent({ user }: { user: SessionUser }) {
     }
 
     const company = companies.find((item) => item.id === form.companyId);
-    upsertProduct({
+    const productPayload = {
       id: editingProductId || undefined,
       cartonSize,
       category: form.category.trim() || "Beverage",
@@ -169,6 +170,20 @@ function ProductManagementContent({ user }: { user: SessionUser }) {
       pricePerCarton: price,
       status: form.status,
       unit: "Cartons"
+    };
+    const oldProduct = products.find((product) => (product.id ?? product.itemCode) === editingProductId);
+    upsertProduct(productPayload);
+    logAuditEvent({
+      action: editingProductId ? "product_edited" : "product_created",
+      companyId: form.companyId,
+      companyName: company?.name ?? form.companyName,
+      module: "Products",
+      newValue: productPayload,
+      oldValue: oldProduct,
+      recordId: productPayload.itemCode,
+      reason: editingProductId ? "Product edited" : "Product created",
+      status: "success",
+      user
     });
     refreshProducts(form.companyId);
     setMessage(editingProductId ? "Product updated successfully." : "Product added successfully.");

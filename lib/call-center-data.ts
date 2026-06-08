@@ -1,4 +1,5 @@
 import type { SessionUser } from "@/lib/auth";
+import { logAuditEvent } from "@/lib/loading-data";
 
 export type CallType =
   | "New Order"
@@ -479,6 +480,17 @@ export function addCallLog(input: Omit<CallLog, "id" | "agent">, user: SessionUs
   };
   const records = [record, ...getCallLogs()];
   writeJson(CALL_LOGS_KEY, records);
+  logAuditEvent({
+    action: "call_logged",
+    companyId: user.companyId,
+    companyName: user.companyName,
+    module: "Call Center",
+    newValue: record,
+    recordId: record.id,
+    reason: "Call logged",
+    status: "success",
+    user
+  });
   return records;
 }
 
@@ -506,6 +518,17 @@ export function addPendingOrder(
   };
   const records = [record, ...getPendingOrders()];
   writeJson(ORDERS_KEY, records);
+  logAuditEvent({
+    action: "order_created",
+    companyId: record.companyId,
+    companyName: record.companyName,
+    module: "Call Center Orders",
+    newValue: record,
+    recordId: record.id,
+    reason: "Call center order created",
+    status: "success",
+    user
+  });
   return records;
 }
 
@@ -555,6 +578,17 @@ export function addComplaint(
   };
   const records = [record, ...getComplaints()];
   writeJson(COMPLAINTS_KEY, records);
+  logAuditEvent({
+    action: "complaint_created",
+    companyId: record.companyId,
+    companyName: record.companyName,
+    module: "Complaints",
+    newValue: record,
+    recordId: record.id,
+    reason: "Complaint created",
+    status: "success",
+    user
+  });
   return records;
 }
 

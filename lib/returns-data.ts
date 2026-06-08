@@ -1,6 +1,6 @@
 import type { SessionUser } from "@/lib/auth";
 import { mirrorRecordsToSupabase } from "@/lib/live-data";
-import { appendAuditLog, getTodayIsoDate } from "@/lib/loading-data";
+import { appendAuditLog, getTodayIsoDate, logAuditEvent } from "@/lib/loading-data";
 import { dedupeById } from "@/lib/record-utils";
 import type { SalesRecord } from "@/lib/sales-data";
 
@@ -120,10 +120,21 @@ export function submitReturnRecord(
         updatedAt: now
       };
 
-  return {
-    record,
-    records: upsertReturnRecord(record)
-  };
+  const records = upsertReturnRecord(record);
+  logAuditEvent({
+    action: "returns_received",
+    companyId: storekeeper.companyId,
+    companyName: storekeeper.companyName,
+    module: "Returns",
+    newValue: record,
+    oldValue: existingRecord,
+    recordId: record.id,
+    reason: "Physical returns received",
+    status: "success",
+    user: storekeeper
+  });
+
+  return { record, records };
 }
 
 export function unlockReturnRecord(

@@ -1,6 +1,6 @@
 import type { SessionUser } from "@/lib/auth";
 import { mirrorRecordsToSupabase } from "@/lib/live-data";
-import { appendAuditLog, getTodayIsoDate } from "@/lib/loading-data";
+import { appendAuditLog, getTodayIsoDate, logAuditEvent } from "@/lib/loading-data";
 import { dedupeById } from "@/lib/record-utils";
 import type { SalesRecord } from "@/lib/sales-data";
 
@@ -112,10 +112,21 @@ export function submitCashRecord(
         updatedAt: now
       };
 
-  return {
-    record,
-    records: upsertCashRecord(record)
-  };
+  const records = upsertCashRecord(record);
+  logAuditEvent({
+    action: "cash_received",
+    companyId: accountant.companyId,
+    companyName: accountant.companyName,
+    module: "Cash",
+    newValue: record,
+    oldValue: existingRecord,
+    recordId: record.id,
+    reason: "Cash received from marketer",
+    status: "success",
+    user: accountant
+  });
+
+  return { record, records };
 }
 
 export function upsertCashRecord(record: CashRecord) {

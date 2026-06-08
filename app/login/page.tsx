@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LockKeyhole, LogIn, ShieldCheck, UserRound } from "lucide-react";
 import { authenticateUser, mockUsers, roleLabels } from "@/lib/auth";
 import { KingAppLogo } from "@/components/KingAppLogo";
+import { logAuditEvent } from "@/lib/loading-data";
 import { getSession, saveSession } from "@/lib/storage";
 
 export default function LoginPage() {
@@ -46,6 +47,14 @@ export default function LoginPage() {
       }
 
       saveSession(user);
+      logAuditEvent({
+        action: "login",
+        module: "Login",
+        recordId: user.id,
+        reason: "User logged in",
+        status: "success",
+        user
+      });
       window.location.assign(user.role === "callcenter" ? "/call-center" : "/dashboard");
     } catch {
       setError(

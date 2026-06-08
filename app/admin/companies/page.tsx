@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Building2, Pencil, Plus, Power } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import type { SessionUser } from "@/lib/auth";
+import { logAuditEvent } from "@/lib/loading-data";
 import {
   createCompany,
   getCompanies,
@@ -28,12 +30,12 @@ const emptyForm: CompanyForm = {
 export default function CompaniesPage() {
   return (
     <AppShell allowedRoles={["admin"]}>
-      {() => <CompaniesContent />}
+      {(user) => <CompaniesContent user={user} />}
     </AppShell>
   );
 }
 
-function CompaniesContent() {
+function CompaniesContent({ user }: { user: SessionUser }) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [form, setForm] = useState<CompanyForm>(emptyForm);
   const [editingId, setEditingId] = useState("");
@@ -52,11 +54,37 @@ function CompaniesContent() {
     }
 
     if (editingId) {
+      const oldCompany = companies.find((company) => company.id === editingId);
       setCompanies(updateCompany(editingId, form));
+      logAuditEvent({
+        action: "company_edited",
+        companyId: editingId,
+        companyName: form.name,
+        module: "Companies",
+        newValue: form,
+        oldValue: oldCompany,
+        recordId: editingId,
+        reason: "Company edited",
+        status: "success",
+        user
+      });
       setEditingId("");
       setMessage("Company updated.");
     } else {
-      setCompanies(createCompany(form));
+      const updatedCompanies = createCompany(form);
+      const createdCompany = updatedCompanies[0];
+      setCompanies(updatedCompanies);
+      logAuditEvent({
+        action: "company_created",
+        companyId: createdCompany.id,
+        companyName: createdCompany.name,
+        module: "Companies",
+        newValue: createdCompany,
+        recordId: createdCompany.id,
+        reason: "Company created",
+        status: "success",
+        user
+      });
       setMessage("Company created.");
     }
     setForm(emptyForm);

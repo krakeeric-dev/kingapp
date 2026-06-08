@@ -1,4 +1,5 @@
 import { getActivePrice, getProducts } from "@/lib/products-data";
+import { logAuditEvent } from "@/lib/loading-data";
 
 export type ClientOrderStatus =
   | "Pending"
@@ -421,6 +422,16 @@ export function createClientOrder(
   };
   const orders = [order, ...getClientOrders()];
   saveClientOrders(orders);
+  logAuditEvent({
+    action: "order_created",
+    companyId: order.companyId,
+    companyName: order.companyName,
+    module: "Client Orders",
+    newValue: order,
+    recordId: order.id,
+    reason: "Client order created",
+    status: "success"
+  });
   return { order, orders };
 }
 
@@ -446,7 +457,20 @@ export function updateClientOrderStatus(
         }
       : order
   );
+  const oldOrder = getClientOrders().find((order) => order.id === orderId);
   saveClientOrders(orders);
+  const updatedOrder = orders.find((order) => order.id === orderId);
+  logAuditEvent({
+    action: `order_${status.toLowerCase().replace(/\s+/g, "_")}`,
+    companyId: updatedOrder?.companyId,
+    companyName: updatedOrder?.companyName,
+    module: "Client Orders",
+    oldValue: oldOrder,
+    newValue: updatedOrder,
+    recordId: orderId,
+    reason: `Order status changed to ${status}`,
+    status: "success"
+  });
   return orders;
 }
 

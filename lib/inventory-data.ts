@@ -1,6 +1,6 @@
 import type { SessionUser } from "@/lib/auth";
 import { mirrorRecordsToSupabase } from "@/lib/live-data";
-import { appendAuditLog, type LoadingRecord } from "@/lib/loading-data";
+import { appendAuditLog, logAuditEvent, type LoadingRecord } from "@/lib/loading-data";
 import { defaultProducts, productMasterKey } from "@/lib/products-data";
 import type { ReturnRecord } from "@/lib/returns-data";
 
@@ -98,6 +98,16 @@ export function addInventoryMovement(movement: Omit<InventoryMovement, "id">) {
   const record = createInventoryMovement(movement);
   const updatedRecords = [record, ...records];
   saveInventoryMovements(updatedRecords);
+  if (record.movementType === "Stock Received") {
+    logAuditEvent({
+      action: "stock_received",
+      module: "Inventory",
+      newValue: record,
+      recordId: record.id,
+      reason: "Finished goods stock received",
+      status: "success"
+    });
+  }
   return updatedRecords;
 }
 

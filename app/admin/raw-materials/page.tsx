@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Factory, Pencil, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import type { SessionUser } from "@/lib/auth";
+import { logAuditEvent } from "@/lib/loading-data";
 import {
   getActiveCompanyId,
   getCompanies,
@@ -164,7 +165,7 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
     }
 
     const company = companies.find((item) => item.id === form.companyId);
-    upsertRawMaterialMaster({
+    const materialPayload = {
       id: editingId || undefined,
       category: form.category.trim() || "Production",
       companyId: form.companyId,
@@ -176,6 +177,20 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
       reorderLevel,
       status: form.status,
       unit: form.unit.trim()
+    };
+    const oldMaterial = materials.find((material) => (material.id ?? material.materialCode) === editingId);
+    upsertRawMaterialMaster(materialPayload);
+    logAuditEvent({
+      action: editingId ? "raw_material_edited" : "raw_material_created",
+      companyId: form.companyId,
+      companyName: company?.name ?? form.companyName,
+      module: "Raw Materials",
+      newValue: materialPayload,
+      oldValue: oldMaterial,
+      recordId: materialPayload.materialCode,
+      reason: editingId ? "Raw material edited" : "Raw material created",
+      status: "success",
+      user
     });
     refreshMaterials(form.companyId);
     setMessage(editingId ? "Raw material updated successfully." : "Raw material added successfully.");

@@ -10,6 +10,7 @@ import {
   type PortalSupplier
 } from "@/lib/client-portal-data";
 import { createInternalNotification } from "@/lib/messageService";
+import { logAuditEvent } from "@/lib/loading-data";
 
 export type ClientMessageType =
   | "General message"
@@ -277,6 +278,16 @@ export function createClientMessage(input: {
     createdAt: new Date().toISOString()
   };
   const messages = saveClientMessages([message, ...getClientMessages()]);
+  logAuditEvent({
+    action: "message_sent",
+    companyId: message.companyId,
+    companyName: message.companyName,
+    module: "Client Messages",
+    newValue: message,
+    recordId: message.id,
+    reason: "Client message sent",
+    status: "success"
+  });
   createInternalNotification({
     type: "message",
     title: `New client message: ${message.clientName}`,
@@ -310,7 +321,18 @@ export function replyToClientMessage(input: {
   const messages = getClientMessages().map((item) =>
     item.threadId === input.threadId ? { ...item, status: "Replied" as const, readByStaff: true } : item
   );
-  return saveClientMessages([message, ...messages]);
+  const updatedMessages = saveClientMessages([message, ...messages]);
+  logAuditEvent({
+    action: "message_sent",
+    companyId: message.companyId,
+    companyName: message.companyName,
+    module: "Client Messages",
+    newValue: message,
+    recordId: message.id,
+    reason: "Client message reply sent",
+    status: "success"
+  });
+  return updatedMessages;
 }
 
 export function closeClientMessageThread(threadId: string) {

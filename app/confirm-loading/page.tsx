@@ -8,6 +8,7 @@ import type { LoadingRecord } from "@/lib/loading-data";
 import {
   formatDate,
   getLoadingRecords,
+  logAuditEvent,
   saveLoadingRecords,
   statusChipClass,
   statusLabels
@@ -58,12 +59,27 @@ function ConfirmLoadingContent({ user }: { user: SessionUser }) {
   }
 
   function confirmRecord(recordId: string) {
+    const record = records.find((item) => item.id === recordId);
     updateRecord(recordId, {
       status: "confirmed",
       locked: true,
       confirmedAt: new Date().toISOString(),
       rejectionReason: ""
     });
+    if (record) {
+      logAuditEvent({
+        action: "loading_confirmed",
+        companyId: user.companyId,
+        companyName: user.companyName,
+        module: "Confirm Loading",
+        newValue: { status: "confirmed", loadedCartons: record.loadedCartons },
+        oldValue: record,
+        recordId,
+        reason: "Marketer confirmed loaded stock",
+        status: "success",
+        user
+      });
+    }
   }
 
   function rejectRecord(event: FormEvent<HTMLFormElement>) {
@@ -75,12 +91,27 @@ function ConfirmLoadingContent({ user }: { user: SessionUser }) {
       return;
     }
 
+    const record = records.find((item) => item.id === activeRejectId);
     updateRecord(activeRejectId, {
       status: "rejected",
       locked: false,
       rejectedAt: new Date().toISOString(),
       rejectionReason: rejectionReason.trim()
     });
+    if (record) {
+      logAuditEvent({
+        action: "loading_rejected",
+        companyId: user.companyId,
+        companyName: user.companyName,
+        module: "Confirm Loading",
+        newValue: { status: "rejected", rejectionReason: rejectionReason.trim() },
+        oldValue: record,
+        recordId: activeRejectId,
+        reason: rejectionReason.trim(),
+        status: "success",
+        user
+      });
+    }
     setActiveRejectId("");
     setRejectionReason("");
   }

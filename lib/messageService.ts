@@ -1,4 +1,5 @@
 import type { SessionUser } from "@/lib/auth";
+import { logAuditEvent } from "@/lib/loading-data";
 import {
   getCallbacks,
   getCallLogs,
@@ -191,6 +192,17 @@ export function sendInternalMessage(input: Pick<InternalMessage, "body" | "subje
   };
   const messages = [message, ...getMessages()];
   writeJson(MESSAGES_KEY, messages);
+  logAuditEvent({
+    action: "message_sent",
+    companyId: user.companyId,
+    companyName: user.companyName,
+    module: "Messages",
+    newValue: message,
+    recordId: message.id,
+    reason: "Internal message sent",
+    status: "success",
+    user
+  });
   createInternalNotification({
     type: "message",
     title: `Message from ${user.displayName}`,
@@ -220,6 +232,17 @@ export function sendConversationMessage(
   };
   const messages = [message, ...getMessages()];
   writeJson(MESSAGES_KEY, messages);
+  logAuditEvent({
+    action: "message_sent",
+    companyId: user.companyId,
+    companyName: user.companyName,
+    module: "Messages",
+    newValue: message,
+    recordId: message.id,
+    reason: "Conversation message sent",
+    status: "success",
+    user
+  });
   return messages;
 }
 

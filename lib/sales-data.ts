@@ -3,6 +3,7 @@ import { mirrorRecordsToSupabase } from "@/lib/live-data";
 import {
   appendAuditLog,
   getTodayIsoDate,
+  logAuditEvent,
   type LoadingRecord
 } from "@/lib/loading-data";
 import { dedupeById } from "@/lib/record-utils";
@@ -223,7 +224,8 @@ export function submitSalesRecord(
   loadingRecord: LoadingRecord,
   soldCartons: number,
   existingRecord?: SalesRecord,
-  clientSales: ClientSaleLine[] = []
+  clientSales: ClientSaleLine[] = [],
+  user?: SessionUser
 ) {
   const now = new Date().toISOString();
   const expectedReturnCartons = loadingRecord.loadedCartons - soldCartons;
@@ -256,7 +258,22 @@ export function submitSalesRecord(
 
   return {
     record,
-    records: upsertSalesRecord(record)
+    records: (() => {
+      const records = upsertSalesRecord(record);
+      logAuditEvent({
+        action: "sales_submitted",
+        companyId: user?.companyId,
+        companyName: user?.companyName,
+        module: "Sales",
+        newValue: record,
+        oldValue: existingRecord,
+        recordId: record.id,
+        reason: "Sales submitted",
+        status: "success",
+        user
+      });
+      return records;
+    })()
   };
 }
 

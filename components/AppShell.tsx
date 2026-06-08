@@ -36,6 +36,7 @@ import {
 import type { SessionUser, UserRole } from "@/lib/auth";
 import { KingAppLogo } from "@/components/KingAppLogo";
 import { cleanupLegacyDemoProductData } from "@/lib/data-cleanup";
+import { logAuditEvent } from "@/lib/loading-data";
 import { syncSupabaseToLocalStorage } from "@/lib/live-data";
 import { canAccessRoute, getAllowedRoles } from "@/lib/permissions";
 import { roleLabels } from "@/lib/auth";
@@ -356,6 +357,16 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
   }, []);
 
   function handleLogout() {
+    if (user) {
+      logAuditEvent({
+        action: "logout",
+        module: "Login",
+        recordId: user.id,
+        reason: "User logged out",
+        status: "success",
+        user
+      });
+    }
     clearSession();
     router.replace("/login");
   }

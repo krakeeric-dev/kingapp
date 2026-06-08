@@ -11,6 +11,7 @@ import {
   createRecordId,
   getLoadingRecords,
   getTodayIsoDate,
+  logAuditEvent,
   upsertLoadingRecord
 } from "@/lib/loading-data";
 import {
@@ -220,6 +221,17 @@ function LoadingContent({ user }: { user: SessionUser }) {
 
     const record = buildRecord("draft");
     const updatedRecords = upsertLoadingRecord(record);
+    logAuditEvent({
+      action: "loading_created",
+      companyId: user.companyId,
+      companyName: user.companyName,
+      module: "Loading",
+      newValue: record,
+      recordId: record.id,
+      reason: "Loading record saved as draft",
+      status: "success",
+      user
+    });
     setRecords(updatedRecords);
     setForm((current) => ({ ...current, id: record.id }));
     setMessage("Loading record saved as draft.");
@@ -238,6 +250,17 @@ function LoadingContent({ user }: { user: SessionUser }) {
 
     const record = buildRecord("pending");
     const updatedRecords = upsertLoadingRecord(record);
+    logAuditEvent({
+      action: "loading_submitted",
+      companyId: user.companyId,
+      companyName: user.companyName,
+      module: "Loading",
+      newValue: record,
+      recordId: record.id,
+      reason: "Loading record submitted for marketer confirmation",
+      status: "success",
+      user
+    });
     setRecords(updatedRecords);
     resetForm();
     setMessage("Loading record submitted for marketer confirmation.");

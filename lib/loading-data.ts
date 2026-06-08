@@ -29,23 +29,20 @@ export type LoadingRecord = {
 
 export type AuditLogEntry = {
   id: string;
+  date?: string;
+  time?: string;
+  userId?: string;
+  username?: string;
+  role?: string;
+  companyId?: string;
+  companyName?: string;
+  module?: string;
   recordId: string;
-  action:
-    | "unlock"
-    | "unlock_sales"
-    | "unlock_cash"
-    | "unlock_return"
-    | "unlock_expenses"
-    | "inventory_adjustment"
-    | "price_change"
-    | "user_created"
-    | "user_edited"
-    | "user_deactivated"
-    | "user_password_reset"
-    | "user_removed"
-    | "historical_data_delete"
-    | "business_data_reset";
+  action: string;
+  oldValue?: string;
+  newValue?: string;
   reason: string;
+  status?: string;
   performedBy: string;
   performedByRole: string;
   createdAt: string;
@@ -114,12 +111,12 @@ export function upsertLoadingRecord(record: LoadingRecord) {
 }
 
 export function getAuditLog() {
-  return readJson<AuditLogEntry[]>(AUDIT_LOG_KEY, []);
+  return readJson<AuditLogEntry[]>(AUDIT_LOG_KEY, []).map(normalizeAuditEntry);
 }
 
 export function appendAuditLog(entry: AuditLogEntry) {
   const entries = getAuditLog();
-  const updatedEntries = [entry, ...entries];
+  const updatedEntries = [normalizeAuditEntry(entry), ...entries];
   writeJson(AUDIT_LOG_KEY, updatedEntries);
   mirrorRecordsToSupabase(
     "audit_logs",
@@ -127,6 +124,77 @@ export function appendAuditLog(entry: AuditLogEntry) {
     (record) => record.id,
     (record) => record.createdAt
   );
+}
+
+export function logAuditEvent(input: {
+  action: string;
+  companyId?: string;
+  companyName?: string;
+  module: string;
+  newValue?: unknown;
+  oldValue?: unknown;
+  reason?: string;
+  recordId: string;
+  status?: string;
+  user?: SessionUser | null;
+}) {
+  const now = new Date();
+  appendAuditLog({
+    id: `AUD-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase(),
+    date: now.toISOString().slice(0, 10),
+    time: now.toTimeString().slice(0, 8),
+    userId: input.user?.id ?? "",
+    username: input.user?.username ?? input.user?.displayName ?? "System",
+    role: input.user?.role ?? "system",
+    companyId: input.companyId ?? input.user?.companyId ?? "",
+    companyName: input.companyName ?? input.user?.companyName ?? "",
+    module: input.module,
+    action: input.action,
+    recordId: input.recordId,
+    oldValue: stringifyAuditValue(input.oldValue),
+    newValue: stringifyAuditValue(input.newValue),
+    reason: input.reason ?? input.action,
+    status: input.status ?? "success",
+    performedBy: input.user?.displayName ?? "System",
+    performedByRole: input.user?.role ?? "system",
+    createdAt: now.toISOString()
+  });
+}
+
+function normalizeAuditEntry(entry: AuditLogEntry): AuditLogEntry {
+  const createdAt = entry.createdAt || new Date().toISOString();
+  return {
+    ...entry,
+    date: entry.date ?? createdAt.slice(0, 10),
+    time: entry.time ?? new Date(createdAt).toTimeString().slice(0, 8),
+    username: entry.username ?? entry.performedBy,
+    role: entry.role ?? entry.performedByRole,
+    module: entry.module ?? inferAuditModule(entry.action),
+    status: entry.status ?? "success",
+    createdAt
+  };
+}
+
+function stringifyAuditValue(value: unknown) {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function inferAuditModule(action: string) {
+  if (action.includes("user")) return "Users";
+  if (action.includes("price")) return "Prices";
+  if (action.includes("inventory")) return "Inventory";
+  if (action.includes("cash")) return "Cash";
+  if (action.includes("sales")) return "Sales";
+  if (action.includes("return")) return "Returns";
+  if (action.includes("expense")) return "Expenses";
+  if (action.includes("reset") || action.includes("historical")) return "Admin";
+  return "Loading";
 }
 
 export function unlockLoadingRecord(
