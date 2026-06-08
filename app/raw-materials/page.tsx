@@ -5,14 +5,17 @@ import { Factory, History, PackageMinus, PackagePlus, SlidersHorizontal } from "
 import { AppShell } from "@/components/AppShell";
 import type { SessionUser } from "@/lib/auth";
 import { formatDate } from "@/lib/loading-data";
+import { getCompanyWorkspaceId } from "@/lib/companies-data";
 import { hasPermission } from "@/lib/permissions";
 import {
   addRawMaterialMovement,
   getRawMaterialMinimums,
   getRawMaterialMovements,
+  getRawMaterialsForCompany,
   getRawMaterialRows,
   getRawMaterialTotals,
   saveRawMaterialMinimum,
+  type RawMaterialMaster,
   type RawMaterialMinimum,
   type RawMaterialMovement,
   type RawMaterialMovementType,
@@ -21,6 +24,7 @@ import {
 
 type MovementForm = {
   date: string;
+  materialCode: string;
   materialName: string;
   unit: string;
   movementType: RawMaterialMovementType;
@@ -30,6 +34,7 @@ type MovementForm = {
 };
 
 type MinimumForm = {
+  materialCode: string;
   materialName: string;
   unit: string;
   minimumLevel: string;
@@ -40,6 +45,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 const emptyMovementForm: MovementForm = {
   date: today(),
+  materialCode: "",
   materialName: "",
   unit: "",
   movementType: "Raw Material In",
@@ -49,6 +55,7 @@ const emptyMovementForm: MovementForm = {
 };
 
 const emptyMinimumForm: MinimumForm = {
+  materialCode: "",
   materialName: "",
   minimumLevel: "",
   reorderLevel: "",
@@ -66,29 +73,53 @@ export default function RawMaterialsPage() {
 function RawMaterialsContent({ user }: { user: SessionUser }) {
   const [movements, setMovements] = useState<RawMaterialMovement[]>([]);
   const [minimums, setMinimums] = useState<RawMaterialMinimum[]>([]);
+  const [materials, setMaterials] = useState<RawMaterialMaster[]>([]);
   const [movementForm, setMovementForm] = useState<MovementForm>(emptyMovementForm);
   const [minimumForm, setMinimumForm] = useState<MinimumForm>(emptyMinimumForm);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
+    setMaterials(getRawMaterialsForCompany(getCompanyWorkspaceId(user)));
     setMovements(getRawMaterialMovements());
     setMinimums(getRawMaterialMinimums());
-  }, []);
+  }, [user]);
+
+  const workspaceCompanyId = getCompanyWorkspaceId(user);
+  const companyMovements = useMemo(
+    () =>
+      movements.filter(
+        (movement) => workspaceCompanyId === "all" || movement.companyId === workspaceCompanyId
+      ),
+    [movements, workspaceCompanyId]
+  );
+  const companyMinimums = useMemo(
+    () =>
+      minimums.filter(
+        (minimum) => workspaceCompanyId === "all" || minimum.companyId === workspaceCompanyId
+      ),
+    [minimums, workspaceCompanyId]
+  );
 
   const rows = useMemo(
-    () => getRawMaterialRows({ minimums, movements }),
-    [minimums, movements]
+    () =>
+      getRawMaterialRows({
+        companyId: workspaceCompanyId,
+        materials,
+        minimums: companyMinimums,
+        movements: companyMovements
+      }),
+    [companyMinimums, companyMovements, materials, workspaceCompanyId]
   );
 
   const totals = useMemo(() => getRawMaterialTotals(rows), [rows]);
   const todayDate = today();
   const dailyUsage = useMemo(
     () =>
-      movements
+      companyMovements
         .filter((movement) => movement.date === todayDate && movement.movementType === "Raw Material Out")
         .reduce((total, movement) => total + movement.quantity, 0),
-    [movements, todayDate]
+    [companyMovements, todayDate]
   );
   const totalMinimumLevel = useMemo(
     () => rows.reduce((total, row) => total + row.minimumLevel, 0),
@@ -113,6 +144,7 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
 
     setMovementForm((current) => ({
       ...current,
+      materialCode: row?.materialCode ?? "",
       materialName,
       unit: row?.unit ?? current.unit
     }));
@@ -143,14 +175,15 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
     setMovements(
       addRawMaterialMovement({
         date: movementForm.date,
+        companyId: workspaceCompanyId === "all" ? user.companyId : workspaceCompanyId,
+        materialCode: movementForm.materialCode,
         materialName: movementForm.materialName.trim(),
         unit: movementForm.unit.trim(),
         movementType: movementForm.movementType,
         quantity,
         reference: movementForm.reference.trim() || movementForm.movementType,
         user: user.displayName,
-        notes: movementForm.notes.trim(),
-        companyId: user.companyId
+        notes: movementForm.notes.trim()
       })
     );
     setMovementForm({ ...emptyMovementForm, date: today() });
@@ -188,6 +221,8 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
     setMinimums(
       saveRawMaterialMinimum({
         materialName: minimumForm.materialName.trim(),
+        companyId: workspaceCompanyId === "all" ? user.companyId : workspaceCompanyId,
+        materialCode: minimumForm.materialCode,
         minimumLevel,
         reorderLevel,
         unit: minimumForm.unit.trim()
@@ -289,7 +324,7 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
           <History className="h-5 w-5 text-brand-700" />
           <h3 className="text-lg font-bold text-slate-950">Raw Material Movement History</h3>
         </div>
-        <MovementHistory records={movements} />
+        <MovementHistory records={companyMovements} />
       </section>
     </div>
   );
@@ -383,6 +418,7 @@ function MinimumFormCard({
   function selectMaterial(materialName: string) {
     const material = materials.find((item) => item.materialName === materialName);
     onChange("materialName", materialName);
+    onChange("materialCode", material?.materialCode ?? "");
     onChange("unit", material?.unit ?? "");
     onChange("minimumLevel", material ? String(material.minimumLevel) : "");
     onChange("reorderLevel", material ? String(material.reorderLevel) : "");

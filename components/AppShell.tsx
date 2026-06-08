@@ -147,6 +147,12 @@ const navItems: NavItem[] = [
     roles: getAllowedRoles("/raw-materials")
   },
   {
+    href: "/admin/raw-materials",
+    label: "Raw Master",
+    icon: Factory,
+    roles: getAllowedRoles("/admin/raw-materials")
+  },
+  {
     href: "/product-management",
     label: "Products",
     icon: PackagePlus,

@@ -311,6 +311,7 @@ export const routePermissions: Record<string, PermissionKey[]> = {
   "/admin/audit-log": ["admin.audit.view"],
   "/admin/users": ["admin.users.manage"],
   "/admin/call-center-numbers": ["admin.permissions.manage"],
+  "/admin/raw-materials": ["rawmaterials.view"],
   "/admin/reset-data": ["admin.historicalData.manage"],
   "/admin/companies": ["admin.companies.manage"]
 };
@@ -356,6 +357,7 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/admin/audit-log": ["admin"],
   "/admin/users": ["admin"],
   "/admin/call-center-numbers": ["admin"],
+  "/admin/raw-materials": ["admin", "manager"],
   "/admin/reset-data": ["admin"],
   "/admin/companies": ["admin"]
 };

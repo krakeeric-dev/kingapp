@@ -7,6 +7,7 @@ export type RawMaterialMovementType =
 export type RawMaterialMovement = {
   id: string;
   date: string;
+  materialCode?: string;
   materialName: string;
   unit: string;
   movementType: RawMaterialMovementType;
@@ -17,7 +18,26 @@ export type RawMaterialMovement = {
   companyId?: string;
 };
 
+export type RawMaterialMasterStatus = "Active" | "Inactive";
+
+export type RawMaterialMaster = {
+  id?: string;
+  companyId?: string;
+  companyName?: string;
+  materialName: string;
+  materialCode: string;
+  category: string;
+  unit: string;
+  openingStock: number;
+  minimumLevel: number;
+  reorderLevel: number;
+  status: RawMaterialMasterStatus;
+  deletedAt?: string;
+};
+
 export type RawMaterialMinimum = {
+  companyId?: string;
+  materialCode?: string;
   materialName: string;
   minimumLevel: number;
   reorderLevel: number;
@@ -25,6 +45,9 @@ export type RawMaterialMinimum = {
 };
 
 export type RawMaterialRow = {
+  companyId?: string;
+  materialCode?: string;
+  category?: string;
   materialName: string;
   unit: string;
   openingStock: number;
@@ -38,6 +61,7 @@ export type RawMaterialRow = {
 
 const RAW_MATERIAL_MOVEMENTS_KEY = "kingapp.rawMaterialMovements";
 const RAW_MATERIAL_MINIMUMS_KEY = "kingapp.rawMaterialMinimums";
+const RAW_MATERIAL_MASTER_KEY = "kingapp.rawMaterialMaster";
 
 const legacyRawMaterialNames: Record<string, string> = {
   "bottle preforms": "Preforms",
@@ -45,21 +69,21 @@ const legacyRawMaterialNames: Record<string, string> = {
   "shrink wrap": "Shrink Film"
 };
 
-const defaultRawMaterials: Array<RawMaterialMinimum & { openingStock: number }> = [
-  { materialName: "Bottle Caps", minimumLevel: 1000, openingStock: 6000, reorderLevel: 500, unit: "Pieces" },
-  { materialName: "Preforms", minimumLevel: 1000, openingStock: 5000, reorderLevel: 500, unit: "Pieces" },
-  { materialName: "Labels", minimumLevel: 1200, openingStock: 7000, reorderLevel: 600, unit: "Pieces" },
-  { materialName: "Cartons", minimumLevel: 150, openingStock: 600, reorderLevel: 75, unit: "Cartons" },
-  { materialName: "Shrink Film", minimumLevel: 100, openingStock: 450, reorderLevel: 50, unit: "Rolls" },
-  { materialName: "Bottle Handles", minimumLevel: 500, openingStock: 2500, reorderLevel: 250, unit: "Pieces" },
-  { materialName: "Water Treatment Chemicals", minimumLevel: 50, openingStock: 220, reorderLevel: 25, unit: "Kg" },
-  { materialName: "Ink / Printing Materials", minimumLevel: 30, openingStock: 120, reorderLevel: 15, unit: "Liters" },
-  { materialName: "Glue", minimumLevel: 40, openingStock: 160, reorderLevel: 20, unit: "Kg" },
-  { materialName: "Packaging Tape", minimumLevel: 60, openingStock: 240, reorderLevel: 30, unit: "Rolls" },
-  { materialName: "Pallets", minimumLevel: 25, openingStock: 90, reorderLevel: 12, unit: "Pieces" },
-  { materialName: "Bottle Sleeves", minimumLevel: 500, openingStock: 2200, reorderLevel: 250, unit: "Pieces" },
-  { materialName: "Disinfectant / Sanitizer", minimumLevel: 40, openingStock: 180, reorderLevel: 20, unit: "Liters" },
-  { materialName: "Machine Lubricants", minimumLevel: 20, openingStock: 80, reorderLevel: 10, unit: "Liters" }
+export const defaultRawMaterials: RawMaterialMaster[] = [
+  { materialName: "Bottle Caps", materialCode: "RAW-CAPS", category: "Packaging", minimumLevel: 1000, openingStock: 6000, reorderLevel: 500, unit: "Pieces", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
+  { materialName: "Preforms", materialCode: "RAW-PREFORMS", category: "Packaging", minimumLevel: 1000, openingStock: 5000, reorderLevel: 500, unit: "Pieces", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
+  { materialName: "Labels", materialCode: "RAW-LABELS", category: "Packaging", minimumLevel: 1200, openingStock: 7000, reorderLevel: 600, unit: "Pieces", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
+  { materialName: "Cartons", materialCode: "RAW-CARTONS", category: "Packaging", minimumLevel: 150, openingStock: 600, reorderLevel: 75, unit: "Cartons", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
+  { materialName: "Shrink Film", materialCode: "RAW-SHRINK", category: "Packaging", minimumLevel: 100, openingStock: 450, reorderLevel: 50, unit: "Rolls", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
+  { materialName: "Bottle Handles", materialCode: "RAW-HANDLES", category: "Packaging", minimumLevel: 500, openingStock: 2500, reorderLevel: 250, unit: "Pieces", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
+  { materialName: "Water Treatment Chemicals", materialCode: "RAW-CHEM", category: "Production", minimumLevel: 50, openingStock: 220, reorderLevel: 25, unit: "Kg", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
+  { materialName: "Ink / Printing Materials", materialCode: "RAW-INK", category: "Production", minimumLevel: 30, openingStock: 120, reorderLevel: 15, unit: "Liters", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
+  { materialName: "Glue", materialCode: "RAW-GLUE", category: "Packaging", minimumLevel: 40, openingStock: 160, reorderLevel: 20, unit: "Kg", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
+  { materialName: "Packaging Tape", materialCode: "RAW-TAPE", category: "Packaging", minimumLevel: 60, openingStock: 240, reorderLevel: 30, unit: "Rolls", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
+  { materialName: "Pallets", materialCode: "RAW-PALLETS", category: "Logistics", minimumLevel: 25, openingStock: 90, reorderLevel: 12, unit: "Pieces", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
+  { materialName: "Bottle Sleeves", materialCode: "RAW-SLEEVES", category: "Packaging", minimumLevel: 500, openingStock: 2200, reorderLevel: 250, unit: "Pieces", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
+  { materialName: "Disinfectant / Sanitizer", materialCode: "RAW-SANITIZER", category: "Production", minimumLevel: 40, openingStock: 180, reorderLevel: 20, unit: "Liters", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
+  { materialName: "Machine Lubricants", materialCode: "RAW-LUBE", category: "Maintenance", minimumLevel: 20, openingStock: 80, reorderLevel: 10, unit: "Liters", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" }
 ];
 
 function readJson<T>(key: string, fallback: T): T {
@@ -93,6 +117,26 @@ function materialKey(materialName: string) {
   return materialName.trim().toLowerCase();
 }
 
+function masterKey(material: Pick<RawMaterialMaster, "companyId" | "materialCode" | "materialName">) {
+  return `${material.companyId ?? "COMP-AGAHOZO"}::${material.materialCode || material.materialName}`.toUpperCase();
+}
+
+function normalizeMaster(material: RawMaterialMaster): RawMaterialMaster {
+  const defaultMaterial = defaultRawMaterials.find(
+    (item) => item.materialCode === material.materialCode || item.materialName === material.materialName
+  );
+
+  return {
+    ...material,
+    id: material.id ?? masterKey(material),
+    companyId: material.companyId ?? defaultMaterial?.companyId ?? "COMP-AGAHOZO",
+    companyName: material.companyName ?? defaultMaterial?.companyName ?? "Agahozo Water",
+    category: material.category || defaultMaterial?.category || "Production",
+    materialCode: material.materialCode || defaultMaterial?.materialCode || material.materialName.toUpperCase().replace(/[^A-Z0-9]+/g, "-"),
+    status: material.status ?? "Active"
+  };
+}
+
 function officialRawMaterialName(materialName: string) {
   return legacyRawMaterialNames[materialKey(materialName)] ?? materialName;
 }
@@ -107,49 +151,83 @@ export function createRawMaterialMovement(
 }
 
 export function ensureDefaultRawMaterials() {
+  const existingMaster = readJson<RawMaterialMaster[]>(RAW_MATERIAL_MASTER_KEY, defaultRawMaterials);
   const existingMovements = readJson<RawMaterialMovement[]>(RAW_MATERIAL_MOVEMENTS_KEY, []);
   const existingMinimums = readJson<RawMaterialMinimum[]>(RAW_MATERIAL_MINIMUMS_KEY, []);
+  const seededMaster = existingMaster.map(normalizeMaster);
+  let masterChanged = false;
   let movementsChanged = false;
   let minimumsChanged = false;
   const seededMovements = existingMovements.map((movement) => {
     const officialName = officialRawMaterialName(movement.materialName);
+    const matchingMaster = seededMaster.find(
+      (material) =>
+        material.materialCode === movement.materialCode ||
+        materialKey(material.materialName) === materialKey(officialName)
+    );
 
-    if (officialName !== movement.materialName) {
+    if (officialName !== movement.materialName || !movement.companyId || !movement.materialCode) {
       movementsChanged = true;
-      return { ...movement, materialName: officialName };
+      return {
+        ...movement,
+        companyId: movement.companyId ?? matchingMaster?.companyId ?? "COMP-AGAHOZO",
+        materialCode: movement.materialCode ?? matchingMaster?.materialCode,
+        materialName: officialName
+      };
     }
 
     return movement;
   });
   const seededMinimums = existingMinimums.map((minimum) => {
     const officialName = officialRawMaterialName(minimum.materialName);
+    const matchingMaster = seededMaster.find(
+      (material) =>
+        material.materialCode === minimum.materialCode ||
+        materialKey(material.materialName) === materialKey(officialName)
+    );
 
-    if (officialName !== minimum.materialName) {
+    if (officialName !== minimum.materialName || !minimum.companyId || !minimum.materialCode) {
       minimumsChanged = true;
-      return { ...minimum, materialName: officialName };
+      return {
+        ...minimum,
+        companyId: minimum.companyId ?? matchingMaster?.companyId ?? "COMP-AGAHOZO",
+        materialCode: minimum.materialCode ?? matchingMaster?.materialCode,
+        materialName: officialName
+      };
     }
 
     return minimum;
   });
 
   defaultRawMaterials.forEach((material) => {
-    const key = materialKey(material.materialName);
-    const openingId = `DEFAULT-RAW-${key.replace(/\s+/g, "-").toUpperCase()}`;
+    const normalizedMaterial = normalizeMaster(material);
+    const key = masterKey(normalizedMaterial);
+    const openingId = `DEFAULT-RAW-${key.replace(/[^A-Z0-9]+/g, "-")}`;
+    const masterExists = seededMaster.some((record) => masterKey(record) === key);
+
+    if (!masterExists) {
+      seededMaster.push(normalizedMaterial);
+      masterChanged = true;
+    }
+
     const hasOpening = seededMovements.some(
       (movement) =>
         movement.id === openingId ||
         (movement.movementType === "Opening Stock" &&
-          materialKey(movement.materialName) === key)
+          (movement.materialCode === normalizedMaterial.materialCode ||
+            (movement.companyId === normalizedMaterial.companyId && materialKey(movement.materialName) === materialKey(normalizedMaterial.materialName))))
     );
 
     if (!hasOpening) {
       seededMovements.push({
         id: openingId,
         date: new Date().toISOString().slice(0, 10),
-        materialName: material.materialName,
-        unit: material.unit,
+        companyId: normalizedMaterial.companyId,
+        materialCode: normalizedMaterial.materialCode,
+        materialName: normalizedMaterial.materialName,
+        unit: normalizedMaterial.unit,
         movementType: "Opening Stock",
-        quantity: material.openingStock,
+        quantity: normalizedMaterial.openingStock,
         reference: "Default Raw Material Master",
         user: "System",
         notes: "Seeded for production planning"
@@ -158,29 +236,41 @@ export function ensureDefaultRawMaterials() {
     }
 
     const minimumIndex = seededMinimums.findIndex(
-      (record) => materialKey(record.materialName) === key
+      (record) =>
+        record.companyId === normalizedMaterial.companyId &&
+        (record.materialCode === normalizedMaterial.materialCode ||
+          materialKey(record.materialName) === materialKey(normalizedMaterial.materialName))
     );
 
     if (minimumIndex >= 0) {
       seededMinimums[minimumIndex] = {
         ...seededMinimums[minimumIndex],
-        minimumLevel: seededMinimums[minimumIndex].minimumLevel || material.minimumLevel,
+        companyId: normalizedMaterial.companyId,
+        materialCode: normalizedMaterial.materialCode,
+        materialName: normalizedMaterial.materialName,
+        minimumLevel: seededMinimums[minimumIndex].minimumLevel || normalizedMaterial.minimumLevel,
         reorderLevel:
           seededMinimums[minimumIndex].reorderLevel ??
-          Math.min(material.reorderLevel, seededMinimums[minimumIndex].minimumLevel || material.minimumLevel),
-        unit: seededMinimums[minimumIndex].unit || material.unit
+          Math.min(normalizedMaterial.reorderLevel, seededMinimums[minimumIndex].minimumLevel || normalizedMaterial.minimumLevel),
+        unit: seededMinimums[minimumIndex].unit || normalizedMaterial.unit
       };
       minimumsChanged = true;
     } else {
       seededMinimums.push({
-        materialName: material.materialName,
-        minimumLevel: material.minimumLevel,
-        reorderLevel: material.reorderLevel,
-        unit: material.unit
+        companyId: normalizedMaterial.companyId,
+        materialCode: normalizedMaterial.materialCode,
+        materialName: normalizedMaterial.materialName,
+        minimumLevel: normalizedMaterial.minimumLevel,
+        reorderLevel: normalizedMaterial.reorderLevel,
+        unit: normalizedMaterial.unit
       });
       minimumsChanged = true;
     }
   });
+
+  if (masterChanged) {
+    writeJson(RAW_MATERIAL_MASTER_KEY, seededMaster);
+  }
 
   if (movementsChanged) {
     writeJson(RAW_MATERIAL_MOVEMENTS_KEY, seededMovements);
@@ -189,6 +279,87 @@ export function ensureDefaultRawMaterials() {
   if (minimumsChanged) {
     writeJson(RAW_MATERIAL_MINIMUMS_KEY, seededMinimums);
   }
+}
+
+export function getRawMaterialMaster() {
+  ensureDefaultRawMaterials();
+  return readJson<RawMaterialMaster[]>(RAW_MATERIAL_MASTER_KEY, defaultRawMaterials).map(normalizeMaster);
+}
+
+export function getRawMaterialsForCompany(companyId?: string, includeInactive = false) {
+  return getRawMaterialMaster().filter((material) => {
+    if (material.deletedAt) return false;
+    if (companyId && companyId !== "all" && material.companyId !== companyId) return false;
+    if (!includeInactive && material.status === "Inactive") return false;
+    return true;
+  });
+}
+
+export function saveRawMaterialMaster(materials: RawMaterialMaster[]) {
+  writeJson(RAW_MATERIAL_MASTER_KEY, materials.map(normalizeMaster));
+  return materials.map(normalizeMaster);
+}
+
+export function upsertRawMaterialMaster(material: RawMaterialMaster) {
+  const normalizedMaterial = normalizeMaster(material);
+  const materials = getRawMaterialMaster();
+  const existingIndex = materials.findIndex((item) => masterKey(item) === masterKey(normalizedMaterial));
+
+  if (existingIndex >= 0) {
+    materials[existingIndex] = {
+      ...materials[existingIndex],
+      ...normalizedMaterial
+    };
+  } else {
+    materials.unshift(normalizedMaterial);
+  }
+
+  saveRawMaterialMinimum({
+    companyId: normalizedMaterial.companyId,
+    materialCode: normalizedMaterial.materialCode,
+    materialName: normalizedMaterial.materialName,
+    minimumLevel: normalizedMaterial.minimumLevel,
+    reorderLevel: normalizedMaterial.reorderLevel,
+    unit: normalizedMaterial.unit
+  });
+
+  const hasOpening = getRawMaterialMovements().some(
+    (movement) =>
+      movement.companyId === normalizedMaterial.companyId &&
+      movement.materialCode === normalizedMaterial.materialCode &&
+      movement.movementType === "Opening Stock"
+  );
+
+  if (!hasOpening && normalizedMaterial.openingStock > 0) {
+    addRawMaterialMovement({
+      date: new Date().toISOString().slice(0, 10),
+      companyId: normalizedMaterial.companyId,
+      materialCode: normalizedMaterial.materialCode,
+      materialName: normalizedMaterial.materialName,
+      unit: normalizedMaterial.unit,
+      movementType: "Opening Stock",
+      quantity: normalizedMaterial.openingStock,
+      reference: "Raw Material Master",
+      user: "Admin",
+      notes: "Opening stock from raw material setup"
+    });
+  }
+
+  return saveRawMaterialMaster(materials);
+}
+
+export function softDeleteRawMaterialMaster(material: RawMaterialMaster) {
+  return upsertRawMaterialMaster({
+    ...material,
+    status: "Inactive",
+    deletedAt: new Date().toISOString()
+  });
+}
+
+export function hardDeleteRawMaterialMaster(material: RawMaterialMaster) {
+  return saveRawMaterialMaster(
+    getRawMaterialMaster().filter((item) => masterKey(item) !== masterKey(material))
+  );
 }
 
 export function getRawMaterialMovements() {
@@ -215,7 +386,10 @@ export function getRawMaterialMinimums() {
 export function saveRawMaterialMinimum(record: RawMaterialMinimum) {
   const records = getRawMaterialMinimums();
   const existingIndex = records.findIndex(
-    (item) => materialKey(item.materialName) === materialKey(record.materialName)
+    (item) =>
+      item.companyId === record.companyId &&
+      ((record.materialCode && item.materialCode === record.materialCode) ||
+        materialKey(item.materialName) === materialKey(record.materialName))
   );
 
   if (existingIndex >= 0) {
@@ -229,19 +403,30 @@ export function saveRawMaterialMinimum(record: RawMaterialMinimum) {
 }
 
 export function getRawMaterialRows({
+  companyId,
+  materials,
   minimums,
   movements
 }: {
+  companyId?: string;
+  materials?: RawMaterialMaster[];
   minimums: RawMaterialMinimum[];
   movements: RawMaterialMovement[];
 }) {
   const rows = new Map<string, RawMaterialRow>();
-  const ensureRow = (materialName: string, unit: string) => {
-    const key = materialKey(materialName);
-    const minimum = minimums.find((record) => materialKey(record.materialName) === key);
+  const activeMaterials = materials ?? getRawMaterialsForCompany(companyId);
+  const ensureRow = (materialName: string, unit: string, materialCode?: string, rowCompanyId?: string, category?: string) => {
+    const key = `${rowCompanyId ?? "COMP-AGAHOZO"}::${materialCode || materialName}`.toLowerCase();
+    const minimum = minimums.find((record) =>
+      record.companyId === rowCompanyId &&
+      ((materialCode && record.materialCode === materialCode) || materialKey(record.materialName) === materialKey(materialName))
+    );
 
     if (!rows.has(key)) {
       rows.set(key, {
+        category,
+        companyId: rowCompanyId,
+        materialCode,
         materialName,
         unit: minimum?.unit ?? unit,
         openingStock: 0,
@@ -257,8 +442,38 @@ export function getRawMaterialRows({
     return rows.get(key)!;
   };
 
+  activeMaterials.forEach((material) => {
+    ensureRow(
+      material.materialName,
+      material.unit,
+      material.materialCode,
+      material.companyId,
+      material.category
+    );
+  });
+
   movements.forEach((movement) => {
-    const row = ensureRow(movement.materialName, movement.unit);
+    if (companyId && companyId !== "all" && movement.companyId !== companyId) return;
+    const hasActiveMaster = activeMaterials.some(
+      (material) =>
+        material.companyId === movement.companyId &&
+        (material.materialCode === movement.materialCode ||
+          materialKey(material.materialName) === materialKey(movement.materialName))
+    );
+    if (!hasActiveMaster && materials) return;
+    const master = activeMaterials.find(
+      (material) =>
+        material.companyId === movement.companyId &&
+        (material.materialCode === movement.materialCode ||
+          materialKey(material.materialName) === materialKey(movement.materialName))
+    );
+    const row = ensureRow(
+      movement.materialName,
+      movement.unit,
+      movement.materialCode,
+      movement.companyId,
+      master?.category
+    );
 
     if (movement.movementType === "Opening Stock") {
       row.openingStock += movement.quantity;
@@ -282,7 +497,15 @@ export function getRawMaterialRows({
   });
 
   minimums.forEach((minimum) => {
-    ensureRow(minimum.materialName, minimum.unit);
+    if (companyId && companyId !== "all" && minimum.companyId !== companyId) return;
+    const hasActiveMaster = activeMaterials.some(
+      (material) =>
+        material.companyId === minimum.companyId &&
+        (material.materialCode === minimum.materialCode ||
+          materialKey(material.materialName) === materialKey(minimum.materialName))
+    );
+    if (!hasActiveMaster && materials) return;
+    ensureRow(minimum.materialName, minimum.unit, minimum.materialCode, minimum.companyId);
   });
 
   return Array.from(rows.values())
