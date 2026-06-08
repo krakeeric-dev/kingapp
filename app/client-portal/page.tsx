@@ -24,6 +24,7 @@ import {
   getLinkedMessageCompaniesForClient,
   getMessagesForPortalClient
 } from "@/lib/clientMessageService";
+import { getDeliveryForOrder } from "@/lib/delivery-data";
 
 export default function ClientPortalPage() {
   const [client, setClient] = useState<PortalClient | null>(null);
@@ -437,10 +438,17 @@ function PortalMetric({ label, value }: { label: string; value: number | string 
 }
 
 function DeliveryNotice({ order }: { order: ClientPortalOrder }) {
+  const delivery = getDeliveryForOrder(order.id);
   const eta = formatEta(order.estimatedArrivalTime, order.estimatedArrivalEndTime);
   const minutesAway = order.driverMinutesAway && order.status === "Out for Delivery"
     ? `Driver is ${order.driverMinutesAway} minutes away.`
     : "";
+  const status = delivery?.status ?? order.status;
+  const truck = delivery?.truck ?? order.deliveryTruck;
+  const driver = delivery?.driver ?? order.deliveryDriver ?? order.deliveryPerson;
+  const etaStart = delivery?.etaStart ?? order.estimatedArrivalTime;
+  const etaEnd = delivery?.etaEnd ?? order.estimatedArrivalEndTime;
+  const deliveryEta = formatEta(etaStart, etaEnd);
 
   return (
     <div className="mt-4 rounded-lg border border-brand-100 bg-brand-50 p-4">
@@ -451,14 +459,19 @@ function DeliveryNotice({ order }: { order: ClientPortalOrder }) {
             Delivery Notice
           </div>
           <p className="mt-2 text-sm font-bold text-slate-800">
-            Order {order.id} - {order.status}
+            Order {order.id} - {status}
           </p>
           <p className="mt-1 text-sm text-slate-600">
             Delivery date: {order.deliveryDate || "Waiting for supplier schedule"}
           </p>
           <p className="mt-1 text-lg font-black text-brand-900">
-            {eta ? `Expected ${eta}` : "ETA not assigned yet"}
+            {deliveryEta || eta ? `Expected ${deliveryEta || eta}` : "ETA not assigned yet"}
           </p>
+          {delivery?.deliveredAt ? (
+            <p className="mt-1 text-sm font-bold text-emerald-700">
+              Delivered: {new Date(delivery.deliveredAt).toLocaleString()}
+            </p>
+          ) : null}
           {minutesAway ? (
             <p className="mt-1 text-sm font-bold text-emerald-700">{minutesAway}</p>
           ) : null}
@@ -466,10 +479,10 @@ function DeliveryNotice({ order }: { order: ClientPortalOrder }) {
         <div className="rounded-lg bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm">
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-brand-700" />
-            {order.deliveryTruck || "Truck pending"}
+            {truck || "Truck pending"}
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Driver: {order.deliveryDriver || order.deliveryPerson || "Pending"}
+            Driver: {driver || "Pending"}
           </p>
         </div>
       </div>

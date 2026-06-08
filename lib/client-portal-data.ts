@@ -4,6 +4,7 @@ import { logAuditEvent } from "@/lib/loading-data";
 export type ClientOrderStatus =
   | "Pending"
   | "Approved"
+  | "Dispatched"
   | "Rejected"
   | "Loaded"
   | "Out for Delivery"

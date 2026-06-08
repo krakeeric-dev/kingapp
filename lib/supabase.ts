@@ -16,6 +16,9 @@ export type SupabaseTable =
   | "cash_records"
   | "returns_records"
   | "expenses_records"
+  | "delivery_records"
+  | "delivery_drivers"
+  | "delivery_vehicles"
   | "audit_logs";
 
 type SupabasePayloadRow<T> = {

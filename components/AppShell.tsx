@@ -29,6 +29,7 @@ import {
   Search,
   ScrollText,
   ShieldCheck,
+  Truck,
   UserRound,
   WalletCards,
   X
@@ -122,6 +123,36 @@ const navItems: NavItem[] = [
     label: "Client Orders",
     icon: ClipboardList,
     roles: getAllowedRoles("/client-orders")
+  },
+  {
+    href: "/delivery",
+    label: "Delivery",
+    icon: Truck,
+    roles: getAllowedRoles("/delivery")
+  },
+  {
+    href: "/delivery/dispatch",
+    label: "Dispatch",
+    icon: Truck,
+    roles: getAllowedRoles("/delivery/dispatch")
+  },
+  {
+    href: "/delivery/routes",
+    label: "Routes",
+    icon: ClipboardList,
+    roles: getAllowedRoles("/delivery/routes")
+  },
+  {
+    href: "/delivery/drivers",
+    label: "Drivers",
+    icon: UserRound,
+    roles: getAllowedRoles("/delivery/drivers")
+  },
+  {
+    href: "/delivery/reports",
+    label: "Delivery Reports",
+    icon: BarChart3,
+    roles: getAllowedRoles("/delivery/reports")
   },
   {
     href: "/client-portal",
@@ -782,6 +813,7 @@ function getMobileNavItems(visibleNav: NavItem[]) {
     "/cash",
     "/returns",
     "/inventory",
+    "/delivery",
     "/product-management",
     "/raw-materials",
     "/expenses",

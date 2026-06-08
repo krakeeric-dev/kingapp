@@ -96,6 +96,7 @@ import {
   getMessagingDashboardStats,
   type TeamAnnouncement
 } from "@/lib/messageService";
+import { filterDeliveriesForUser, getDeliveryRecords, type DeliveryRecord } from "@/lib/delivery-data";
 
 type ActionMode = "order" | "payment" | "complaint" | "delivery" | "callback";
 type DetailTab = "orders" | "payments" | "notes";
@@ -216,6 +217,7 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
   const [assignedNumbers, setAssignedNumbers] = useState<CallCenterNumber[]>([]);
   const [products, setProducts] = useState<ProductMaster[]>([]);
   const [announcements, setAnnouncements] = useState<TeamAnnouncement[]>([]);
+  const [deliveries, setDeliveries] = useState<DeliveryRecord[]>([]);
   const [activeCompany, setActiveCompany] = useState("all");
   const [focusedCallId, setFocusedCallId] = useState("");
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -335,7 +337,7 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
   const kpis = {
     todayOrders: stats.ordersTaken,
     pendingOrders: pendingOrders.length,
-    deliveriesToday: orders.filter((order) => order.deliveryDate === today()).length,
+    deliveriesToday: deliveries.filter((delivery) => delivery.date === today()).length,
     paymentsDue: payments.filter((payment) => payment.status !== "Closed").reduce((sum, payment) => sum + payment.amountDue, 0)
   };
   const messagingStats = getMessagingDashboardStats(user);
@@ -369,6 +371,7 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
     setCallbacks(getCompanyCallbacks(user));
     setQueueCalls(getCompanyQueueCalls(user));
     setAgents(getCompanyAgents(user));
+    setDeliveries(filterDeliveriesForUser(getDeliveryRecords(), user));
   }
 
   function updateCurrentAgentStatus(status: CallCenterAgent["status"]) {
@@ -873,6 +876,47 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                </Panel>
+
+                <Panel title="Delivery Follow-Up">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="text-xs font-black uppercase text-slate-500">
+                        <tr>
+                          <th className="px-3 py-3">Client</th>
+                          <th className="px-3 py-3">Order</th>
+                          <th className="px-3 py-3">Truck</th>
+                          <th className="px-3 py-3">Driver</th>
+                          <th className="px-3 py-3">ETA</th>
+                          <th className="px-3 py-3">Status</th>
+                          <th className="px-3 py-3">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deliveries.slice(0, 6).map((delivery) => (
+                          <tr className="border-t border-slate-100" key={delivery.id}>
+                            <td className="px-3 py-3 font-black">{delivery.clientName}</td>
+                            <td className="px-3 py-3">{delivery.orderId}</td>
+                            <td className="px-3 py-3">{delivery.truck}</td>
+                            <td className="px-3 py-3">{delivery.driver}</td>
+                            <td className="px-3 py-3">{delivery.etaStart} - {delivery.etaEnd}</td>
+                            <td className="px-3 py-3"><StatusPill label={delivery.status} tone={delivery.status === "Delivered" ? "green" : "blue"} /></td>
+                            <td className="px-3 py-3">
+                              <div className="flex flex-wrap gap-2">
+                                <Link className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-black text-blue-700" href="/delivery/routes">Follow Up</Link>
+                                <button className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-black text-amber-700" onClick={() => setMessage(`Driver notified for ${delivery.orderId}.`)} type="button">Notify Driver</button>
+                                <button className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-black text-slate-700" onClick={() => setMessage(`Reschedule request logged for ${delivery.orderId}.`)} type="button">Reschedule</button>
+                                <button className="rounded-lg bg-red-50 px-3 py-2 text-xs font-black text-red-700" onClick={() => setActionMode("complaint")} type="button">Complaint</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {deliveries.length === 0 ? (
+                      <p className="px-3 py-4 text-sm font-semibold text-slate-500">No delivery records yet.</p>
+                    ) : null}
                   </div>
                 </Panel>
 

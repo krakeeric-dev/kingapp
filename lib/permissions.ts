@@ -31,6 +31,11 @@ export type PermissionKey =
   | "expenses.view"
   | "expenses.record"
   | "expenses.approve"
+  | "delivery.view"
+  | "delivery.dispatch"
+  | "delivery.confirm"
+  | "delivery.reports"
+  | "delivery.manageDrivers"
   | "reports.view"
   | "reports.export"
   | "reports.print"
@@ -130,6 +135,16 @@ export const permissionGroups: PermissionGroup[] = [
     ]
   },
   {
+    title: "Delivery",
+    permissions: [
+      { key: "delivery.view", label: "View Delivery" },
+      { key: "delivery.dispatch", label: "Create Dispatch" },
+      { key: "delivery.confirm", label: "Confirm Delivery" },
+      { key: "delivery.reports", label: "View Delivery Reports" },
+      { key: "delivery.manageDrivers", label: "Manage Drivers and Vehicles" }
+    ]
+  },
+  {
     title: "Reports",
     permissions: [
       { key: "reports.view", label: "View Reports" },
@@ -202,6 +217,10 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "cash.view",
     "returns.view",
     "expenses.view",
+    "delivery.view",
+    "delivery.dispatch",
+    "delivery.reports",
+    "delivery.manageDrivers",
     "reports.view",
     "reports.export",
     "reports.print",
@@ -232,6 +251,8 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "returns.receive",
     "inventory.view",
     "inventory.receive",
+    "delivery.view",
+    "delivery.dispatch",
     "product.view",
     "rawmaterials.view",
     "rawmaterials.update",
@@ -244,6 +265,8 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "sales.view",
     "sales.create",
     "sales.edit",
+    "delivery.view",
+    "delivery.confirm",
     "sync.view"
   ],
   accountant: [
@@ -259,6 +282,7 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
   ],
   callcenter: [
     "callcenter.view",
+    "delivery.view",
     "callcenter.queue.manage",
     "callcenter.calls.answer",
     "callcenter.calls.transfer",
@@ -296,6 +320,11 @@ export const routePermissions: Record<string, PermissionKey[]> = {
   "/client-portal/messages": ["clients.message"],
   "/client-orders": ["clientorders.view"],
   "/supplier-dashboard": ["supplier.view"],
+  "/delivery": ["delivery.view"],
+  "/delivery/dispatch": ["delivery.view", "delivery.dispatch"],
+  "/delivery/routes": ["delivery.view"],
+  "/delivery/drivers": ["delivery.view", "delivery.manageDrivers"],
+  "/delivery/reports": ["delivery.view", "delivery.reports"],
   "/loading": ["loading.view"],
   "/inventory": ["inventory.view"],
   "/raw-materials": ["rawmaterials.view"],
@@ -342,6 +371,11 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/client-portal/messages": ["admin", "client"],
   "/client-orders": ["admin", "storekeeper", "accountant", "marketer", "manager", "supervisor"],
   "/supplier-dashboard": ["admin", "manager", "supplier"],
+  "/delivery": ["admin", "manager", "storekeeper", "marketer", "callcenter"],
+  "/delivery/dispatch": ["admin", "manager", "storekeeper"],
+  "/delivery/routes": ["admin", "manager", "storekeeper", "marketer", "callcenter"],
+  "/delivery/drivers": ["admin", "manager"],
+  "/delivery/reports": ["admin", "manager"],
   "/loading": ["admin", "supervisor", "storekeeper"],
   "/inventory": ["admin", "manager", "supervisor", "storekeeper"],
   "/raw-materials": ["admin", "manager", "storekeeper", "accountant"],
