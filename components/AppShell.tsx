@@ -23,6 +23,7 @@ import {
   PhoneCall,
   Plus,
   ReceiptText,
+  RotateCcw,
   RefreshCw,
   Search,
   ScrollText,
@@ -197,6 +198,12 @@ const navItems: NavItem[] = [
     label: "Call Numbers",
     icon: PhoneCall,
     roles: getAllowedRoles("/admin/call-center-numbers")
+  },
+  {
+    href: "/admin/reset-data",
+    label: "Reset Data",
+    icon: RotateCcw,
+    roles: getAllowedRoles("/admin/reset-data")
   },
   {
     href: "/admin/companies",
