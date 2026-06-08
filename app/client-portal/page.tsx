@@ -25,6 +25,12 @@ import {
   getMessagesForPortalClient
 } from "@/lib/clientMessageService";
 import { getDeliveryForOrder } from "@/lib/delivery-data";
+import {
+  getCustomerAccounts,
+  getCustomerDebts,
+  getCustomerPayments,
+  getCustomerStatement
+} from "@/lib/customer-accounts-data";
 
 export default function ClientPortalPage() {
   const [client, setClient] = useState<PortalClient | null>(null);
@@ -70,6 +76,18 @@ export default function ClientPortalPage() {
   const messageStats = getClientMessageStats(clientMessages);
   const messageThreads = getClientMessageThreads(clientMessages);
   const linkedMessageCompanies = client ? getLinkedMessageCompaniesForClient(client) : [];
+  const customerAccount = client
+    ? getCustomerAccounts().find((account) => account.phone.replace(/\D/g, "") === client.phone.replace(/\D/g, ""))
+    : null;
+  const customerDebts = customerAccount
+    ? getCustomerDebts().filter((debt) => debt.customerId === customerAccount.customerId && debt.balance > 0)
+    : [];
+  const customerPayments = customerAccount
+    ? getCustomerPayments().filter((payment) => payment.customerId === customerAccount.customerId)
+    : [];
+  const statementLines = customerAccount
+    ? getCustomerStatement({ customerId: customerAccount.customerId, companyId: customerAccount.companyId })
+    : [];
   const total = catalog.reduce((sum, product) => {
     const quantity = Number(quantities[product.itemCode]) || 0;
     return sum + quantity * product.clientPrice;
@@ -216,6 +234,8 @@ export default function ClientPortalPage() {
           <PortalMetric label="Open Support Requests" value={messageStats.openSupportRequests} />
           <PortalMetric label="Last Reply" value={messageStats.lastReply ? new Date(messageStats.lastReply).toLocaleDateString() : "-"} />
           <PortalMetric label="Pending Replies" value={messageStats.waitingReply} />
+          <PortalMetric label="Current Balance" value={`${formatMoney(customerAccount?.currentBalance ?? 0)} RWF`} />
+          <PortalMetric label="Unpaid Invoices" value={customerDebts.length} />
         </div>
 
         <section className="app-card p-5">
@@ -366,6 +386,62 @@ export default function ClientPortalPage() {
             </button>
           </div>
         </form>
+
+        <section className="app-card p-5">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-black text-slate-950">My Account Statement</h2>
+              <p className="text-sm font-semibold text-slate-500">View balance, unpaid invoices, and payment history.</p>
+            </div>
+            <button className="secondary-button" onClick={() => window.print()} type="button">
+              Download / Print Statement
+            </button>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <p className="text-xs font-black uppercase text-slate-500">Balance</p>
+              <p className="mt-2 text-2xl font-black text-brand-800">{formatMoney(customerAccount?.currentBalance ?? 0)} RWF</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500">Credit limit: {formatMoney(customerAccount?.creditLimit ?? 0)} RWF</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <p className="text-xs font-black uppercase text-slate-500">Unpaid Invoices</p>
+              <p className="mt-2 text-2xl font-black text-red-700">{customerDebts.length}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500">{formatMoney(customerDebts.reduce((sum, debt) => sum + debt.balance, 0))} RWF outstanding</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <p className="text-xs font-black uppercase text-slate-500">Last Payment</p>
+              <p className="mt-2 text-lg font-black text-slate-950">{customerPayments[0]?.date ?? "No payment yet"}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500">{customerPayments[0] ? `${formatMoney(customerPayments[0].amountPaid)} RWF` : "Payment history will appear here"}</p>
+            </div>
+          </div>
+          <div className="mt-4 overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Reference</th>
+                  <th>Debit</th>
+                  <th>Credit</th>
+                  <th>Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {statementLines.slice(-8).map((line, index) => (
+                  <tr key={`${line.reference}-${index}`}>
+                    <td>{line.date}</td>
+                    <td>{line.type}</td>
+                    <td>{line.reference}</td>
+                    <td>{formatMoney(line.debit)} RWF</td>
+                    <td>{formatMoney(line.credit)} RWF</td>
+                    <td className="font-black text-slate-950">{formatMoney(line.balance)} RWF</td>
+                  </tr>
+                ))}
+                {!statementLines.length ? <tr><td colSpan={6}>No account statement records yet.</td></tr> : null}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         <section className="app-card p-5">
           <h2 className="text-xl font-black text-slate-950">My Orders</h2>

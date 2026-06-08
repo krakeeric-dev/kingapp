@@ -220,6 +220,21 @@ function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase();
 }
 
+function getCustomerCreditControl(companyId: string, phone: string, name: string) {
+  if (typeof window === "undefined") return null;
+  const customerId = `${companyId}-${phone.replace(/\D/g, "") || name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  try {
+    const records = JSON.parse(window.localStorage.getItem("kingapp.customerAccount.overrides") ?? "[]") as Array<{
+      customerId: string;
+      creditLimit: number;
+      status: "Active" | "Blocked" | "On Hold";
+    }>;
+    return records.find((record) => record.customerId === customerId) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function activeClient(client: PortalClient) {
   return client.status !== "inactive";
 }
@@ -421,6 +436,13 @@ export function createClientOrder(
       }
     ]
   };
+  const creditControl = getCustomerCreditControl(company.id, client.phone, client.clientName);
+  if (creditControl?.status === "Blocked" || creditControl?.status === "On Hold") {
+    throw new Error("This customer account is blocked or on hold. Admin approval is required before creating a new credit order.");
+  }
+  if (creditControl && order.totalAmount > creditControl.creditLimit) {
+    throw new Error("This order exceeds the customer credit limit. Admin approval is required before creating a new credit order.");
+  }
   const orders = [order, ...getClientOrders()];
   saveClientOrders(orders);
   logAuditEvent({

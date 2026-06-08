@@ -36,6 +36,11 @@ export type PermissionKey =
   | "delivery.confirm"
   | "delivery.reports"
   | "delivery.manageDrivers"
+  | "customers.view"
+  | "customers.debts.view"
+  | "customers.payments.record"
+  | "customers.statements.view"
+  | "customers.credit.manage"
   | "reports.view"
   | "reports.export"
   | "reports.print"
@@ -145,6 +150,16 @@ export const permissionGroups: PermissionGroup[] = [
     ]
   },
   {
+    title: "Customers",
+    permissions: [
+      { key: "customers.view", label: "View Customers" },
+      { key: "customers.debts.view", label: "View Customer Debts" },
+      { key: "customers.payments.record", label: "Record Customer Payments" },
+      { key: "customers.statements.view", label: "View Customer Statements" },
+      { key: "customers.credit.manage", label: "Manage Credit Control" }
+    ]
+  },
+  {
     title: "Reports",
     permissions: [
       { key: "reports.view", label: "View Reports" },
@@ -221,6 +236,9 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "delivery.dispatch",
     "delivery.reports",
     "delivery.manageDrivers",
+    "customers.view",
+    "customers.debts.view",
+    "customers.statements.view",
     "reports.view",
     "reports.export",
     "reports.print",
@@ -273,6 +291,10 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "dashboard.view",
     "cash.view",
     "cash.record",
+    "customers.view",
+    "customers.debts.view",
+    "customers.payments.record",
+    "customers.statements.view",
     "product.view",
     "rawmaterials.view",
     "expenses.view",
@@ -283,6 +305,8 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
   callcenter: [
     "callcenter.view",
     "delivery.view",
+    "customers.view",
+    "customers.debts.view",
     "callcenter.queue.manage",
     "callcenter.calls.answer",
     "callcenter.calls.transfer",
@@ -292,7 +316,7 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "callcenter.callbacks.manage"
   ],
   supplier: ["supplier.view", "supplier.orders.manage", "supplier.message"],
-  client: ["dashboard.view", "clientorders.view", "clients.message"]
+  client: ["dashboard.view", "clientorders.view", "clients.message", "customers.statements.view"]
 };
 
 export const routePermissions: Record<string, PermissionKey[]> = {
@@ -325,6 +349,10 @@ export const routePermissions: Record<string, PermissionKey[]> = {
   "/delivery/routes": ["delivery.view"],
   "/delivery/drivers": ["delivery.view", "delivery.manageDrivers"],
   "/delivery/reports": ["delivery.view", "delivery.reports"],
+  "/customers": ["customers.view"],
+  "/customers/debts": ["customers.debts.view"],
+  "/customers/statements": ["customers.statements.view"],
+  "/customers/payments": ["customers.payments.record"],
   "/loading": ["loading.view"],
   "/inventory": ["inventory.view"],
   "/raw-materials": ["rawmaterials.view"],
@@ -376,6 +404,10 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/delivery/routes": ["admin", "manager", "storekeeper", "marketer", "callcenter"],
   "/delivery/drivers": ["admin", "manager"],
   "/delivery/reports": ["admin", "manager"],
+  "/customers": ["admin", "manager", "accountant", "callcenter"],
+  "/customers/debts": ["admin", "manager", "accountant", "callcenter"],
+  "/customers/statements": ["admin", "manager", "accountant"],
+  "/customers/payments": ["admin", "accountant"],
   "/loading": ["admin", "supervisor", "storekeeper"],
   "/inventory": ["admin", "manager", "supervisor", "storekeeper"],
   "/raw-materials": ["admin", "manager", "storekeeper", "accountant"],

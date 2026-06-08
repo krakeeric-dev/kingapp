@@ -97,6 +97,7 @@ import {
   type TeamAnnouncement
 } from "@/lib/messageService";
 import { filterDeliveriesForUser, getDeliveryRecords, type DeliveryRecord } from "@/lib/delivery-data";
+import { getCustomerAccounts, getCustomerDebts, getCustomerPayments } from "@/lib/customer-accounts-data";
 
 type ActionMode = "order" | "payment" | "complaint" | "delivery" | "callback";
 type DetailTab = "orders" | "payments" | "notes";
@@ -1263,6 +1264,14 @@ function ClientDetailsCard({
   query: string;
   results: CallCenterClient[];
 }) {
+  const account = getCustomerAccounts().find((item) => item.phone.replace(/\D/g, "") === client.phone.replace(/\D/g, ""));
+  const debts = account ? getCustomerDebts().filter((debt) => debt.customerId === account.customerId) : [];
+  const overdueAmount = debts.filter((debt) => debt.paymentStatus === "Overdue").reduce((sum, debt) => sum + debt.balance, 0);
+  const lastPayment = account ? getCustomerPayments().find((payment) => payment.customerId === account.customerId) : null;
+  const currentBalance = account?.currentBalance ?? client.currentBalance;
+  const creditLimit = account?.creditLimit ?? 500_000;
+  const creditStatus = account?.status ?? (currentBalance > creditLimit ? "Blocked" : "Active");
+
   return (
     <Panel id="clients" title="Client Details" action={<span className="text-xl font-black text-slate-400">...</span>}>
       <label className="mb-4 block">
@@ -1289,20 +1298,20 @@ function ClientDetailsCard({
       <div className="mt-5 grid grid-cols-2 divide-x divide-slate-100 border-y border-slate-100 py-4">
         <div>
           <p className="text-xs font-bold text-slate-500">Credit Status</p>
-          <p className={`mt-1 font-black ${client.currentBalance > 0 ? "text-red-600" : "text-emerald-600"}`}>
-            {formatMoney(client.currentBalance)} RWF
+          <p className={`mt-1 font-black ${currentBalance > 0 ? "text-red-600" : "text-emerald-600"}`}>
+            {formatMoney(currentBalance)} RWF
           </p>
-          <p className="text-xs font-bold text-slate-500">{client.currentBalance > 0 ? "BALANCE DUE" : "CLEAR"}</p>
+          <p className="text-xs font-bold text-slate-500">{creditStatus} {overdueAmount > 0 ? `- ${formatMoney(overdueAmount)} overdue` : ""}</p>
         </div>
         <div className="pl-4">
           <p className="text-xs font-bold text-slate-500">Credit Limit</p>
-          <p className="mt-1 font-black">500,000 RWF</p>
+          <p className="mt-1 font-black">{formatMoney(creditLimit)} RWF</p>
           <p className="text-xs font-bold text-slate-500">AVAILABLE</p>
         </div>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <InfoLine label="Last Order" value={`${client.lastOrderQuantity} cartons`} sub={client.lastOrderDate} />
-        <InfoLine label="Last Payment" value={client.lastPaymentDate} sub="Recorded" />
+        <InfoLine label="Last Payment" value={lastPayment ? `${formatMoney(lastPayment.amountPaid)} RWF` : client.lastPaymentDate} sub={lastPayment?.date ?? "Recorded"} />
       </div>
       <button className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-black text-white" type="button">View Full Client Profile</button>
     </Panel>

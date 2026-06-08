@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   Truck,
   UserRound,
+  UsersRound as UsersIcon,
   WalletCards,
   X
 } from "lucide-react";
@@ -123,6 +124,30 @@ const navItems: NavItem[] = [
     label: "Client Orders",
     icon: ClipboardList,
     roles: getAllowedRoles("/client-orders")
+  },
+  {
+    href: "/customers",
+    label: "Customers",
+    icon: UsersIcon,
+    roles: getAllowedRoles("/customers")
+  },
+  {
+    href: "/customers/debts",
+    label: "Customer Debts",
+    icon: WalletCards,
+    roles: getAllowedRoles("/customers/debts")
+  },
+  {
+    href: "/customers/statements",
+    label: "Statements",
+    icon: ScrollText,
+    roles: getAllowedRoles("/customers/statements")
+  },
+  {
+    href: "/customers/payments",
+    label: "Customer Payments",
+    icon: BadgeDollarSign,
+    roles: getAllowedRoles("/customers/payments")
   },
   {
     href: "/delivery",
@@ -671,7 +696,7 @@ function groupNavItems(items: NavItem[]): NavGroup[] {
 function getNavGroupTitle(href: string) {
   if (href === "/dashboard" || href === "/executive") return "Main";
   if (href.startsWith("/call-center")) return "Call Center";
-  if (href === "/client-orders" || href === "/supplier-dashboard" || href === "/client-portal") return "Client Network";
+  if (href === "/client-orders" || href === "/supplier-dashboard" || href === "/client-portal" || href.startsWith("/customers")) return "Client Network";
   if (href.startsWith("/admin") || href === "/reports" || href === "/daily-report" || href === "/sync-status") return "Management";
   return "Operations";
 }
