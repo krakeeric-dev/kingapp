@@ -397,14 +397,18 @@ function DebtsView({ debts }: { debts: CustomerDebt[] }) {
   const approvals = getDebtApprovals();
   const pendingApprovals = approvals.filter((approval) => approval.status === "Pending Debt Approval" || approval.status === "Pending Manager Approval").length;
   const approvedApprovals = approvals.filter((approval) => approval.status === "Approved Debt").length;
-  const rejectedApprovals = approvals.filter((approval) => approval.status === "Debt Rejected").length;
+  const supervisorDeclined = approvals.filter((approval) => approval.status === "Supervisor Declined").length;
+  const managerDeclined = approvals.filter((approval) => approval.status === "Manager Declined").length;
+  const correctionRequested = approvals.filter((approval) => approval.status === "Correction Requested").length;
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Metric icon={WalletCards} label="Pending Approval" value={pendingApprovals} />
         <Metric icon={WalletCards} label="Approved Debt" value={approvedApprovals} />
-        <Metric danger icon={AlertTriangle} label="Rejected Debt" value={rejectedApprovals} />
+        <Metric danger icon={AlertTriangle} label="Supervisor Declined" value={supervisorDeclined} />
+        <Metric danger icon={AlertTriangle} label="Manager Declined" value={managerDeclined} />
+        <Metric icon={AlertTriangle} label="Correction Requested" value={correctionRequested} />
         <Metric danger icon={AlertTriangle} label="Overdue Debt" value={debts.filter((debt) => debt.paymentStatus === "Overdue").length} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

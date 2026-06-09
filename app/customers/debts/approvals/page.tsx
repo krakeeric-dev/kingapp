@@ -45,14 +45,16 @@ function DebtApprovalsContent({ user }: { user: SessionUser }) {
     return {
       pending: approvals.filter((item) => item.status === "Pending Debt Approval" || item.status === "Pending Manager Approval").length,
       approved: approvals.filter((item) => item.status === "Approved Debt" || approvedDebtIds.has(item.debtId)).length,
-      rejected: approvals.filter((item) => item.status === "Debt Rejected").length,
+      supervisorDeclined: approvals.filter((item) => item.status === "Supervisor Declined").length,
+      managerDeclined: approvals.filter((item) => item.status === "Manager Declined").length,
+      correction: approvals.filter((item) => item.status === "Correction Requested").length,
       overdue: overdueApproved
     };
   }, [approvals, user]);
 
   const visibleApprovals = approvals.filter((approval) => statusFilter === "all" || approval.status === statusFilter);
 
-  function handleReview(approval: CustomerDebtApproval, action: "supervisor_approve" | "manager_approve" | "reject" | "request_correction" | "admin_override", reason: string) {
+  function handleReview(approval: CustomerDebtApproval, action: "supervisor_approve" | "manager_approve" | "supervisor_decline" | "manager_decline" | "request_correction" | "admin_override", reason: string) {
     setApprovals(reviewDebtApproval({ approvalId: approval.id, action, reason, user }));
     setMessage("Debt approval workflow updated.");
     refresh();
@@ -79,10 +81,12 @@ function DebtApprovalsContent({ user }: { user: SessionUser }) {
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{message}</div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <Metric icon={ClipboardCheck} label="Pending Approval" value={summary.pending} />
         <Metric icon={CheckCircle2} label="Approved Debt" value={summary.approved} />
-        <Metric danger icon={XCircle} label="Rejected Debt" value={summary.rejected} />
+        <Metric danger icon={XCircle} label="Supervisor Declined" value={summary.supervisorDeclined} />
+        <Metric danger icon={XCircle} label="Manager Declined" value={summary.managerDeclined} />
+        <Metric icon={RotateCcw} label="Correction Requested" value={summary.correction} />
         <Metric danger icon={RotateCcw} label="Overdue Debt" value={summary.overdue} />
       </div>
 
@@ -91,7 +95,7 @@ function DebtApprovalsContent({ user }: { user: SessionUser }) {
           <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Status</span>
           <select className="form-input" onChange={(event) => setStatusFilter(event.target.value as DebtApprovalStatus | "all")} value={statusFilter}>
             <option value="all">All Statuses</option>
-            {["Pending Debt Approval", "Pending Manager Approval", "Approved Debt", "Debt Rejected", "Correction Requested"].map((status) => (
+            {["Pending Debt Approval", "Pending Manager Approval", "Approved Debt", "Supervisor Declined", "Manager Declined", "Correction Requested"].map((status) => (
               <option key={status} value={status}>{status}</option>
             ))}
           </select>
@@ -156,14 +160,17 @@ function ApprovalActions({
   user
 }: {
   approval: CustomerDebtApproval;
-  onReview: (approval: CustomerDebtApproval, action: "supervisor_approve" | "manager_approve" | "reject" | "request_correction" | "admin_override", reason: string) => void;
+  onReview: (approval: CustomerDebtApproval, action: "supervisor_approve" | "manager_approve" | "supervisor_decline" | "manager_decline" | "request_correction" | "admin_override", reason: string) => void;
   user: SessionUser;
 }) {
   const [reason, setReason] = useState("");
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
+  const [declineError, setDeclineError] = useState("");
   const canSupervisorReview = (user.role === "supervisor" || user.role === "admin") && approval.status === "Pending Debt Approval";
   const canManagerReview = (user.role === "manager" || user.role === "admin") && approval.status === "Pending Manager Approval";
   const canAdminOverride = user.role === "admin" && approval.status !== "Approved Debt";
-  const marketerNotice = user.role === "marketer" && ["Debt Rejected", "Correction Requested"].includes(approval.status);
+  const marketerNotice = user.role === "marketer" && ["Supervisor Declined", "Manager Declined", "Correction Requested"].includes(approval.status);
 
   if (!canSupervisorReview && !canManagerReview && !canAdminOverride && !marketerNotice) return null;
 
@@ -184,20 +191,68 @@ function ApprovalActions({
         <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
           <input className="form-input" onChange={(event) => setReason(event.target.value)} placeholder="Reason / notes" value={reason} />
           {canSupervisorReview ? (
-            <button className="primary-button" onClick={() => onReview(approval, "supervisor_approve", reason)} type="button">Supervisor Approve</button>
+            <button className="primary-button !bg-emerald-700" onClick={() => onReview(approval, "supervisor_approve", reason)} type="button">Approve</button>
           ) : null}
           {canManagerReview ? (
-            <button className="primary-button" onClick={() => onReview(approval, "manager_approve", reason)} type="button">Manager Approve</button>
+            <button className="primary-button !bg-emerald-700" onClick={() => onReview(approval, "manager_approve", reason)} type="button">Approve</button>
           ) : null}
           {canAdminOverride ? (
             <button className="primary-button" onClick={() => onReview(approval, "admin_override", reason)} type="button">Admin Override</button>
           ) : null}
           {(canSupervisorReview || canManagerReview) ? (
             <>
-              <button className="secondary-button" onClick={() => onReview(approval, "request_correction", reason)} type="button">Request Correction</button>
-              <button className="danger-button" onClick={() => onReview(approval, "reject", reason)} type="button">Reject</button>
+              <button className="danger-button" onClick={() => setDeclineOpen(true)} type="button">Decline</button>
+              <button className="secondary-button !border-amber-200 !bg-amber-50 !text-amber-800" onClick={() => onReview(approval, "request_correction", reason)} type="button">Request Correction</button>
             </>
           ) : null}
+        </div>
+      ) : null}
+      {declineOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-executive">
+            <h4 className="text-lg font-black text-slate-950">Decline Debt Request</h4>
+            <p className="mt-2 text-sm font-semibold text-slate-600">A decline reason is required and will be saved in the audit log.</p>
+            <label className="mt-4 block">
+              <span className="mb-1 block text-xs font-black uppercase text-slate-500">Decline Reason</span>
+              <select className="form-input" onChange={(event) => setDeclineReason(event.target.value)} value={declineReason}>
+                <option value="">Select reason</option>
+                <option>Customer exceeded credit limit</option>
+                <option>Customer has overdue balance</option>
+                <option>Wrong amount entered</option>
+                <option>Wrong client selected</option>
+                <option>Manager decision</option>
+                <option>Other</option>
+              </select>
+            </label>
+            <textarea
+              className="form-input mt-3 min-h-24"
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Additional notes"
+              value={reason}
+            />
+            {declineError ? <p className="mt-3 text-sm font-bold text-red-700">{declineError}</p> : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="secondary-button" onClick={() => setDeclineOpen(false)} type="button">Cancel</button>
+              <button
+                className="danger-button"
+                onClick={() => {
+                  if (!declineReason) {
+                    setDeclineError("Decline reason is required.");
+                    return;
+                  }
+                  onReview(
+                    approval,
+                    canSupervisorReview ? "supervisor_decline" : "manager_decline",
+                    `${declineReason}${reason ? ` - ${reason}` : ""}`
+                  );
+                  setDeclineOpen(false);
+                }}
+                type="button"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </section>
@@ -224,7 +279,7 @@ function StatusBadge({ status }: { status: DebtApprovalStatus }) {
   const tone =
     status === "Approved Debt"
       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-      : status === "Debt Rejected"
+      : status === "Supervisor Declined" || status === "Manager Declined"
         ? "border-red-200 bg-red-50 text-red-700"
         : status === "Correction Requested"
           ? "border-amber-200 bg-amber-50 text-amber-700"

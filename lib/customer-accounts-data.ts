@@ -12,7 +12,8 @@ export type DebtApprovalStatus =
   | "Pending Debt Approval"
   | "Pending Manager Approval"
   | "Approved Debt"
-  | "Debt Rejected"
+  | "Supervisor Declined"
+  | "Manager Declined"
   | "Correction Requested";
 
 export type CustomerAccount = {
@@ -442,7 +443,7 @@ export function reviewDebtApproval({
   user
 }: {
   approvalId: string;
-  action: "supervisor_approve" | "manager_approve" | "reject" | "request_correction" | "admin_override";
+  action: "supervisor_approve" | "manager_approve" | "supervisor_decline" | "manager_decline" | "request_correction" | "admin_override";
   reason: string;
   user: SessionUser;
 }) {
@@ -458,7 +459,9 @@ export function reviewDebtApproval({
         ? "Approved Debt"
         : action === "request_correction"
           ? "Correction Requested"
-          : "Debt Rejected";
+          : action === "supervisor_decline"
+            ? "Supervisor Declined"
+            : "Manager Declined";
   const updatedRecord: CustomerDebtApproval = {
     ...oldRecord,
     status: nextStatus,
@@ -492,7 +495,9 @@ export function reviewDebtApproval({
             ? "debt_correction_requested"
             : action === "admin_override"
               ? "admin_override_debt"
-              : "debt_rejected",
+              : action === "supervisor_decline"
+                ? "supervisor_declined_debt"
+                : "manager_declined_debt",
     companyId: updatedRecord.companyId,
     companyName: updatedRecord.companyName,
     module: "Customer Debt Approval",
