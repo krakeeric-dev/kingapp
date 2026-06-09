@@ -14,8 +14,10 @@ import {
   XCircle
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
+import { KingAppLogo } from "@/components/KingAppLogo";
 import { getCompanies, getCompanyName, getCompanyWorkspaceId } from "@/lib/companies-data";
 import type { ClientPortalOrder } from "@/lib/client-portal-data";
+import { logAuditEvent } from "@/lib/loading-data";
 import { formatMoney } from "@/lib/sales-data";
 import {
   createDeliveryDispatch,
@@ -40,6 +42,7 @@ import {
 import { hasPermission } from "@/lib/permissions";
 
 type DeliveryWorkspaceMode = "dashboard" | "dispatch" | "routes" | "drivers" | "reports";
+type DispatchPassCopyMode = "driver" | "gate" | "both";
 
 const deliveryStatuses: DeliveryStatus[] = [
   "Pending Dispatch",
@@ -62,6 +65,7 @@ export function DeliveryWorkspace({
   const [vehicles, setVehicles] = useState<DeliveryVehicle[]>([]);
   const [dispatchableOrders, setDispatchableOrders] = useState<ClientPortalOrder[]>([]);
   const [message, setMessage] = useState("");
+  const [printPass, setPrintPass] = useState<{ copyMode: DispatchPassCopyMode; record: DeliveryRecord } | null>(null);
 
   function refresh() {
     setRecords(filterDeliveriesForUser(getDeliveryRecords(), user));
@@ -87,6 +91,7 @@ export function DeliveryWorkspace({
     const form = new FormData(event.currentTarget);
     const truck = String(form.get("truck") ?? "").trim();
     const driver = String(form.get("driver") ?? "").trim();
+    const driverPhone = drivers.find((item) => item.name === driver)?.phone ?? "";
     const deliveryStaff = String(form.get("deliveryStaff") ?? user.displayName).trim();
     const etaStart = String(form.get("etaStart") ?? "").trim();
     const etaEnd = String(form.get("etaEnd") ?? "").trim();
@@ -99,6 +104,7 @@ export function DeliveryWorkspace({
     createDeliveryDispatch({
       deliveryStaff,
       driver,
+      driverPhone,
       etaEnd,
       etaStart,
       order,
@@ -185,6 +191,26 @@ export function DeliveryWorkspace({
     saveDeliveryRecords(records);
   }
 
+  const canPrintDispatchPass =
+    user.role === "admin" ||
+    hasPermission(user, "delivery.dispatch") ||
+    hasPermission(user, "delivery.confirm");
+
+  function handlePrintDispatchPass(record: DeliveryRecord, copyMode: DispatchPassCopyMode, output: "print" | "pdf") {
+    setPrintPass({ copyMode, record });
+    logAuditEvent({
+      action: "dispatch_pass_printed",
+      companyId: record.companyId,
+      companyName: record.companyName,
+      module: "Delivery",
+      recordId: record.id,
+      reason: output === "pdf" ? "Dispatch gate pass PDF requested using browser print" : "Dispatch gate pass printed",
+      status: "success",
+      user
+    });
+    window.setTimeout(() => window.print(), 100);
+  }
+
   return (
     <div className="space-y-6">
       <section className="app-card-soft p-5 sm:p-6">
@@ -230,25 +256,38 @@ export function DeliveryWorkspace({
           <DeliveryDashboardOverview records={records} dispatchableOrders={dispatchableOrders} />
           <DeliveryRecordsTable
             canConfirm={hasPermission(user, "delivery.confirm") || user.role === "admin"}
+            canPrint={canPrintDispatchPass}
             onStatusUpdate={handleStatusUpdate}
+            onPrint={handlePrintDispatchPass}
             records={records}
           />
         </>
       ) : null}
 
       {mode === "dispatch" ? (
-        <DispatchBoard
-          drivers={drivers}
-          onCreateDispatch={handleCreateDispatch}
-          orders={dispatchableOrders}
-          user={user}
-          vehicles={vehicles}
-        />
+        <>
+          <DispatchBoard
+            drivers={drivers}
+            onCreateDispatch={handleCreateDispatch}
+            orders={dispatchableOrders}
+            user={user}
+            vehicles={vehicles}
+          />
+          <DeliveryRecordsTable
+            canConfirm={false}
+            canPrint={canPrintDispatchPass}
+            onPrint={handlePrintDispatchPass}
+            records={records.filter((record) => record.status === "Dispatched" || record.status === "Out for Delivery")}
+            title="Printable Dispatch Passes"
+          />
+        </>
       ) : null}
 
       {mode === "routes" ? (
         <RoutesBoard
           canConfirm={hasPermission(user, "delivery.confirm") || user.role === "admin"}
+          canPrint={canPrintDispatchPass}
+          onPrint={handlePrintDispatchPass}
           onStatusUpdate={handleStatusUpdate}
           records={records}
         />
@@ -266,6 +305,10 @@ export function DeliveryWorkspace({
 
       {mode === "reports" ? (
         <DeliveryReports records={records} onNoop={clearDeliveryRecordsForDemoOnly} />
+      ) : null}
+
+      {printPass ? (
+        <PrintableDispatchGatePass copyMode={printPass.copyMode} record={printPass.record} user={user} />
       ) : null}
     </div>
   );
@@ -454,10 +497,14 @@ function DispatchBoard({
 
 function RoutesBoard({
   canConfirm,
+  canPrint,
+  onPrint,
   onStatusUpdate,
   records
 }: {
   canConfirm: boolean;
+  canPrint: boolean;
+  onPrint: (record: DeliveryRecord, copyMode: DispatchPassCopyMode, output: "print" | "pdf") => void;
   onStatusUpdate: (event: FormEvent<HTMLFormElement>, record: DeliveryRecord) => void;
   records: DeliveryRecord[];
 }) {
@@ -475,7 +522,7 @@ function RoutesBoard({
             <MapPinned className="h-5 w-5 text-brand-700" />
             <h3 className="text-lg font-black text-slate-950">{truck}</h3>
           </div>
-          <DeliveryRecordsTable canConfirm={canConfirm} onStatusUpdate={onStatusUpdate} records={truckRecords} />
+          <DeliveryRecordsTable canConfirm={canConfirm} canPrint={canPrint} onPrint={onPrint} onStatusUpdate={onStatusUpdate} records={truckRecords} />
         </section>
       ))}
       {!records.length ? (
@@ -647,16 +694,22 @@ function DeliveryReports({ records }: { records: DeliveryRecord[]; onNoop: () =>
 
 function DeliveryRecordsTable({
   canConfirm,
+  canPrint = false,
   onStatusUpdate,
-  records
+  onPrint,
+  records,
+  title = "Delivery Records"
 }: {
   canConfirm: boolean;
+  canPrint?: boolean;
   onStatusUpdate?: (event: FormEvent<HTMLFormElement>, record: DeliveryRecord) => void;
+  onPrint?: (record: DeliveryRecord, copyMode: DispatchPassCopyMode, output: "print" | "pdf") => void;
   records: DeliveryRecord[];
+  title?: string;
 }) {
   return (
     <section className="app-card p-5">
-      <h3 className="text-lg font-black text-slate-950">Delivery Records</h3>
+      <h3 className="text-lg font-black text-slate-950">{title}</h3>
       <div className="mt-4 overflow-x-auto">
         <table className="data-table">
           <thead>
@@ -674,6 +727,7 @@ function DeliveryRecordsTable({
               <th>Location</th>
               <th>ETA</th>
               <th>Status</th>
+              {canPrint ? <th>Gate Pass</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -692,10 +746,20 @@ function DeliveryRecordsTable({
                 <td>{record.deliveryLocation}</td>
                 <td>{record.etaStart} - {record.etaEnd}</td>
                 <td><StatusBadge status={record.status} /></td>
+                {canPrint ? (
+                  <td>
+                    <div className="flex min-w-64 flex-wrap gap-2">
+                      <button className="secondary-button !px-3 !py-2" onClick={() => onPrint?.(record, "driver", "print")} type="button">Driver Copy</button>
+                      <button className="secondary-button !px-3 !py-2" onClick={() => onPrint?.(record, "gate", "print")} type="button">Gate Copy</button>
+                      <button className="primary-button !px-3 !py-2" onClick={() => onPrint?.(record, "both", "print")} type="button">Print Dispatch Pass</button>
+                      <button className="secondary-button !px-3 !py-2" onClick={() => onPrint?.(record, "both", "pdf")} type="button">Download PDF</button>
+                    </div>
+                  </td>
+                ) : null}
               </tr>
             ))}
             {!records.length ? (
-              <tr><td colSpan={13}>No delivery records yet.</td></tr>
+              <tr><td colSpan={canPrint ? 14 : 13}>No delivery records yet.</td></tr>
             ) : null}
           </tbody>
         </table>
@@ -737,6 +801,174 @@ function StatusBadge({ status }: { status: string }) {
         : "border-amber-200 bg-amber-50 text-amber-700";
 
   return <span className={`status-badge ${tone}`}>{status}</span>;
+}
+
+function PrintableDispatchGatePass({
+  copyMode,
+  record,
+  user
+}: {
+  copyMode: DispatchPassCopyMode;
+  record: DeliveryRecord;
+  user: SessionUser;
+}) {
+  const copies =
+    copyMode === "both"
+      ? ["Driver Copy", "Gate Copy"]
+      : [copyMode === "driver" ? "Driver Copy" : "Gate Copy"];
+
+  return (
+    <div className="hidden print:block">
+      <style>{`
+        @page { size: A4; margin: 12mm; }
+        @media print {
+          body { background: white !important; }
+          .dispatch-pass-page {
+            page-break-after: always;
+            color: #111827;
+            font-family: Arial, sans-serif;
+          }
+          .dispatch-pass-page:last-child { page-break-after: auto; }
+        }
+      `}</style>
+      {copies.map((copyLabel) => (
+        <DispatchPassCopy copyLabel={copyLabel} key={copyLabel} record={record} user={user} />
+      ))}
+    </div>
+  );
+}
+
+function DispatchPassCopy({
+  copyLabel,
+  record,
+  user
+}: {
+  copyLabel: string;
+  record: DeliveryRecord;
+  user: SessionUser;
+}) {
+  const now = new Date();
+  const productRows = parseProductSummary(record.productSummary);
+
+  return (
+    <section className="dispatch-pass-page mx-auto min-h-[267mm] max-w-[190mm] bg-white p-2 text-black">
+      <div className="border-2 border-black p-5">
+        <div className="flex items-start justify-between gap-4 border-b-2 border-black pb-4">
+          <div className="flex items-center gap-3">
+            <KingAppLogo size={54} />
+            <div>
+              <p className="text-sm font-bold uppercase">{record.companyName}</p>
+              <h1 className="text-2xl font-black">KINGAPP DISPATCH GATE PASS</h1>
+              <p className="text-xs font-bold uppercase">Sales & Stock Management</p>
+            </div>
+          </div>
+          <div className="border-2 border-black px-4 py-2 text-center">
+            <p className="text-xs font-bold uppercase">Copy</p>
+            <p className="text-lg font-black">{copyLabel}</p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+          <PrintInfo label="Company Name" value={record.companyName} />
+          <PrintInfo label="Dispatch Number" value={record.id} />
+          <PrintInfo label="Date" value={record.date} />
+          <PrintInfo label="Time" value={now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} />
+          <PrintInfo label="Order ID" value={record.orderId} />
+          <PrintInfo label="Status" value={record.status} />
+          <PrintInfo label="Client Name" value={record.clientName} />
+          <PrintInfo label="Client Phone" value={record.clientPhone ?? "Not recorded"} />
+          <PrintInfo label="Delivery Location" value={record.deliveryLocation} />
+          <PrintInfo label="Truck / Vehicle Plate" value={record.truck} />
+          <PrintInfo label="Driver Name" value={record.driver} />
+          <PrintInfo label="Driver Phone" value={record.driverPhone ?? "Not recorded"} />
+          <PrintInfo label="Marketer / Salesperson" value={record.deliveryStaff} />
+          <PrintInfo label="Expected Delivery Time" value={`${record.etaStart} - ${record.etaEnd}`} />
+          <PrintInfo label="Prepared By" value={record.createdBy || user.displayName} />
+          <PrintInfo label="Approved By" value="Manager / Storekeeper" />
+        </div>
+
+        <div className="mt-5">
+          <p className="mb-2 text-sm font-black uppercase">Products Summary</p>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className="border border-black px-2 py-2 text-left">Product</th>
+                <th className="border border-black px-2 py-2 text-left">Quantity</th>
+                <th className="border border-black px-2 py-2 text-left">Unit</th>
+                <th className="border border-black px-2 py-2 text-left">Total Cartons</th>
+              </tr>
+            </thead>
+            <tbody>
+              {productRows.map((row, index) => (
+                <tr key={`${row.product}-${index}`}>
+                  <td className="border border-black px-2 py-2">{row.product}</td>
+                  <td className="border border-black px-2 py-2">{row.quantity}</td>
+                  <td className="border border-black px-2 py-2">Cartons</td>
+                  <td className="border border-black px-2 py-2">{row.quantity}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="border border-black px-2 py-2 font-black" colSpan={3}>Total Cartons</td>
+                <td className="border border-black px-2 py-2 font-black">{record.totalCartons}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div className="mt-6 grid grid-cols-[1fr_130px] gap-6">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-8 text-sm">
+            <SignatureLine label="Gate Security Signature" />
+            <SignatureLine label="Driver Signature" />
+            <SignatureLine label="Marketer Signature" />
+            <SignatureLine label="Approved By Signature" />
+          </div>
+          <div className="flex h-32 flex-col items-center justify-center border-2 border-black text-center text-xs font-black uppercase">
+            <div className="mb-2 h-16 w-16 border border-black" />
+            Scan to verify dispatch
+          </div>
+        </div>
+
+        <p className="mt-6 border-t border-black pt-3 text-center text-xs font-bold">
+          This gate pass is read-only and valid only for the dispatch number shown above.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function PrintInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[150px_1fr] border-b border-black/40 py-1">
+      <span className="font-bold">{label}:</span>
+      <span>{value || "Not recorded"}</span>
+    </div>
+  );
+}
+
+function SignatureLine({ label }: { label: string }) {
+  return (
+    <div className="pt-8">
+      <div className="border-t border-black pt-2 font-bold">{label}</div>
+    </div>
+  );
+}
+
+function parseProductSummary(summary: string) {
+  const rows = summary
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => {
+      const match = item.match(/^(\d+(?:\.\d+)?)\s*x\s*(.+)$/i);
+      return {
+        product: match?.[2]?.trim() || item,
+        quantity: Number(match?.[1] ?? 0) || 0
+      };
+    });
+
+  return rows.length ? rows : [{ product: summary || "Product", quantity: 0 }];
 }
 
 function Input({

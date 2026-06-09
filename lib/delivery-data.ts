@@ -31,11 +31,13 @@ export type DeliveryRecord = {
   companyName: string;
   clientId?: string;
   clientName: string;
+  clientPhone?: string;
   orderId: string;
   productSummary: string;
   totalCartons: number;
   truck: string;
   driver: string;
+  driverPhone?: string;
   deliveryStaff: string;
   deliveryLocation: string;
   etaStart: string;
@@ -191,6 +193,7 @@ export function getDispatchableOrders(user: SessionUser) {
 export function createDeliveryDispatch({
   deliveryStaff,
   driver,
+  driverPhone,
   etaEnd,
   etaStart,
   order,
@@ -199,6 +202,7 @@ export function createDeliveryDispatch({
 }: {
   deliveryStaff: string;
   driver: string;
+  driverPhone?: string;
   etaEnd: string;
   etaStart: string;
   order: ClientPortalOrder;
@@ -218,11 +222,13 @@ export function createDeliveryDispatch({
     companyName,
     clientId: order.clientId,
     clientName: order.clientName,
+    clientPhone: order.phone,
     orderId: order.id,
     productSummary,
     totalCartons: order.totalQuantity,
     truck,
     driver,
+    driverPhone,
     deliveryStaff,
     deliveryLocation: order.location,
     etaStart,
