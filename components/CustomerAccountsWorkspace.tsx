@@ -21,6 +21,7 @@ import {
   getCustomerDebts,
   getCustomerPayments,
   getCustomerStatement,
+  getDebtApprovals,
   getDebtAging,
   recordCustomerPayment,
   updateCustomerCredit,
@@ -393,9 +394,19 @@ function CustomersTable({
 
 function DebtsView({ debts }: { debts: CustomerDebt[] }) {
   const aging = getDebtAging(debts);
+  const approvals = getDebtApprovals();
+  const pendingApprovals = approvals.filter((approval) => approval.status === "Pending Debt Approval" || approval.status === "Pending Manager Approval").length;
+  const approvedApprovals = approvals.filter((approval) => approval.status === "Approved Debt").length;
+  const rejectedApprovals = approvals.filter((approval) => approval.status === "Debt Rejected").length;
 
   return (
     <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric icon={WalletCards} label="Pending Approval" value={pendingApprovals} />
+        <Metric icon={WalletCards} label="Approved Debt" value={approvedApprovals} />
+        <Metric danger icon={AlertTriangle} label="Rejected Debt" value={rejectedApprovals} />
+        <Metric danger icon={AlertTriangle} label="Overdue Debt" value={debts.filter((debt) => debt.paymentStatus === "Overdue").length} />
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Object.entries(aging).map(([label, value]) => (
           <Metric danger={label === "31+ days" && value > 0} icon={AlertTriangle} key={label} label={label} value={`${formatMoney(value)} RWF`} />

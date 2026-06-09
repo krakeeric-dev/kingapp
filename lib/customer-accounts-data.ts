@@ -2,12 +2,18 @@ import type { SessionUser } from "@/lib/auth";
 import { getClientOrders, getPortalClients, type ClientPortalOrder, type PortalClient } from "@/lib/client-portal-data";
 import { canAccessCompany, filterByAssignedCompanies, getCompanyName, getCompanyWorkspaceId } from "@/lib/companies-data";
 import { logAuditEvent } from "@/lib/loading-data";
-import { getSalesRecords, type ClientSaleLine, type SalesRecord } from "@/lib/sales-data";
+import { getSalesRecords, saveSalesRecords, type ClientSaleLine, type SalesRecord } from "@/lib/sales-data";
 import { upsertSupabaseRows } from "@/lib/supabase";
 
 export type CustomerStatus = "Active" | "Blocked" | "On Hold";
 export type DebtPaymentStatus = "Paid" | "Partial" | "Unpaid" | "Overdue";
 export type PaymentMethod = "Cash" | "Mobile Money" | "Bank" | "Cheque";
+export type DebtApprovalStatus =
+  | "Pending Debt Approval"
+  | "Pending Manager Approval"
+  | "Approved Debt"
+  | "Debt Rejected"
+  | "Correction Requested";
 
 export type CustomerAccount = {
   id: string;
@@ -52,6 +58,37 @@ export type CustomerDebt = {
   dueDate: string;
   paymentStatus: DebtPaymentStatus;
   createdAt: string;
+  approvalStatus?: DebtApprovalStatus;
+};
+
+export type CustomerDebtApproval = {
+  id: string;
+  debtId: string;
+  companyId: string;
+  companyName: string;
+  date: string;
+  marketerUsername: string;
+  marketerName: string;
+  customerId: string;
+  customerName: string;
+  phone: string;
+  location: string;
+  productSummary: string;
+  totalAmount: number;
+  amountPaid: number;
+  debtAmount: number;
+  salesId: string;
+  clientSaleId: string;
+  dueDate: string;
+  notes: string;
+  status: DebtApprovalStatus;
+  supervisorReason?: string;
+  managerReason?: string;
+  adminReason?: string;
+  supervisorReviewedBy?: string;
+  managerReviewedBy?: string;
+  updatedAt: string;
+  createdAt: string;
 };
 
 export type CustomerPayment = {
@@ -82,6 +119,7 @@ export type CustomerStatementLine = {
 
 const CUSTOMER_OVERRIDES_KEY = "kingapp.customerAccount.overrides";
 const CUSTOMER_PAYMENTS_KEY = "kingapp.customerAccount.payments";
+const CUSTOMER_DEBT_APPROVALS_KEY = "kingapp.customerAccount.debtApprovals";
 const DEFAULT_CREDIT_LIMIT = 250_000;
 
 function readJson<T>(key: string, fallback: T): T {
@@ -125,6 +163,10 @@ function customerKey(companyId?: string, phone?: string, name?: string) {
   return `${companyId || "COMP-AGAHOZO"}-${phoneKey || (name ?? "customer").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 }
 
+export function getCustomerId(companyId?: string, phone?: string, name?: string) {
+  return customerKey(companyId, phone, name);
+}
+
 export function getCustomerOverrides() {
   return readJson<CustomerAccountOverride[]>(CUSTOMER_OVERRIDES_KEY, []);
 }
@@ -148,6 +190,21 @@ export function saveCustomerPayments(records: CustomerPayment[]) {
   writeJson(CUSTOMER_PAYMENTS_KEY, records);
   void upsertSupabaseRows(
     "customer_payments",
+    records,
+    (record) => record.id,
+    (record) => record.updatedAt
+  );
+  return records;
+}
+
+export function getDebtApprovals() {
+  return readJson<CustomerDebtApproval[]>(CUSTOMER_DEBT_APPROVALS_KEY, []);
+}
+
+export function saveDebtApprovals(records: CustomerDebtApproval[]) {
+  writeJson(CUSTOMER_DEBT_APPROVALS_KEY, records);
+  void upsertSupabaseRows(
+    "customer_debts",
     records,
     (record) => record.id,
     (record) => record.updatedAt
@@ -278,8 +335,11 @@ function getSourceDebts() {
     (record.clientSales ?? []).forEach((line) => {
       if ((Number(line.balance) || 0) <= 0) return;
       const account = getSalesCustomer(record, line);
+      const debtId = `DEBT-${record.id}-${line.id}`;
+      const approval = getDebtApprovals().find((item) => item.debtId === debtId);
+      if (approval?.status !== "Approved Debt") return;
       debts.push({
-        id: `DEBT-${record.id}-${line.id}`,
+        id: debtId,
         companyId: account.companyId,
         companyName: account.companyName,
         customerId: account.customerId,
@@ -293,12 +353,158 @@ function getSourceDebts() {
         balance: line.balance,
         dueDate: addDays(record.date, 7),
         paymentStatus: line.amountPaid > 0 ? "Partial" : "Unpaid",
-        createdAt: record.createdAt
+        createdAt: record.createdAt,
+        approvalStatus: approval.status
       });
     });
   });
 
   return debts;
+}
+
+export function submitDebtApprovalRequests({
+  clientSales,
+  salesRecord,
+  user
+}: {
+  clientSales: ClientSaleLine[];
+  salesRecord: SalesRecord;
+  user: SessionUser;
+}) {
+  const existing = getDebtApprovals();
+  const now = new Date().toISOString();
+  const companyId = (salesRecord as SalesRecord & { companyId?: string }).companyId ?? user.companyId ?? "COMP-AGAHOZO";
+  const companyName = getCompanyName(companyId, user.companyName);
+  const createdOrUpdated: CustomerDebtApproval[] = clientSales
+    .filter((line) => (Number(line.balance) || 0) > 0)
+    .map((line) => {
+      const debtId = `DEBT-${salesRecord.id}-${line.id}`;
+      const previous = existing.find((item) => item.debtId === debtId);
+      const productSummary = line.productQuantities
+        ? Object.entries(line.productQuantities)
+            .filter(([, quantity]) => Number(quantity) > 0)
+            .map(([product, quantity]) => `${quantity} x ${product}`)
+            .join(", ")
+        : `${line.quantityCartons} x ${line.productName}`;
+      return {
+        id: previous?.id ?? makeId("DAPR"),
+        debtId,
+        companyId,
+        companyName,
+        date: line.saleDate ?? salesRecord.date,
+        marketerUsername: salesRecord.marketerUsername,
+        marketerName: salesRecord.marketerName,
+        customerId: getCustomerId(companyId, line.clientPhone, line.clientName),
+        customerName: line.clientName,
+        phone: line.clientPhone,
+        location: line.clientLocation,
+        productSummary,
+        totalAmount: line.totalAmount,
+        amountPaid: line.amountPaid,
+        debtAmount: line.balance,
+        salesId: salesRecord.id,
+        clientSaleId: line.id,
+        dueDate: addDays(line.saleDate ?? salesRecord.date, 7),
+        notes: line.notes,
+        status: "Pending Debt Approval" as const,
+        createdAt: previous?.createdAt ?? now,
+        updatedAt: now
+      };
+    });
+
+  const updated = [
+    ...createdOrUpdated,
+    ...existing.filter((item) => !createdOrUpdated.some((next) => next.debtId === item.debtId))
+  ];
+  saveDebtApprovals(updated);
+
+  createdOrUpdated.forEach((record) => {
+    logAuditEvent({
+      action: "debt_submitted",
+      companyId: record.companyId,
+      companyName: record.companyName,
+      module: "Customer Debt Approval",
+      newValue: record,
+      recordId: record.id,
+      reason: "Marketer submitted unpaid customer sale for supervisor approval",
+      status: "success",
+      user
+    });
+  });
+
+  return updated;
+}
+
+export function reviewDebtApproval({
+  approvalId,
+  action,
+  reason,
+  user
+}: {
+  approvalId: string;
+  action: "supervisor_approve" | "manager_approve" | "reject" | "request_correction" | "admin_override";
+  reason: string;
+  user: SessionUser;
+}) {
+  const approvals = getDebtApprovals();
+  const oldRecord = approvals.find((item) => item.id === approvalId);
+  if (!oldRecord) return approvals;
+
+  const now = new Date().toISOString();
+  const nextStatus: DebtApprovalStatus =
+    action === "supervisor_approve"
+      ? "Pending Manager Approval"
+      : action === "manager_approve" || action === "admin_override"
+        ? "Approved Debt"
+        : action === "request_correction"
+          ? "Correction Requested"
+          : "Debt Rejected";
+  const updatedRecord: CustomerDebtApproval = {
+    ...oldRecord,
+    status: nextStatus,
+    supervisorReason: user.role === "supervisor" || action === "supervisor_approve" ? reason : oldRecord.supervisorReason,
+    managerReason: user.role === "manager" || action === "manager_approve" ? reason : oldRecord.managerReason,
+    adminReason: action === "admin_override" ? reason : oldRecord.adminReason,
+    supervisorReviewedBy: action === "supervisor_approve" ? user.displayName : oldRecord.supervisorReviewedBy,
+    managerReviewedBy: action === "manager_approve" || action === "admin_override" ? user.displayName : oldRecord.managerReviewedBy,
+    updatedAt: now
+  };
+  const updated = approvals.map((item) => (item.id === approvalId ? updatedRecord : item));
+  saveDebtApprovals(updated);
+
+  if (nextStatus === "Correction Requested") {
+    saveSalesRecords(
+      getSalesRecords().map((record) =>
+        record.id === updatedRecord.salesId
+          ? { ...record, locked: false, updatedAt: now }
+          : record
+      )
+    );
+  }
+
+  logAuditEvent({
+    action:
+      action === "supervisor_approve"
+        ? "supervisor_approved_debt"
+        : action === "manager_approve"
+          ? "manager_approved_debt"
+          : action === "request_correction"
+            ? "debt_correction_requested"
+            : action === "admin_override"
+              ? "admin_override_debt"
+              : "debt_rejected",
+    companyId: updatedRecord.companyId,
+    companyName: updatedRecord.companyName,
+    module: "Customer Debt Approval",
+    oldValue: oldRecord,
+    newValue: updatedRecord,
+    recordId: updatedRecord.id,
+    reason,
+    status: "success",
+    user
+  });
+
+  return updated;
 }
 
 function allocatePaymentsToDebts(debts: CustomerDebt[], payments: CustomerPayment[]) {

@@ -27,6 +27,7 @@ import {
   upsertClientsFromSales,
   type MarketerClient
 } from "@/lib/marketer-clients-data";
+import { submitDebtApprovalRequests } from "@/lib/customer-accounts-data";
 
 type ClientSaleDraft = {
   id: string;
@@ -382,6 +383,11 @@ function SalesContent({ user }: { user: SessionUser }) {
       clientSales,
       user
     );
+    submitDebtApprovalRequests({
+      clientSales,
+      salesRecord: result.record,
+      user
+    });
     const updatedClients = upsertClientsFromSales({
       clientSales,
       companyId: user.companyId,
@@ -401,7 +407,11 @@ function SalesContent({ user }: { user: SessionUser }) {
       ...current,
       [load.id]: clientSales.map(clientLineToDraft)
     }));
-    setMessage("Client sales submitted, locked, and client list updated.");
+    setMessage(
+      clientSales.some((row) => row.balance > 0)
+        ? "Client sales submitted. Unpaid balances are pending Supervisor and Manager debt approval."
+        : "Client sales submitted, locked, and client list updated."
+    );
   }
 
   function handleUnlock(event: FormEvent<HTMLFormElement>) {

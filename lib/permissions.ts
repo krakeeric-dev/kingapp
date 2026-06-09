@@ -38,6 +38,7 @@ export type PermissionKey =
   | "delivery.manageDrivers"
   | "customers.view"
   | "customers.debts.view"
+  | "customers.debts.approve"
   | "customers.payments.record"
   | "customers.statements.view"
   | "customers.credit.manage"
@@ -154,6 +155,7 @@ export const permissionGroups: PermissionGroup[] = [
     permissions: [
       { key: "customers.view", label: "View Customers" },
       { key: "customers.debts.view", label: "View Customer Debts" },
+      { key: "customers.debts.approve", label: "Approve Customer Debts" },
       { key: "customers.payments.record", label: "Record Customer Payments" },
       { key: "customers.statements.view", label: "View Customer Statements" },
       { key: "customers.credit.manage", label: "Manage Credit Control" }
@@ -238,6 +240,7 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "delivery.manageDrivers",
     "customers.view",
     "customers.debts.view",
+    "customers.debts.approve",
     "customers.statements.view",
     "reports.view",
     "reports.export",
@@ -253,6 +256,9 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "sales.view",
     "returns.view",
     "cash.view",
+    "customers.view",
+    "customers.debts.view",
+    "customers.debts.approve",
     "expenses.view",
     "reports.view",
     "reports.export",
@@ -285,6 +291,7 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "sales.edit",
     "delivery.view",
     "delivery.confirm",
+    "customers.debts.view",
     "sync.view"
   ],
   accountant: [
@@ -351,6 +358,7 @@ export const routePermissions: Record<string, PermissionKey[]> = {
   "/delivery/reports": ["delivery.view", "delivery.reports"],
   "/customers": ["customers.view"],
   "/customers/debts": ["customers.debts.view"],
+  "/customers/debts/approvals": ["customers.debts.view"],
   "/customers/statements": ["customers.statements.view"],
   "/customers/payments": ["customers.payments.record"],
   "/loading": ["loading.view"],
@@ -406,6 +414,7 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/delivery/reports": ["admin", "manager"],
   "/customers": ["admin", "manager", "accountant", "callcenter"],
   "/customers/debts": ["admin", "manager", "accountant", "callcenter"],
+  "/customers/debts/approvals": ["admin", "supervisor", "manager", "marketer"],
   "/customers/statements": ["admin", "manager", "accountant"],
   "/customers/payments": ["admin", "accountant"],
   "/loading": ["admin", "supervisor", "storekeeper"],

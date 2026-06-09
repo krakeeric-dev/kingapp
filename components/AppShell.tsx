@@ -138,6 +138,12 @@ const navItems: NavItem[] = [
     roles: getAllowedRoles("/customers/debts")
   },
   {
+    href: "/customers/debts/approvals",
+    label: "Debt Approvals",
+    icon: ClipboardCheck,
+    roles: getAllowedRoles("/customers/debts/approvals")
+  },
+  {
     href: "/customers/statements",
     label: "Statements",
     icon: ScrollText,
