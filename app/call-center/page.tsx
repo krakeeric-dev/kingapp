@@ -263,20 +263,7 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
   });
 
   useEffect(() => {
-    const loadedClients = getCompanyClients(user);
-    setClients(loadedClients);
-    setSelectedClientId(loadedClients[0]?.id ?? "");
-    setCallLogs(getCallLogs().filter((log) => loadedClients.some((client) => client.id === log.clientId)));
-    setOrders(getCompanyOrders(user));
-    setPayments(getCompanyPayments(user));
-    setComplaints(getCompanyComplaints(user));
-    setCallbacks(getCompanyCallbacks(user));
-    setQueueCalls(getCompanyQueueCalls(user));
-    setAgents(getCompanyAgents(user));
-    setAssignedNumbers(getNumbersForUser(user));
-    setProducts(getProducts());
-    setAnnouncements(getAnnouncementsForUser(user));
-    setActiveCompany(getActiveCallCenterCompanyForUser(user));
+    refreshDesk();
   }, [user]);
 
   useEffect(() => {
@@ -365,6 +352,7 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
   function refreshDesk() {
     const loadedClients = getCompanyClients(user);
     setClients(loadedClients);
+    setSelectedClientId((current) => current || (loadedClients[0]?.id ?? ""));
     setCallLogs(getCallLogs().filter((log) => loadedClients.some((client) => client.id === log.clientId)));
     setOrders(getCompanyOrders(user));
     setPayments(getCompanyPayments(user));
@@ -373,6 +361,10 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
     setQueueCalls(getCompanyQueueCalls(user));
     setAgents(getCompanyAgents(user));
     setDeliveries(filterDeliveriesForUser(getDeliveryRecords(), user));
+    setAssignedNumbers(getNumbersForUser(user));
+    setProducts(getProducts());
+    setAnnouncements(getAnnouncementsForUser(user));
+    setActiveCompany(getActiveCallCenterCompanyForUser(user));
   }
 
   function updateCurrentAgentStatus(status: CallCenterAgent["status"]) {

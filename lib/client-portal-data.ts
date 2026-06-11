@@ -101,7 +101,7 @@ const SUPPLIER_SESSION_KEY = "kingapp.clientPortal.supplierSession";
 
 const mainSupplierId = "SUP-001";
 
-const defaultSuppliers: PortalSupplier[] = [
+const _defaultSuppliers: PortalSupplier[] = [
   {
     id: mainSupplierId,
     username: "supplier1",
@@ -133,7 +133,7 @@ const defaultPrices = {
   "WT-5000": 5000
 };
 
-const defaultClients: PortalClient[] = [
+const _defaultClients: PortalClient[] = [
   {
     id: "PORTAL-CL-001",
     username: "kigalimart",
@@ -173,7 +173,7 @@ function getCompanyForClientOrder(client: PortalClient, supplierId?: string) {
   return { id: "COMP-AGAHOZO", name: "Agahozo Water" };
 }
 
-const defaultLinks: SupplierClientLink[] = [
+const _defaultLinks: SupplierClientLink[] = [
   {
     id: "LINK-001",
     supplierId: mainSupplierId,

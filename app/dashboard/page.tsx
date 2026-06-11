@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   BarChart3,
   Boxes,
-  ClipboardCheck,
   FileText,
   RefreshCw,
   ShieldCheck,
@@ -139,7 +138,7 @@ const storekeeperDashboardTabs: DashboardTab[] = [
   "Raw Materials"
 ];
 
-const roleSummaries: Partial<Record<UserRole, string>> = {
+const _roleSummaries: Partial<Record<UserRole, string>> = {
   admin: "Executive overview of stock movement, cash performance, variances, and operational activity.",
   supervisor: "Review performance, variances, and correction priorities from one clean control room.",
   storekeeper: "Monitor loaded stock, warehouse position, returns, and items needing attention.",
@@ -1010,7 +1009,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
   );
 }
 
-function ExecutiveSection({
+function _ExecutiveSection({
   children,
   icon: Icon,
   subtitle,
@@ -1465,7 +1464,7 @@ function getBeverageTone(tone: KpiMetric["tone"]) {
   return styles[tone];
 }
 
-function StockCashOverview({
+function _StockCashOverview({
   days
 }: {
   days: { cash: number; date: string; loaded: number; sold: number }[];
@@ -1510,7 +1509,7 @@ function StockCashOverview({
   );
 }
 
-function RecentActivities({ activities }: { activities: Activity[] }) {
+function _RecentActivities({ activities }: { activities: Activity[] }) {
   if (activities.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm font-semibold text-slate-500">
@@ -1551,7 +1550,7 @@ function RecentActivities({ activities }: { activities: Activity[] }) {
   );
 }
 
-function MarketerPerformance({
+function _MarketerPerformance({
   rows
 }: {
   rows: { marketer: string; sold: number; value: number }[];
@@ -1595,7 +1594,7 @@ function MarketerPerformance({
   );
 }
 
-function SummaryTile({
+function _SummaryTile({
   label,
   value
 }: {
@@ -1621,7 +1620,7 @@ function Legend({ color, label }: { color: string; label: string }) {
   );
 }
 
-function getStatToneClass(tone: DashboardStat["tone"] = "neutral") {
+function _getStatToneClass(tone: DashboardStat["tone"] = "neutral") {
   if (tone === "danger") {
     return {
       icon: "bg-red-50 text-red-700",
@@ -1649,7 +1648,7 @@ function getStatToneClass(tone: DashboardStat["tone"] = "neutral") {
   };
 }
 
-function getAlertClass(tone: "success" | "danger" | "warning") {
+function _getAlertClass(tone: "success" | "danger" | "warning") {
   if (tone === "danger") {
     return "border-red-200 bg-red-50 text-red-800";
   }

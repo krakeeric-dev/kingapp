@@ -10,11 +10,10 @@ import {
   Printer,
   ReceiptText,
   Search,
-  UserRound,
   WalletCards
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
-import { getCompanies, getCompanyName } from "@/lib/companies-data";
+import { getCompanies } from "@/lib/companies-data";
 import {
   getCustomerAccounts,
   getCustomerDashboard,

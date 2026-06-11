@@ -10,7 +10,6 @@ import {
   PackageCheck,
   Route,
   Truck,
-  UserRound,
   XCircle
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";

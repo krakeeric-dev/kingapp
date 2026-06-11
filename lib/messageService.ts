@@ -114,7 +114,7 @@ function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase();
 }
 
-const seedMessages: InternalMessage[] = [
+const _seedMessages: InternalMessage[] = [
   {
     id: "MSG-001",
     fromUser: "Alice Agent",
@@ -149,7 +149,7 @@ const seedMessages: InternalMessage[] = [
   }
 ];
 
-const seedAnnouncements: TeamAnnouncement[] = [
+const _seedAnnouncements: TeamAnnouncement[] = [
   {
     id: "ANN-001",
     title: "Meeting at 4 PM",

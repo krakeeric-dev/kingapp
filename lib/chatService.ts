@@ -41,7 +41,7 @@ export const chatChannels: ChatChannel[] = [
   { id: "king-eggs", name: "#king-eggs", companyId: "COMP-KING-EGGS", companyName: "King Eggs", onlineCount: 0, unreadCount: 0 }
 ];
 
-const seedMessages: ChatMessage[] = [
+const _seedMessages: ChatMessage[] = [
   {
     id: "CHAT-001",
     channelId: "call-center",

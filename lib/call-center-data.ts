@@ -181,7 +181,7 @@ const QUEUE_CALLS_KEY = "kingapp.callCenter.queueCalls";
 const MISSED_CALLS_KEY = "kingapp.callCenter.missedCalls";
 const CALLBACKS_KEY = "kingapp.callCenter.callbacks";
 
-const defaultClients: CallCenterClient[] = [
+const _defaultClients: CallCenterClient[] = [
   {
     id: "CL-001",
     clientName: "Kigali Mart",
@@ -314,7 +314,7 @@ const defaultClients: CallCenterClient[] = [
   }
 ];
 
-const defaultAgents: CallCenterAgent[] = [
+const _defaultAgents: CallCenterAgent[] = [
   { id: "AG-001", name: "Alice Agent", extension: "101", status: "Available", phoneType: "Browser Softphone" },
   { id: "AG-002", name: "Eric Agent", extension: "102", status: "On Call", phoneType: "IP Desk Phone" },
   { id: "AG-003", name: "Chantal Agent", extension: "103", status: "Available", phoneType: "Mobile App" },
@@ -322,7 +322,7 @@ const defaultAgents: CallCenterAgent[] = [
   { id: "AG-005", name: "Esther Agent", extension: "105", status: "Offline", phoneType: "Browser Softphone" }
 ];
 
-const defaultQueueCalls: QueueCall[] = [
+const _defaultQueueCalls: QueueCall[] = [
   {
     id: "QCALL-001",
     clientId: "CL-001",
@@ -411,13 +411,13 @@ const defaultQueueCalls: QueueCall[] = [
   }
 ];
 
-const defaultMissedCalls: MissedCall[] = [
+const _defaultMissedCalls: MissedCall[] = [
   { id: "MIS-001", date: "2026-06-01", time: "09:20", caller: "Peace Corner Shop", phone: "0788000007", reason: "Payment Follow-up", status: "Not Called Back", clientId: "CL-007" },
   { id: "MIS-002", date: "2026-06-01", time: "10:12", caller: "Unknown Caller", phone: "0788111222", reason: "New Client Prospect", status: "No Answer" },
   { id: "MIS-003", date: "2026-05-31", time: "16:42", caller: "City Corner", phone: "0788000003", reason: "Reorder", status: "Called Back", clientId: "CL-003" }
 ];
 
-const defaultCallbacks: CallbackItem[] = [
+const _defaultCallbacks: CallbackItem[] = [
   { id: "CB-001", clientId: "CL-004", clientName: "Green Valley Bar", phone: "0788000004", callbackDate: "2026-06-01", callbackTime: "14:30", reason: "Payment promise follow-up", assignedAgent: "Alice Agent", priority: "Urgent", status: "Pending" },
   { id: "CB-002", clientId: "CL-006", clientName: "Hilltop Restaurant", phone: "0788000006", callbackDate: "2026-06-01", callbackTime: "15:00", reason: "Confirm reorder", assignedAgent: "Chantal Agent", priority: "Medium", status: "Pending" },
   { id: "CB-003", clientId: "CL-008", clientName: "Express Kiosk", phone: "0788000008", callbackDate: "2026-06-02", callbackTime: "09:00", reason: "Morning delivery preference", assignedAgent: "Alice Agent", priority: "Low", status: "Pending" }

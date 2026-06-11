@@ -114,7 +114,7 @@ export function getClientMessageCompanyDisplay(companyId?: string, companyName?:
   };
 }
 
-const seedMessages: ClientMessage[] = [
+const _seedMessages: ClientMessage[] = [
   {
     id: "CLMSG-001",
     threadId: "CLTH-001",

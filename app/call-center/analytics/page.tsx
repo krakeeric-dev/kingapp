@@ -71,7 +71,7 @@ function AnalyticsContent({ user }: { user: SessionUser }) {
             <table className="data-table">
               <thead><tr><th>Agent</th><th>Extension</th><th>Status</th><th>Calls</th><th>Orders</th><th>Payment Promises</th></tr></thead>
               <tbody>
-                {agents.map((agent, index) => (
+                {agents.map((agent) => (
                   <tr key={agent.id}>
                     <td className="font-bold text-slate-950">{agent.name}</td>
                     <td>{agent.extension}</td>
