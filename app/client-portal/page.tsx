@@ -34,8 +34,8 @@ import {
 
 export default function ClientPortalPage() {
   const [client, setClient] = useState<PortalClient | null>(null);
-  const [username, setUsername] = useState("kigalimart");
-  const [password, setPassword] = useState("client123");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -187,9 +187,6 @@ export default function ClientPortalPage() {
             </div>
           ) : null}
           <button className="primary-button mt-5 w-full">Sign in</button>
-          <p className="mt-4 text-center text-xs font-semibold text-slate-500">
-            Demo: kigalimart / client123
-          </p>
         </form>
       </main>
     );

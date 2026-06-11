@@ -400,7 +400,7 @@ function AdminRelationshipPanel({
           </div>
           <Input label="Supplier Name" name="name" />
           <Input label="Username" name="username" />
-          <Input defaultValue="supplier123" label="Password" name="password" />
+          <Input label="Password" name="password" />
           <Input label="Phone" name="phone" />
           <Input label="Location" name="location" />
           <Input label="Notes" name="notes" />
@@ -415,7 +415,7 @@ function AdminRelationshipPanel({
           <Input label="Business Name" name="clientName" />
           <Input label="Owner Name" name="ownerName" />
           <Input label="Username" name="username" />
-          <Input defaultValue="client123" label="Password" name="password" />
+          <Input label="Password" name="password" />
           <Input label="Phone" name="phone" />
           <Input label="Location" name="location" />
           <button className="primary-button mt-3 w-full">Create client</button>

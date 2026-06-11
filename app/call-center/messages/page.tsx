@@ -273,7 +273,7 @@ function MessagesContent({ user }: { user: SessionUser }) {
             }) : (
               <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
                 <p className="font-black text-slate-700">No messages yet.</p>
-                <p className="mt-1 text-sm font-semibold text-slate-500">Send a text, file, image, voice note placeholder, or system notification.</p>
+                <p className="mt-1 text-sm font-semibold text-slate-500">Send a text, file, image, voice note, or system notification.</p>
               </div>
             )}
           </div>

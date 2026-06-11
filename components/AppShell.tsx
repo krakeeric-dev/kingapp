@@ -25,6 +25,7 @@ import {
   Plus,
   ReceiptText,
   RotateCcw,
+  SlidersHorizontal,
   RefreshCw,
   Search,
   ScrollText,
@@ -280,6 +281,12 @@ const navItems: NavItem[] = [
     label: "Historical Data",
     icon: RotateCcw,
     roles: getAllowedRoles("/admin/reset-data")
+  },
+  {
+    href: "/admin/dev-tools",
+    label: "Dev Tools",
+    icon: SlidersHorizontal,
+    roles: getAllowedRoles("/admin/dev-tools")
   },
   {
     href: "/admin/companies",

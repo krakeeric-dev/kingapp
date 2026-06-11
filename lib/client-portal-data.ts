@@ -216,6 +216,20 @@ function writeJson<T>(key: string, value: T) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
+function withoutSeedRecords<T extends { id: string }>(key: string, records: T[], seedIds: string[]) {
+  const seedSet = new Set(seedIds);
+  const filtered = records.filter((record) => !seedSet.has(record.id));
+  if (filtered.length !== records.length) writeJson(key, filtered);
+  return filtered;
+}
+
+function withoutSeedLinks(records: SupplierClientLink[]) {
+  const seedKeys = new Set(_defaultLinks.map((link) => `${link.supplierId}:${link.clientId}`));
+  const filtered = records.filter((record) => !seedKeys.has(`${record.supplierId}:${record.clientId}`));
+  if (filtered.length !== records.length) writeJson(LINKS_KEY, filtered);
+  return filtered;
+}
+
 function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase();
 }
@@ -241,8 +255,7 @@ function activeClient(client: PortalClient) {
 
 export function getSuppliers() {
   const suppliers = readJson<PortalSupplier[]>(SUPPLIERS_KEY, []);
-  writeJson(SUPPLIERS_KEY, suppliers);
-  return suppliers;
+  return withoutSeedRecords(SUPPLIERS_KEY, suppliers, _defaultSuppliers.map((supplier) => supplier.id));
 }
 
 export function saveSuppliers(suppliers: PortalSupplier[]) {
@@ -252,8 +265,7 @@ export function saveSuppliers(suppliers: PortalSupplier[]) {
 
 export function getPortalClients() {
   const clients = readJson<PortalClient[]>(CLIENTS_KEY, []);
-  writeJson(CLIENTS_KEY, clients);
-  return clients;
+  return withoutSeedRecords(CLIENTS_KEY, clients, _defaultClients.map((client) => client.id));
 }
 
 export function savePortalClients(clients: PortalClient[]) {
@@ -263,8 +275,7 @@ export function savePortalClients(clients: PortalClient[]) {
 
 export function getSupplierClientLinks() {
   const links = readJson<SupplierClientLink[]>(LINKS_KEY, []);
-  writeJson(LINKS_KEY, links);
-  return links;
+  return withoutSeedLinks(links);
 }
 
 export function saveSupplierClientLinks(links: SupplierClientLink[]) {

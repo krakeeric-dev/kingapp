@@ -71,34 +71,34 @@ function createMockAdapter(provider: TelephonyProvider): TelephonyAdapter {
   return {
     provider,
     async makeCall(phone) {
-      return result(`Mock makeCall to ${phone}`);
+      return result(`Manual makeCall to ${phone}`);
     },
     async answerCall(callId) {
-      return result(`Mock answerCall ${callId}`);
+      return result(`Manual answerCall ${callId}`);
     },
     async endCall(callId) {
-      return result(`Mock endCall ${callId}`);
+      return result(`Manual endCall ${callId}`);
     },
     async holdCall(callId) {
-      return result(`Mock holdCall ${callId}`);
+      return result(`Manual holdCall ${callId}`);
     },
     async resumeCall(callId) {
-      return result(`Mock resumeCall ${callId}`);
+      return result(`Manual resumeCall ${callId}`);
     },
     async transferCall(callId, target) {
-      return result(`Mock transferCall ${callId} to ${target}`);
+      return result(`Manual transferCall ${callId} to ${target}`);
     },
     async getCallStatus(callId) {
-      return result(`Mock getCallStatus ${callId}`);
+      return result(`Manual getCallStatus ${callId}`);
     },
     async listRecordings() {
-      return { ...result("Mock listRecordings"), recordings: [] };
+      return { ...result("Manual listRecordings"), recordings: [] };
     },
     async handleWebhookEvent(payload) {
-      return result(`Mock handleWebhookEvent ${payload.event}`);
+      return result(`Manual handleWebhookEvent ${payload.event}`);
     },
     async handleWebhook(payload) {
-      return result(`Mock handleWebhook ${payload.event}`);
+      return result(`Manual handleWebhook ${payload.event}`);
     }
   };
 }

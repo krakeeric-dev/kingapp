@@ -110,6 +110,13 @@ function writeJson<T>(key: string, value: T) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
+function withoutSeedRecords<T extends { id: string }>(key: string, records: T[], seedIds: string[]) {
+  const seedSet = new Set(seedIds);
+  const filtered = records.filter((record) => !seedSet.has(record.id));
+  if (filtered.length !== records.length) writeJson(key, filtered);
+  return filtered;
+}
+
 function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase();
 }
@@ -172,8 +179,7 @@ const _seedAnnouncements: TeamAnnouncement[] = [
 
 export function getMessages() {
   const messages = readJson<InternalMessage[]>(MESSAGES_KEY, []);
-  writeJson(MESSAGES_KEY, messages);
-  return messages;
+  return withoutSeedRecords(MESSAGES_KEY, messages, _seedMessages.map((message) => message.id));
 }
 
 export function sendInternalMessage(input: Pick<InternalMessage, "body" | "subject" | "toRole" | "toUser">, user: SessionUser) {
@@ -326,8 +332,7 @@ export function markMessageRead(messageId: string) {
 
 export function getAnnouncements() {
   const announcements = readJson<TeamAnnouncement[]>(ANNOUNCEMENTS_KEY, []);
-  writeJson(ANNOUNCEMENTS_KEY, announcements);
-  return announcements;
+  return withoutSeedRecords(ANNOUNCEMENTS_KEY, announcements, _seedAnnouncements.map((announcement) => announcement.id));
 }
 
 export function createAnnouncement(input: Pick<TeamAnnouncement, "audience" | "body" | "priority" | "title">, user: SessionUser) {

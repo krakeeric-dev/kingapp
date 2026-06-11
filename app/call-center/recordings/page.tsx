@@ -19,7 +19,7 @@ export default function CallCenterRecordingsPage() {
 
 function RecordingsContent({ user }: { user: SessionUser }) {
   const [rows, setRows] = useState<RecordingRow[]>([]);
-  const [provider, setProvider] = useState("Mock");
+  const [provider, setProvider] = useState("Not Connected");
   const [phones, setPhones] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -37,7 +37,7 @@ function RecordingsContent({ user }: { user: SessionUser }) {
           </div>
           <div>
             <h2 className="text-2xl font-black text-slate-950">Call Recording Center</h2>
-            <p className="text-sm font-semibold text-slate-500">Mock recordings today, ready for Twilio, 3CX, or Asterisk recording URLs later.</p>
+            <p className="text-sm font-semibold text-slate-500">Recordings appear here when a phone provider is connected.</p>
           </div>
         </div>
       </section>
@@ -47,7 +47,7 @@ function RecordingsContent({ user }: { user: SessionUser }) {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs font-black uppercase text-slate-500">
               <tr>
-                {["Date", "Time", "Agent", "Client", "Phone", "Duration", "Provider", "Recording URL / Placeholder", "Status", "Notes"].map((heading) => (
+                {["Date", "Time", "Agent", "Client", "Phone", "Duration", "Provider", "Recording URL", "Status", "Notes"].map((heading) => (
                   <th className="px-4 py-3" key={heading}>{heading}</th>
                 ))}
               </tr>

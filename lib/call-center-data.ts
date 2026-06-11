@@ -450,14 +450,22 @@ function writeJson<T>(key: string, value: T) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
+function withoutSeedRecords<T extends { id: string }>(key: string, records: T[], seedIds: string[]) {
+  const seedSet = new Set(seedIds);
+  const filtered = records.filter((record) => !seedSet.has(record.id));
+  if (filtered.length !== records.length) {
+    writeJson(key, filtered);
+  }
+  return filtered;
+}
+
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase();
 }
 
 export function getCallCenterClients() {
   const clients = readJson<CallCenterClient[]>(CLIENTS_KEY, []);
-  writeJson(CLIENTS_KEY, clients);
-  return clients;
+  return withoutSeedRecords(CLIENTS_KEY, clients, _defaultClients.map((client) => client.id));
 }
 
 export function saveClientNotes(clientId: string, notes: string[]) {
@@ -614,8 +622,7 @@ export function addScheduledFollowUp(
 
 export function getAgents() {
   const agents = readJson<CallCenterAgent[]>(AGENTS_KEY, []);
-  writeJson(AGENTS_KEY, agents);
-  return agents;
+  return withoutSeedRecords(AGENTS_KEY, agents, _defaultAgents.map((agent) => agent.id));
 }
 
 export function saveAgents(agents: CallCenterAgent[]) {
@@ -632,8 +639,7 @@ export function updateAgentStatus(agentId: string, status: AgentStatus) {
 
 export function getQueueCalls() {
   const calls = readJson<QueueCall[]>(QUEUE_CALLS_KEY, []);
-  writeJson(QUEUE_CALLS_KEY, calls);
-  return calls;
+  return withoutSeedRecords(QUEUE_CALLS_KEY, calls, _defaultQueueCalls.map((call) => call.id));
 }
 
 export function saveQueueCalls(calls: QueueCall[]) {
@@ -643,8 +649,7 @@ export function saveQueueCalls(calls: QueueCall[]) {
 
 export function getMissedCalls() {
   const calls = readJson<MissedCall[]>(MISSED_CALLS_KEY, []);
-  writeJson(MISSED_CALLS_KEY, calls);
-  return calls;
+  return withoutSeedRecords(MISSED_CALLS_KEY, calls, _defaultMissedCalls.map((call) => call.id));
 }
 
 export function saveMissedCalls(calls: MissedCall[]) {
@@ -654,8 +659,7 @@ export function saveMissedCalls(calls: MissedCall[]) {
 
 export function getCallbacks() {
   const callbacks = readJson<CallbackItem[]>(CALLBACKS_KEY, []);
-  writeJson(CALLBACKS_KEY, callbacks);
-  return callbacks;
+  return withoutSeedRecords(CALLBACKS_KEY, callbacks, _defaultCallbacks.map((callback) => callback.id));
 }
 
 export function saveCallbacks(callbacks: CallbackItem[]) {

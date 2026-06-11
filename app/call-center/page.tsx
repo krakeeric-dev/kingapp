@@ -388,38 +388,6 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
     setAgents(getCompanyAgents(user));
   }
 
-  function simulateIncomingCall() {
-    const matchedClient = clients[0];
-    const companyId = matchedClient?.companyId ?? (activeCompany === "all" ? user.companyId : activeCompany);
-    const companyName =
-      matchedClient?.companyName ??
-      callCenterCompanies.find((company) => company.id === companyId)?.name ??
-      user.companyName;
-    const call: QueueCall = {
-      id: `QCALL-MOCK-${Date.now()}`,
-      companyId,
-      companyName,
-      clientId: matchedClient?.id ?? `UNKNOWN-${Date.now()}`,
-      clientName: matchedClient?.clientName ?? "Unknown Caller",
-      phone: matchedClient?.phone ?? "0788999000",
-      location: matchedClient?.area ?? "Unknown location",
-      currentBalance: matchedClient?.currentBalance ?? 0,
-      lastOrder: matchedClient ? `${matchedClient.lastOrderQuantity} cartons on ${matchedClient.lastOrderDate}` : "No order history",
-      assignedMarketer: matchedClient?.assignedMarketer ?? "Unassigned",
-      callReason: "Customer Care",
-      status: "Incoming",
-      startedAt: new Date().toISOString(),
-      notes: ["Mock provider test call"]
-    };
-
-    saveQueueCalls([call, ...getQueueCalls()]);
-    updateCurrentAgentStatus("Ringing");
-    setQueueCalls(getCompanyQueueCalls(user));
-    setFocusedCallId(call.id);
-    setSelectedClientId(matchedClient?.id ?? "");
-    setMessage("Mock incoming call created. Provider: Mock Mode.");
-  }
-
   function answerCall(call: QueueCall) {
     acceptQueueCall(call.id, user.displayName);
     updateCurrentAgentStatus("On Call");
@@ -674,18 +642,14 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
                     <p className="mt-1 text-sm font-semibold text-slate-600">Status: Manual Logging Mode</p>
                   </div>
                   <div>
-                    <p className="text-xs font-black uppercase text-amber-700">Provider: Mock Mode</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-600">Real phone provider not connected</p>
+                    <p className="text-xs font-black uppercase text-amber-700">Provider: Not Connected</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-600">Phone provider connection pending</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button className="primary-button" onClick={() => setMtnFormOpen((current) => !current)} type="button">
                     <Phone className="h-4 w-4" />
                     Log Incoming MTN Call
-                  </button>
-                  <button className="secondary-button" onClick={simulateIncomingCall} type="button">
-                    <PhoneIncoming className="h-4 w-4" />
-                    Simulate Incoming Call
                   </button>
                 </div>
               </div>

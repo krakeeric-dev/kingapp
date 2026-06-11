@@ -32,8 +32,8 @@ import {
 
 export default function SupplierDashboardPage() {
   const [supplier, setSupplier] = useState<PortalSupplier | null>(null);
-  const [username, setUsername] = useState("supplier1");
-  const [password, setPassword] = useState("supplier123");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -78,9 +78,6 @@ export default function SupplierDashboardPage() {
             </div>
           ) : null}
           <button className="primary-button mt-5 w-full">Sign in</button>
-          <p className="mt-4 text-center text-xs font-semibold text-slate-500">
-            Demo: supplier1 / supplier123
-          </p>
         </form>
       </main>
     );

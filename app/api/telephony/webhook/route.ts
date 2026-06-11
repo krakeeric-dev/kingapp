@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     message: verification.message,
     audit: {
       action: "webhook_received",
-      provider: payload.provider ?? "mock",
+      provider: payload.provider ?? "manual",
       event: payload.event,
       callId: payload.callId ?? "",
       fromNumber: payload.fromNumber ?? payload.phone,

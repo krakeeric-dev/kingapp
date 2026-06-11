@@ -10,8 +10,8 @@ export async function POST(request: Request) {
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    provider: process.env.TELEPHONY_PROVIDER ?? "mock",
-    mode: process.env.TELEPHONY_PROVIDER ? "configured" : "mock",
+    provider: process.env.TELEPHONY_PROVIDER ?? "manual",
+    mode: process.env.TELEPHONY_PROVIDER ? "configured" : "manual",
     message: "Telephony status route is available."
   });
 }

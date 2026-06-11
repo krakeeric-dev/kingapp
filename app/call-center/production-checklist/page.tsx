@@ -59,7 +59,7 @@ export default function ProductionChecklistPage() {
             <p>Secrets must be configured as environment variables, not stored in browser state.</p>
             <p>Webhook signatures must be verified before events are saved.</p>
             <p>Run inbound, outbound, transfer, missed-call, and recording tests before go-live.</p>
-            <p>Mock Mode remains available for staff training and provider downtime drills.</p>
+            <p>Manual Mode remains available for staff training and provider downtime drills.</p>
           </div>
         </aside>
       </div>

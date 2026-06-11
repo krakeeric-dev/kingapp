@@ -3,15 +3,15 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LockKeyhole, LogIn, ShieldCheck, UserRound } from "lucide-react";
-import { authenticateUser, mockUsers, roleLabels } from "@/lib/auth";
+import { authenticateUser, mockUsers } from "@/lib/auth";
 import { KingAppLogo } from "@/components/KingAppLogo";
 import { logAuditEvent } from "@/lib/loading-data";
 import { getSession, saveSession } from "@/lib/storage";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin123");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -122,7 +122,7 @@ export default function LoginPage() {
                   autoComplete="username"
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
-                  placeholder="admin or admin@kingapp.local"
+                  placeholder="Enter username or email"
                 />
               </span>
             </label>
@@ -138,7 +138,7 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="admin123"
+                  placeholder="Enter password"
                   type="password"
                 />
               </span>
@@ -159,25 +159,6 @@ export default function LoginPage() {
               {isSubmitting ? "Signing in..." : "Sign in"}
             </button>
           </form>
-
-          <div className="mt-7 rounded-lg border border-brand-100 bg-brand-50/80 p-4">
-            <p className="text-sm font-black text-brand-950">Test users</p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {mockUsers.map((user) => (
-                <div
-                  className="rounded-lg border border-white bg-white px-3 py-2 text-xs shadow-sm"
-                  key={user.username}
-                >
-                  <div className="font-bold text-slate-950">
-                    {user.username} / {user.password}
-                  </div>
-                  <div className="mt-0.5 font-semibold text-brand-700">
-                    {roleLabels[user.role]}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </section>
     </main>

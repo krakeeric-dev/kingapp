@@ -777,9 +777,9 @@ function DeliveryRecordsTable({
               <Input label="Client Phone" name="clientReceivedPhone" />
               <SelectInput defaultValue={record.paymentStatus ?? "Unpaid"} label="Payment Status" name="paymentStatus" options={["Unpaid", "Partial", "Paid"]} />
               <Input label="Failed Reason" name="failedReason" />
-              <Input label="Signature Placeholder" name="signature" />
-              <Input label="Photo Upload Placeholder" name="photoPlaceholder" />
-              <Input label="GPS Location Placeholder" name="gpsLocation" />
+              <Input label="Signature" name="signature" />
+              <Input label="Photo Upload" name="photoPlaceholder" />
+              <Input label="GPS Location" name="gpsLocation" />
               <Input label="Notes" name="notes" />
               <button className="primary-button md:col-span-4">Save Delivery Update</button>
             </form>

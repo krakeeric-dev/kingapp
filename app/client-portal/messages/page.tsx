@@ -252,7 +252,7 @@ export default function ClientPortalMessagesPage() {
               <Field label="Message">
                 <textarea className="form-input min-h-32" onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))} value={form.body} />
               </Field>
-              <Field label="Attach file placeholder">
+              <Field label="Attach file">
                 <div className="relative">
                   <Paperclip className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                   <input className="form-input pl-9" onChange={(event) => setForm((current) => ({ ...current, attachmentName: event.target.value }))} placeholder="receipt.jpg, invoice.pdf" value={form.attachmentName} />

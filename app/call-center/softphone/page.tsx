@@ -14,7 +14,7 @@ const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "+", "0", "#"];
 
 export default function SoftphonePage() {
   return (
-    <CallCenterShell title="Browser Softphone" subtitle="Mock Calling Panel">
+    <CallCenterShell title="Browser Softphone" subtitle="Call Control Panel">
       {(user) => <SoftphoneContent user={user} />}
     </CallCenterShell>
   );
@@ -24,9 +24,9 @@ function SoftphoneContent({ user }: { user: SessionUser }) {
   const [state, setState] = useState<SoftphoneState>(defaultSoftphoneState);
   const [message, setMessage] = useState("");
   const [recognized, setRecognized] = useState<ReturnType<typeof recognizeClientByPhone>>(null);
-  const [mode, setMode] = useState<"mock" | "real">("mock");
+  const [mode, setMode] = useState<"manual" | "real">("manual");
   const [transferTarget, setTransferTarget] = useState("Supervisor");
-  const [providerStatus, setProviderStatus] = useState("Mock provider ready");
+  const [providerStatus, setProviderStatus] = useState("Not Connected");
 
   useEffect(() => {
     setState((current) => ({
@@ -51,7 +51,7 @@ function SoftphoneContent({ user }: { user: SessionUser }) {
         ? await callBackendAction(name, state.callerId, transferTarget)
         : await mockSoftphoneAction(name, state.callerId);
     setMessage(response.message ?? "Call action completed.");
-    appendTelephonyAudit("provider_action", "Softphone", `${mode} ${name} ${state.callerId || "mock-call"}`);
+    appendTelephonyAudit("provider_action", "Softphone", `${mode} ${name} ${state.callerId || "manual-call"}`);
 
     if (name === "dial") {
       const client = recognizeClientByPhone(state.callerId);
@@ -73,13 +73,13 @@ function SoftphoneContent({ user }: { user: SessionUser }) {
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h3 className="text-xl font-black">KingApp Softphone</h3>
-            <p className="text-sm font-semibold text-slate-500">Browser calling panel with mock and real-mode placeholders</p>
+            <p className="text-sm font-semibold text-slate-500">Browser calling panel for manual and provider-connected operation</p>
           </div>
           <span className="status-badge border-emerald-200 bg-emerald-50 text-emerald-700">{state.status}</span>
         </div>
         <div className="mb-4 grid grid-cols-2 rounded-lg bg-slate-100 p-1">
-          <button className={`rounded-md px-3 py-2 text-sm font-black ${mode === "mock" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"}`} onClick={() => setMode("mock")} type="button">Mock Mode</button>
-          <button className={`rounded-md px-3 py-2 text-sm font-black ${mode === "real" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"}`} onClick={() => setMode("real")} type="button">Real Mode</button>
+          <button className={`rounded-md px-3 py-2 text-sm font-black ${mode === "manual" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"}`} onClick={() => setMode("manual")} type="button">Manual Mode</button>
+          <button className={`rounded-md px-3 py-2 text-sm font-black ${mode === "real" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"}`} onClick={() => setMode("real")} type="button">Connected Mode</button>
         </div>
         <div className="rounded-xl bg-slate-950 p-5 text-white">
           <p className="text-xs font-bold uppercase text-slate-400">Caller ID</p>
@@ -118,10 +118,10 @@ function SoftphoneContent({ user }: { user: SessionUser }) {
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             <Info label="Provider" value={providerStatus} />
             <Info label="Call Status" value={state.status} />
-            <Info label="Mode" value={mode === "real" ? "API routes" : "Manual mock"} />
+            <Info label="Mode" value={mode === "real" ? "Connected provider" : "Manual Mode"} />
           </div>
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
-            Microphone permission and browser WebRTC softphone connection are placeholders for the future phone provider. Current actions are routed through KingApp API/mock mode.
+            Microphone permission and browser WebRTC softphone connection require a configured phone provider. Current actions run in manual mode until the provider is connected.
           </div>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -173,7 +173,7 @@ async function callBackendAction(
   const body =
     action === "dial"
       ? { phone }
-      : { callId: "mock-call", target: action === "transfer" ? transferTarget : undefined };
+      : { callId: "manual-call", target: action === "transfer" ? transferTarget : undefined };
 
   try {
     const response = await fetch(routeMap[action], {

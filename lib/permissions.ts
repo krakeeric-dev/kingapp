@@ -68,6 +68,7 @@ export type PermissionKey =
   | "admin.audit.view"
   | "admin.permissions.manage"
   | "admin.historicalData.manage"
+  | "admin.devtools.manage"
   | "executive.view"
   | "executive.company.switch"
   | "executive.allCompanies.view"
@@ -209,7 +210,8 @@ export const permissionGroups: PermissionGroup[] = [
       { key: "admin.roles.manage", label: "Manage Roles" },
       { key: "admin.audit.view", label: "View Audit Log" },
       { key: "admin.permissions.manage", label: "Manage Permissions" },
-      { key: "admin.historicalData.manage", label: "Historical Data Management" }
+      { key: "admin.historicalData.manage", label: "Historical Data Management" },
+      { key: "admin.devtools.manage", label: "Developer Tools" }
     ]
   },
   {
@@ -379,6 +381,7 @@ export const routePermissions: Record<string, PermissionKey[]> = {
   "/admin/call-center-numbers": ["admin.permissions.manage"],
   "/admin/raw-materials": ["rawmaterials.view"],
   "/admin/reset-data": ["admin.historicalData.manage"],
+  "/admin/dev-tools": ["admin.devtools.manage"],
   "/admin/companies": ["admin.companies.manage"]
 };
 
@@ -435,6 +438,7 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/admin/call-center-numbers": ["admin"],
   "/admin/raw-materials": ["admin", "manager"],
   "/admin/reset-data": ["admin"],
+  "/admin/dev-tools": ["admin"],
   "/admin/companies": ["admin"]
 };
 

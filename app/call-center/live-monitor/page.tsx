@@ -24,7 +24,7 @@ function LiveMonitorContent({ user }: { user: SessionUser }) {
   const [agents, setAgents] = useState<ReturnType<typeof getAgents>>([]);
   const [priority, setPriority] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState("");
-  const [providerStatus, setProviderStatus] = useState("Mock provider ready");
+  const [providerStatus, setProviderStatus] = useState("Not Connected");
   const [lastSync, setLastSync] = useState("");
   const [webhookEvents, setWebhookEvents] = useState<ReturnType<typeof getTelephonyAudit>>([]);
 

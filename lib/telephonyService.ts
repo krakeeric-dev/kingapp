@@ -217,7 +217,7 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
         callType: existingCall.callReason,
         duration: getCallDuration(existingCall.acceptedAt ?? existingCall.startedAt, now),
         outcome: "Closed",
-        nextAction: "Ended from webhook simulation"
+        nextAction: "Ended from webhook event"
       },
       {
         id: `USER-${(payload.agentName ?? "Telephony").toUpperCase().replace(/\s+/g, "-")}`,
@@ -244,11 +244,11 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
         id: createId("REC"),
         callId: existingCall.id,
         recordingStatus: "Ready",
-        recordingUrl: payload.recordingUrl ?? "https://recordings.example.com/mock-call.mp3",
+        recordingUrl: payload.recordingUrl ?? "",
         duration: getCallDuration(existingCall.acceptedAt ?? existingCall.startedAt, existingCall.endedAt),
         agent: existingCall.assignedAgent ?? payload.agentName ?? "Unassigned",
         client: existingCall.clientName,
-        notes: "Mock recording placeholder"
+        notes: "Recording pending provider connection"
       },
       ...recordings
     ]);

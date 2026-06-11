@@ -20,12 +20,12 @@ export async function mockSoftphoneAction(action: string, phoneOrCallId = "") {
   const adapter = getProviderAdapter(settings.provider);
 
   if (action === "dial") return adapter.makeCall(phoneOrCallId);
-  if (action === "answer") return adapter.answerCall(phoneOrCallId || "mock-call");
-  if (action === "hold") return adapter.holdCall(phoneOrCallId || "mock-call");
-  if (action === "resume") return adapter.resumeCall(phoneOrCallId || "mock-call");
-  if (action === "transfer") return adapter.transferCall(phoneOrCallId || "mock-call", "Supervisor");
-  if (action === "end") return adapter.endCall(phoneOrCallId || "mock-call");
+  if (action === "answer") return adapter.answerCall(phoneOrCallId || "manual-call");
+  if (action === "hold") return adapter.holdCall(phoneOrCallId || "manual-call");
+  if (action === "resume") return adapter.resumeCall(phoneOrCallId || "manual-call");
+  if (action === "transfer") return adapter.transferCall(phoneOrCallId || "manual-call", "Supervisor");
+  if (action === "end") return adapter.endCall(phoneOrCallId || "manual-call");
 
-  console.log(`[KingApp Softphone] Mock ${action}`);
-  return { ok: true, provider: settings.provider, message: `Mock ${action}` };
+  console.log(`[KingApp Softphone] Manual ${action}`);
+  return { ok: true, provider: settings.provider, message: `Manual ${action}` };
 }

@@ -106,14 +106,11 @@ function companyName(companyId: string) {
 }
 
 export function getCallCenterNumbers() {
-  const records = readJson<CallCenterNumber[]>(NUMBERS_KEY, defaultNumbers);
-  const merged = [...records];
-  defaultNumbers.forEach((number) => {
-    if (!merged.some((record) => record.id === number.id)) {
-      merged.push(number);
-    }
-  });
-  return merged;
+  const seedIds = new Set(defaultNumbers.map((number) => number.id));
+  const records = readJson<CallCenterNumber[]>(NUMBERS_KEY, []);
+  const filtered = records.filter((record) => !seedIds.has(record.id));
+  if (filtered.length !== records.length) writeJson(NUMBERS_KEY, filtered);
+  return filtered;
 }
 
 export function saveCallCenterNumber(input: Omit<CallCenterNumber, "id" | "companyName" | "createdAt" | "updatedAt"> & { id?: string }) {

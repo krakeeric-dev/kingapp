@@ -14,8 +14,8 @@ export function verifyTelephonySignature(body: string, signature: string | null)
   if (!secret) {
     return {
       ok: true,
-      mode: "mock",
-      message: "Webhook secret is not configured. Mock webhook accepted."
+      mode: "manual",
+      message: "Webhook secret is not configured. Manual webhook accepted."
     };
   }
 

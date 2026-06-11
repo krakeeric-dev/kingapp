@@ -53,7 +53,7 @@ function AgentsContent({ user }: { user: SessionUser }) {
           <div>
             <h2 className="text-2xl font-black text-slate-950">Call Center Agents</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Control mock agent status and decide who can receive new calls.
+              Control agent status and decide who can receive new calls.
             </p>
           </div>
         </div>

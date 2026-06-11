@@ -177,7 +177,7 @@ function QueueContent({ user }: { user: SessionUser }) {
             <div>
               <h2 className="text-2xl font-black text-slate-950">Call Queue Command Center</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Mock queue control for future 3CX, Twilio, Asterisk, IP phone, and office phone integration.
+                Queue control for 3CX, Twilio, Asterisk, IP phone, and office phone integration.
               </p>
             </div>
           </div>

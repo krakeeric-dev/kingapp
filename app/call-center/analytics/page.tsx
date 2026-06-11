@@ -97,7 +97,7 @@ function AnalyticsContent({ user }: { user: SessionUser }) {
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="mb-4 font-black">Call Recording Placeholder</h3>
+        <h3 className="mb-4 font-black">Call Recording Status</h3>
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead><tr><th>Status</th><th>Recording URL</th><th>Duration</th><th>Agent</th><th>Client</th><th>Notes</th></tr></thead>

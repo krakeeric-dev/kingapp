@@ -175,6 +175,13 @@ function writeJson<T>(key: string, value: T) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
+function withoutSeedRecords<T extends { id: string }>(key: string, records: T[], seedIds: string[]) {
+  const seedSet = new Set(seedIds);
+  const filtered = records.filter((record) => !seedSet.has(record.id));
+  if (filtered.length !== records.length) writeJson(key, filtered);
+  return filtered;
+}
+
 function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase();
 }
@@ -205,8 +212,7 @@ export function getLinkedMessageCompaniesForClient(client: PortalClient) {
 
 export function getClientMessages() {
   const messages = readJson<ClientMessage[]>(CLIENT_MESSAGES_KEY, []);
-  writeJson(CLIENT_MESSAGES_KEY, messages);
-  return messages;
+  return withoutSeedRecords(CLIENT_MESSAGES_KEY, messages, _seedMessages.map((message) => message.id));
 }
 
 export function saveClientMessages(messages: ClientMessage[]) {

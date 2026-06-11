@@ -58,32 +58,7 @@ function SettingsContent({ user }: { user: SessionUser }) {
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     saveTelephonySettings(settings);
-    setMessage("Telephony settings saved in mock mode.");
-  }
-
-  async function sendTestIncomingCall() {
-    try {
-      const response = await fetch("/api/call-center/incoming-call", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          callerNumber: "0788000001",
-          calledNumber: settings.companyPhoneNumber || "+250 788 100 500",
-          provider: settings.providerName || "Mock Provider",
-          callId: `TEST-${Date.now()}`,
-          timestamp: new Date().toISOString()
-        })
-      });
-
-      if (!response.ok) {
-        setMessage("Test webhook failed. Check the provider endpoint.");
-        return;
-      }
-
-      setMessage("Test incoming call sent. Open /call-center to see the popup.");
-    } catch {
-      setMessage("Test webhook failed. The browser could not reach the endpoint.");
-    }
+    setMessage("Telephony settings saved.");
   }
 
   function updatePhoneType(agentId: string, phoneType: AgentPhoneType) {
@@ -104,10 +79,6 @@ function SettingsContent({ user }: { user: SessionUser }) {
         <p className="mt-2 break-all rounded-lg bg-white px-4 py-3 text-sm font-black text-slate-950 shadow-sm">
           {webhookUrl}
         </p>
-        <button className="primary-button mt-4" onClick={sendTestIncomingCall} type="button">
-          <PhoneCall className="h-4 w-4" />
-          Send Test Incoming Call
-        </button>
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -115,7 +86,7 @@ function SettingsContent({ user }: { user: SessionUser }) {
           <div className="rounded-lg bg-blue-50 p-3 text-blue-700"><Server className="h-5 w-5" /></div>
           <div>
             <h3 className="text-lg font-black text-slate-950">Provider Settings</h3>
-            <p className="text-sm font-semibold text-slate-500">Mock configuration for 3CX, Twilio, Asterisk, SIP, and manual mode.</p>
+            <p className="text-sm font-semibold text-slate-500">Configuration for 3CX, Twilio, Asterisk, SIP, and manual mode.</p>
           </div>
         </div>
         <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" onSubmit={save}>
@@ -128,7 +99,7 @@ function SettingsContent({ user }: { user: SessionUser }) {
           <Field label="Provider Name" onChange={(value) => update("providerName", value)} value={settings.providerName} />
           <Field label={providerServerLabel(settings.provider)} onChange={(value) => update("sipServer", value)} value={settings.sipServer} />
           <Field label="Webhook URL" onChange={(value) => update("webhookUrl", value)} value={settings.webhookUrl} />
-          <Field label="API Key Placeholder" onChange={(value) => update("apiKey", value)} placeholder="Stored securely later" type="password" value={settings.apiKey} />
+          <Field label="API Key" onChange={(value) => update("apiKey", value)} placeholder="Enter provider key" type="password" value={settings.apiKey} />
           <Field label={settings.provider === "Twilio" ? "Twilio Phone Number" : "Company Phone Number"} onChange={(value) => update("companyPhoneNumber", value)} value={settings.companyPhoneNumber} />
           <label className="block">
             <span className="mb-1 block text-xs font-black uppercase text-slate-500">Status</span>
@@ -204,7 +175,7 @@ function providerServerLabel(provider: TelephonyProvider) {
   if (provider === "Twilio") return "Account SID";
   if (provider === "3CX") return "PBX URL";
   if (provider === "Asterisk / SIP") return "PBX Host / SIP Trunk";
-  return "SIP Server / Mock Provider";
+  return "SIP Server / Provider";
 }
 
 function secretCards(provider: TelephonyProvider) {
