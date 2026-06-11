@@ -70,22 +70,24 @@ const legacyRawMaterialNames: Record<string, string> = {
   "shrink wrap": "Shrink Film"
 };
 
-export const defaultRawMaterials: RawMaterialMaster[] = [
-  { materialName: "Bottle Caps", materialCode: "RAW-CAPS", category: "Packaging", minimumLevel: 1000, openingStock: 6000, reorderLevel: 500, unit: "Pieces", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
-  { materialName: "Preforms", materialCode: "RAW-PREFORMS", category: "Packaging", minimumLevel: 1000, openingStock: 5000, reorderLevel: 500, unit: "Pieces", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
-  { materialName: "Labels", materialCode: "RAW-LABELS", category: "Packaging", minimumLevel: 1200, openingStock: 7000, reorderLevel: 600, unit: "Pieces", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
-  { materialName: "Cartons", materialCode: "RAW-CARTONS", category: "Packaging", minimumLevel: 150, openingStock: 600, reorderLevel: 75, unit: "Cartons", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
-  { materialName: "Shrink Film", materialCode: "RAW-SHRINK", category: "Packaging", minimumLevel: 100, openingStock: 450, reorderLevel: 50, unit: "Rolls", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
-  { materialName: "Bottle Handles", materialCode: "RAW-HANDLES", category: "Packaging", minimumLevel: 500, openingStock: 2500, reorderLevel: 250, unit: "Pieces", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
-  { materialName: "Water Treatment Chemicals", materialCode: "RAW-CHEM", category: "Production", minimumLevel: 50, openingStock: 220, reorderLevel: 25, unit: "Kg", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
-  { materialName: "Ink / Printing Materials", materialCode: "RAW-INK", category: "Production", minimumLevel: 30, openingStock: 120, reorderLevel: 15, unit: "Liters", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
-  { materialName: "Glue", materialCode: "RAW-GLUE", category: "Packaging", minimumLevel: 40, openingStock: 160, reorderLevel: 20, unit: "Kg", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
-  { materialName: "Packaging Tape", materialCode: "RAW-TAPE", category: "Packaging", minimumLevel: 60, openingStock: 240, reorderLevel: 30, unit: "Rolls", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
-  { materialName: "Pallets", materialCode: "RAW-PALLETS", category: "Logistics", minimumLevel: 25, openingStock: 90, reorderLevel: 12, unit: "Pieces", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
-  { materialName: "Bottle Sleeves", materialCode: "RAW-SLEEVES", category: "Packaging", minimumLevel: 500, openingStock: 2200, reorderLevel: 250, unit: "Pieces", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
-  { materialName: "Disinfectant / Sanitizer", materialCode: "RAW-SANITIZER", category: "Production", minimumLevel: 40, openingStock: 180, reorderLevel: 20, unit: "Liters", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" },
-  { materialName: "Machine Lubricants", materialCode: "RAW-LUBE", category: "Maintenance", minimumLevel: 20, openingStock: 80, reorderLevel: 10, unit: "Liters", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", status: "Active" }
-];
+export const defaultRawMaterials: RawMaterialMaster[] = [];
+
+const retiredRawMaterialCodes = new Set([
+  "RAW-CAPS",
+  "RAW-PREFORMS",
+  "RAW-LABELS",
+  "RAW-CARTONS",
+  "RAW-SHRINK",
+  "RAW-HANDLES",
+  "RAW-CHEM",
+  "RAW-INK",
+  "RAW-GLUE",
+  "RAW-TAPE",
+  "RAW-PALLETS",
+  "RAW-SLEEVES",
+  "RAW-SANITIZER",
+  "RAW-LUBE"
+]);
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") {
@@ -119,7 +121,7 @@ function materialKey(materialName: string) {
 }
 
 function masterKey(material: Pick<RawMaterialMaster, "companyId" | "materialCode" | "materialName">) {
-  return `${material.companyId ?? "COMP-AGAHOZO"}::${material.materialCode || material.materialName}`.toUpperCase();
+  return `${material.companyId ?? ""}::${material.materialCode || material.materialName}`.toUpperCase();
 }
 
 function normalizeMaster(material: RawMaterialMaster): RawMaterialMaster {
@@ -130,8 +132,8 @@ function normalizeMaster(material: RawMaterialMaster): RawMaterialMaster {
   return {
     ...material,
     id: material.id ?? masterKey(material),
-    companyId: material.companyId ?? defaultMaterial?.companyId ?? "COMP-AGAHOZO",
-    companyName: material.companyName ?? defaultMaterial?.companyName ?? "Agahozo Water",
+    companyId: material.companyId ?? defaultMaterial?.companyId ?? "",
+    companyName: material.companyName ?? defaultMaterial?.companyName ?? "No company selected",
     category: material.category || defaultMaterial?.category || "Production",
     materialCode: material.materialCode || defaultMaterial?.materialCode || material.materialName.toUpperCase().replace(/[^A-Z0-9]+/g, "-"),
     status: material.status ?? "Active"
@@ -155,8 +157,9 @@ export function ensureDefaultRawMaterials() {
   const existingMaster = readJson<RawMaterialMaster[]>(RAW_MATERIAL_MASTER_KEY, defaultRawMaterials);
   const existingMovements = readJson<RawMaterialMovement[]>(RAW_MATERIAL_MOVEMENTS_KEY, []);
   const existingMinimums = readJson<RawMaterialMinimum[]>(RAW_MATERIAL_MINIMUMS_KEY, []);
-  const seededMaster = existingMaster.map(normalizeMaster);
-  let masterChanged = false;
+  const filteredMaster = existingMaster.filter((material) => !retiredRawMaterialCodes.has(material.materialCode));
+  const seededMaster = filteredMaster.map(normalizeMaster);
+  let masterChanged = filteredMaster.length !== existingMaster.length;
   let movementsChanged = false;
   let minimumsChanged = false;
   const seededMovements = existingMovements.map((movement) => {

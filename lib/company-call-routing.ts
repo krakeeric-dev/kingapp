@@ -6,36 +6,7 @@ export type CompanyCallRoute = {
   defaultQueue: string;
 };
 
-export const companyCallRoutes: CompanyCallRoute[] = [
-  {
-    companyId: "COMP-AGAHOZO",
-    companyName: "Agahozo Water",
-    inboundNumber: "+250788000100",
-    department: "Sales",
-    defaultQueue: "Agahozo Sales Queue"
-  },
-  {
-    companyId: "COMP-TEJU",
-    companyName: "Teju Juice",
-    inboundNumber: "+250788000200",
-    department: "Sales",
-    defaultQueue: "Teju Juice Queue"
-  },
-  {
-    companyId: "COMP-KING-HONEY",
-    companyName: "King Honey",
-    inboundNumber: "+250788000300",
-    department: "Customer Care",
-    defaultQueue: "King Honey Queue"
-  },
-  {
-    companyId: "COMP-KING-EGGS",
-    companyName: "King Eggs",
-    inboundNumber: "+250788000400",
-    department: "Orders",
-    defaultQueue: "King Eggs Queue"
-  }
-];
+export const companyCallRoutes: CompanyCallRoute[] = [];
 
 function normalizePhone(phone?: string) {
   return (phone ?? "").replace(/\D/g, "");

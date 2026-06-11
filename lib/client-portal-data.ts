@@ -101,101 +101,20 @@ const SUPPLIER_SESSION_KEY = "kingapp.clientPortal.supplierSession";
 
 const mainSupplierId = "SUP-001";
 
-const _defaultSuppliers: PortalSupplier[] = [
-  {
-    id: mainSupplierId,
-    username: "supplier1",
-    password: "supplier123",
-    name: "KingApp Beverage Pro",
-    phone: "0788999000",
-    location: "Kigali",
-    status: "active",
-    notes: "Main beverage supplier",
-    createdAt: "2026-05-30T00:00:00.000Z"
-  },
-  {
-    id: "SUP-002",
-    username: "supplier2",
-    password: "supplier123",
-    name: "Premium Water Depot",
-    phone: "0788999001",
-    location: "Gasabo",
-    status: "active",
-    notes: "Secondary supplier for private client relationships",
-    createdAt: "2026-05-30T00:00:00.000Z"
-  }
-];
+const _defaultSuppliers: PortalSupplier[] = [];
 
-const defaultPrices = {
-  "WT-500": 1999,
-  "WT-1000": 2500,
-  "WT-1500": 3000,
-  "WT-5000": 5000
-};
+const defaultPrices: Record<string, number> = {};
 
-const _defaultClients: PortalClient[] = [
-  {
-    id: "PORTAL-CL-001",
-    username: "kigalimart",
-    password: "client123",
-    clientName: "Kigali Mart",
-    ownerName: "Jean Bosco",
-    phone: "0788000001",
-    location: "Nyamirambo",
-    supplier: "KingApp Beverage Pro",
-    assignedMarketer: "Marketer 1",
-    productPrices: defaultPrices,
-    status: "active",
-    createdAt: "2026-05-30T00:00:00.000Z"
-  },
-  {
-    id: "PORTAL-CL-002",
-    username: "sunrise",
-    password: "client123",
-    clientName: "Sunrise Shop",
-    ownerName: "Aline Uwase",
-    phone: "0788000002",
-    location: "Kimironko",
-    supplier: "KingApp Beverage Pro",
-    assignedMarketer: "Marketer 1",
-    productPrices: {
-      ...defaultPrices,
-      "WT-500": 1950
-    },
-    status: "active",
-    createdAt: "2026-05-30T00:00:00.000Z"
-  }
-];
+const _defaultClients: PortalClient[] = [];
 
 function getCompanyForClientOrder(client: PortalClient, supplierId?: string) {
-  if (supplierId === "SUP-002") return { id: "COMP-TEJU", name: "Teju Juice" };
-  if (client.id === "PORTAL-CL-002") return { id: "COMP-TEJU", name: "Teju Juice" };
-  return { id: "COMP-AGAHOZO", name: "Agahozo Water" };
+  return {
+    id: "",
+    name: "No company selected"
+  };
 }
 
-const _defaultLinks: SupplierClientLink[] = [
-  {
-    id: "LINK-001",
-    supplierId: mainSupplierId,
-    clientId: "PORTAL-CL-001",
-    active: true,
-    assignedMarketer: "Marketer 1",
-    productPrices: defaultPrices,
-    createdAt: "2026-05-30T00:00:00.000Z"
-  },
-  {
-    id: "LINK-002",
-    supplierId: mainSupplierId,
-    clientId: "PORTAL-CL-002",
-    active: true,
-    assignedMarketer: "Marketer 1",
-    productPrices: {
-      ...defaultPrices,
-      "WT-500": 1950
-    },
-    createdAt: "2026-05-30T00:00:00.000Z"
-  }
-];
+const _defaultLinks: SupplierClientLink[] = [];
 
 function readJson<T>(key: string, fallback: T): T {
   const rawValue = window.localStorage.getItem(key);

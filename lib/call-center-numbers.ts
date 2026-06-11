@@ -56,32 +56,7 @@ const NUMBERS_KEY = "kingapp.callCenter.numbers";
 const MANUAL_CALLS_KEY = "kingapp.callCenter.manualCalls";
 const MESSAGE_LOGS_KEY = "kingapp.callCenter.companyMessages";
 
-const defaultNumbers: CallCenterNumber[] = [
-  {
-    id: "CCN-AGAHOZO-SALES",
-    companyId: "COMP-AGAHOZO",
-    companyName: "Agahozo Water",
-    phoneNumber: "+250 788 100 500",
-    label: "Agahozo Sales Line",
-    purpose: "Sales Calls",
-    status: "Active",
-    assignedAgentUsernames: ["callcenter", "agahozo_agent", "multi_agent"],
-    createdAt: "2026-06-01T00:00:00.000Z",
-    updatedAt: "2026-06-01T00:00:00.000Z"
-  },
-  {
-    id: "CCN-TEJU-SUPPORT",
-    companyId: "COMP-TEJU",
-    companyName: "Teju Juice",
-    phoneNumber: "+250 788 200 500",
-    label: "Teju Support Line",
-    purpose: "Customer Support",
-    status: "Active",
-    assignedAgentUsernames: ["teju_agent", "multi_agent"],
-    createdAt: "2026-06-01T00:00:00.000Z",
-    updatedAt: "2026-06-01T00:00:00.000Z"
-  }
-];
+const defaultNumbers: CallCenterNumber[] = [];
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;

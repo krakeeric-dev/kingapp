@@ -67,12 +67,7 @@ const defaultSettings: TelephonySettings = {
   callPopupEnabled: true
 };
 
-const defaultDevices: DeviceMapping[] = [
-  { id: "DEV-101", extension: "101", agent: "Alice Agent", deviceType: "Browser", deviceName: "Chrome Softphone", status: "Online", lastSeen: "Just now" },
-  { id: "DEV-102", extension: "102", agent: "Eric Agent", deviceType: "IP Phone", deviceName: "Yealink T31P", status: "Online", lastSeen: "2 min ago" },
-  { id: "DEV-103", extension: "103", agent: "Chantal Agent", deviceType: "Mobile", deviceName: "3CX Mobile App", status: "Online", lastSeen: "5 min ago" },
-  { id: "DEV-104", extension: "104", agent: "David Agent", deviceType: "Fixed Line Gateway", deviceName: "Office Gateway 1", status: "Provisioning", lastSeen: "Today 09:15" }
-];
+const defaultDevices: DeviceMapping[] = [];
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -226,7 +221,7 @@ export async function processTelephonyWebhook(payload: WebhookPayload) {
         displayName: payload.agentName ?? "Telephony",
         role: "callcenter",
         companyId: existingCall.companyId ?? "COMP-AGAHOZO",
-        companyName: existingCall.companyName ?? "Agahozo Water",
+        companyName: existingCall.companyName ?? "No company selected",
         assignedCompanies: [existingCall.companyId ?? "COMP-AGAHOZO"],
         phone: "",
         email: "",

@@ -44,39 +44,17 @@ type ClientSaleDraft = {
 };
 
 type DraftClientRows = Record<string, ClientSaleDraft[]>;
-type ProductGridKey = "500ml" | "1L" | "1.5L" | "5L";
+type ProductGridKey = string;
 
-const productGrid: {
-  key: ProductGridKey;
-  label: string;
-  itemCode: string;
-  productName: string;
-}[] = [
-  {
-    key: "500ml",
-    label: "500ml",
-    itemCode: "WT-500",
-    productName: "Water 500ml"
-  },
-  {
-    key: "1L",
-    label: "1L",
-    itemCode: "WT-1000",
-    productName: "Water 1L"
-  },
-  {
-    key: "1.5L",
-    label: "1.5L",
-    itemCode: "WT-1500",
-    productName: "Water 1.5L"
-  },
-  {
-    key: "5L",
-    label: "5L",
-    itemCode: "WT-5000",
-    productName: "Water 5L"
-  }
-];
+function productGridFor(products: ProductMaster[]) {
+  const activeProducts = products.filter((product) => product.status !== "Inactive" && !product.deletedAt);
+  return activeProducts.map((product) => ({
+    key: product.itemCode || product.name,
+    label: product.name,
+    itemCode: product.itemCode,
+    productName: product.name
+  }));
+}
 
 const paymentStatuses: PaymentStatus[] = ["Paid", "Partial", "Unpaid"];
 
@@ -170,6 +148,9 @@ function SalesContent({ user }: { user: SessionUser }) {
   }
 
   function createDraftClient(load: LoadingRecord): ClientSaleDraft {
+    const productsForSale = productGridFor(products);
+    const firstProduct = productsForSale[0];
+    const firstProductKey = firstProduct?.key ?? "";
     return {
       id: `SALE-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase(),
       clientName: "",
@@ -177,13 +158,8 @@ function SalesContent({ user }: { user: SessionUser }) {
       clientLocation: "",
       saleDate: getTodayIsoDate(),
       marketerName: user.displayName || user.username || load.marketerName,
-      productKey: "500ml",
-      quantities: {
-        "500ml": "",
-        "1L": "",
-        "1.5L": "",
-        "5L": ""
-      },
+      productKey: firstProductKey,
+      quantities: firstProductKey ? { [firstProductKey]: "" } : {},
       paymentStatus: "Unpaid",
       amountPaid: "",
       notes: ""
@@ -236,10 +212,6 @@ function SalesContent({ user }: { user: SessionUser }) {
             ...row,
             productKey: nextProductKey,
             quantities: {
-              "500ml": "",
-              "1L": "",
-              "1.5L": "",
-              "5L": "",
               [nextProductKey]: currentQuantity
             }
           };
@@ -297,12 +269,12 @@ function SalesContent({ user }: { user: SessionUser }) {
 
   function normalizeClientRows(rows: ClientSaleDraft[]) {
     return rows.map((row) => {
-      const productQuantities = getProductQuantities(row);
+      const productQuantities = getProductQuantities(row, products);
       const productAmounts = getProductAmounts(row, products);
       const quantityCartons = getRowTotalCartons(row);
       const totalAmount = getRowTotalAmount(row, products);
       const amountPaid = 0;
-      const selectedProduct = productGrid.find(
+      const selectedProduct = productGridFor(products).find(
         (product) => product.key === row.productKey
       );
       const pricePerCarton = getProductPrice(row.productKey, products);
@@ -314,8 +286,8 @@ function SalesContent({ user }: { user: SessionUser }) {
         clientLocation: row.clientLocation.trim(),
         saleDate: row.saleDate,
         marketerName: row.marketerName,
-        productName: selectedProduct?.productName ?? "Water 500ml",
-        itemCode: selectedProduct?.itemCode ?? "WT-500",
+        productName: selectedProduct?.productName ?? "",
+        itemCode: selectedProduct?.itemCode ?? "",
         productQuantities,
         productAmounts,
         quantityCartons,
@@ -927,7 +899,7 @@ function SalesEntryTable({
                       }
                       value={row.productKey}
                     >
-                      {productGrid.map((product) => (
+                      {productGridFor(products).map((product) => (
                         <option key={product.key} value={product.key}>
                           {product.productName}
                         </option>
@@ -1076,7 +1048,7 @@ function SalesEntryTable({
                     }
                     value={row.productKey}
                   >
-                    {productGrid.map((product) => (
+                    {productGridFor(products).map((product) => (
                       <option key={product.key} value={product.key}>
                         {product.productName}
                       </option>
@@ -1255,7 +1227,7 @@ function ClientSaleCard({
           <div className="px-3 py-2 text-right">Amount</div>
         </div>
         <div className="divide-y divide-slate-100">
-          {productGrid.map((product) => {
+          {productGridFor(products).map((product) => {
             const price = getProductPrice(product.key, products);
             const quantity = toNumber(row.quantities[product.key]);
             const amount = quantity * price;
@@ -1608,17 +1580,8 @@ function Metric({
 }
 
 function clientLineToDraft(line: ClientSaleLine): ClientSaleDraft {
-  const productQuantities = line.productQuantities ?? {
-    "500ml": line.itemCode === "WT-500" ? line.quantityCartons : 0,
-    "1L": line.itemCode === "WT-1000" ? line.quantityCartons : 0,
-    "1.5L": line.itemCode === "WT-1500" ? line.quantityCartons : 0,
-    "5L": line.itemCode === "WT-5000" ? line.quantityCartons : 0
-  };
-  const productKey =
-    productGrid.find((product) => Number(productQuantities[product.key]) > 0)
-      ?.key ??
-    productGrid.find((product) => product.itemCode === line.itemCode)?.key ??
-    "500ml";
+  const productQuantities = line.productQuantities ?? {};
+  const productKey = Object.keys(productQuantities).find((key) => Number(productQuantities[key]) > 0) ?? line.itemCode ?? line.productName ?? "";
 
   return {
     id: line.id,
@@ -1686,7 +1649,7 @@ function groupConfirmedLoads(loads: LoadingRecord[]) {
 }
 
 function getProductPrice(productKey: ProductGridKey, products: ProductMaster[]) {
-  const gridProduct = productGrid.find((product) => product.key === productKey);
+  const gridProduct = productGridFor(products).find((product) => product.key === productKey);
   const product = products.find(
     (item) =>
       item.itemCode === gridProduct?.itemCode ||
@@ -1702,15 +1665,15 @@ function getProductPrice(productKey: ProductGridKey, products: ProductMaster[]) 
     : getActivePrice(gridProduct.productName, gridProduct.itemCode);
 }
 
-function getProductQuantities(row: ClientSaleDraft) {
-  return productGrid.reduce<Record<string, number>>((quantities, product) => {
+function getProductQuantities(row: ClientSaleDraft, products: ProductMaster[]) {
+  return productGridFor(products).reduce<Record<string, number>>((quantities, product) => {
     quantities[product.key] = toNumber(row.quantities[product.key]);
     return quantities;
   }, {});
 }
 
 function getProductAmounts(row: ClientSaleDraft, products: ProductMaster[]) {
-  return productGrid.reduce<Record<string, number>>((amounts, product) => {
+  return productGridFor(products).reduce<Record<string, number>>((amounts, product) => {
     amounts[product.key] =
       toNumber(row.quantities[product.key]) * getProductPrice(product.key, products);
     return amounts;
@@ -1718,14 +1681,11 @@ function getProductAmounts(row: ClientSaleDraft, products: ProductMaster[]) {
 }
 
 function getRowTotalCartons(row: ClientSaleDraft) {
-  return productGrid.reduce(
-    (total, product) => total + toNumber(row.quantities[product.key]),
-    0
-  );
+  return Object.values(row.quantities).reduce((total, quantity) => total + toNumber(quantity), 0);
 }
 
 function getRowTotalAmount(row: ClientSaleDraft, products: ProductMaster[]) {
-  return productGrid.reduce(
+  return productGridFor(products).reduce(
     (total, product) =>
       total + toNumber(row.quantities[product.key]) * getProductPrice(product.key, products),
     0

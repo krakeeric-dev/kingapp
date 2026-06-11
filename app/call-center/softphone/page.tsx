@@ -56,7 +56,7 @@ function SoftphoneContent({ user }: { user: SessionUser }) {
     if (name === "dial") {
       const client = recognizeClientByPhone(state.callerId);
       setRecognized(client);
-      await handleMockPhoneWebhook({ event: "incoming_call", phone: state.callerId || "0788000001", agentName: "Alice Agent" });
+      await handleMockPhoneWebhook({ event: "incoming_call", phone: state.callerId || "", agentName: user.displayName });
       setState((current) => ({ ...current, status: "Dialing", timer: "00:00:04" }));
     }
     if (name === "answer") setState((current) => ({ ...current, status: "Connected", timer: "00:00:12" }));

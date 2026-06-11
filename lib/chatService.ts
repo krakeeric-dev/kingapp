@@ -1,5 +1,5 @@
 import type { SessionUser } from "@/lib/auth";
-import { canAccessCompany, getCompanyWorkspaceId } from "@/lib/companies-data";
+import { canAccessCompany, getCompanies, getCompanyWorkspaceId } from "@/lib/companies-data";
 
 export type ChatMessage = {
   id: string;
@@ -34,40 +34,22 @@ export const chatChannels: ChatChannel[] = [
   { id: "loading", name: "#loading", onlineCount: 0, unreadCount: 0 },
   { id: "storekeepers", name: "#storekeepers", onlineCount: 0, unreadCount: 0 },
   { id: "accounting", name: "#accounting", onlineCount: 0, unreadCount: 0 },
-  { id: "call-center", name: "#call-center", onlineCount: 0, unreadCount: 0 },
-  { id: "agahozo-water", name: "#agahozo-water", companyId: "COMP-AGAHOZO", companyName: "Agahozo Water", onlineCount: 0, unreadCount: 0 },
-  { id: "teju-juice", name: "#teju-juice", companyId: "COMP-TEJU", companyName: "Teju Juice", onlineCount: 0, unreadCount: 0 },
-  { id: "king-honey", name: "#king-honey", companyId: "COMP-KING-HONEY", companyName: "King Honey", onlineCount: 0, unreadCount: 0 },
-  { id: "king-eggs", name: "#king-eggs", companyId: "COMP-KING-EGGS", companyName: "King Eggs", onlineCount: 0, unreadCount: 0 }
+  { id: "call-center", name: "#call-center", onlineCount: 0, unreadCount: 0 }
 ];
 
-const _seedMessages: ChatMessage[] = [
-  {
-    id: "CHAT-001",
-    channelId: "call-center",
-    author: "Manager",
-    authorRole: "manager",
-    body: "@team prioritize unpaid balance calls before lunch.",
-    mention: "@team",
-    pinned: true,
-    edited: false,
-    deleted: false,
-    createdAt: "2026-06-02T08:50:00.000Z",
-    updatedAt: "2026-06-02T08:50:00.000Z"
-  },
-  {
-    id: "CHAT-002",
-    channelId: "dispatch",
-    author: "Alice Agent",
-    authorRole: "callcenter",
-    body: "Kigali Mart requested delivery confirmation.",
-    pinned: false,
-    edited: false,
-    deleted: false,
-    createdAt: "2026-06-02T09:05:00.000Z",
-    updatedAt: "2026-06-02T09:05:00.000Z"
-  }
-];
+function getChatChannels() {
+  const companyChannels = getCompanies().map((company) => ({
+    id: company.id,
+    name: `#${company.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
+    companyId: company.id,
+    companyName: company.name,
+    onlineCount: 0,
+    unreadCount: 0
+  }));
+  return [...chatChannels, ...companyChannels];
+}
+
+const _seedMessages: ChatMessage[] = [];
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -104,7 +86,7 @@ export function getChatMessages() {
 
 export function getChatChannelsForUser(user: SessionUser) {
   const workspaceId = getCompanyWorkspaceId(user);
-  return chatChannels.filter((channel) => {
+  return getChatChannels().filter((channel) => {
     if (!channel.companyId) return true;
     if (workspaceId !== "all") return channel.companyId === workspaceId;
     return canAccessCompany(user, channel.companyId);

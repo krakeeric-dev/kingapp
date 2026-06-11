@@ -1,5 +1,5 @@
 import type { SessionUser } from "@/lib/auth";
-import { canAccessCompany, getCompanyWorkspaceId } from "@/lib/companies-data";
+import { canAccessCompany, getCompanies, getCompanyWorkspaceId } from "@/lib/companies-data";
 import {
   getClientOrders,
   getClientsForSupplier,
@@ -56,107 +56,41 @@ export type ClientMessageCompanyDisplay = {
 
 const CLIENT_MESSAGES_KEY = "kingapp.clientPortal.messages";
 
-const companyBySupplierId: Record<string, { id: string; name: string }> = {
-  "SUP-001": { id: "COMP-AGAHOZO", name: "Agahozo Water" },
-  "SUP-002": { id: "COMP-TEJU", name: "Teju Juice" }
-};
+const companyBySupplierId: Record<string, { id: string; name: string }> = {};
 
-const clientCompanyFallback: Record<string, { id: string; name: string }> = {
-  "PORTAL-CL-001": { id: "COMP-AGAHOZO", name: "Agahozo Water" },
-  "PORTAL-CL-002": { id: "COMP-TEJU", name: "Teju Juice" }
-};
+const clientCompanyFallback: Record<string, { id: string; name: string }> = {};
 
-export const clientMessageCompanyDisplays: Record<string, ClientMessageCompanyDisplay> = {
-  "COMP-AGAHOZO": {
-    id: "COMP-AGAHOZO",
-    logo: "AW",
-    name: "Agahozo Water",
-    supportStatus: "Online",
-    supportTeam: "Customer Support",
-    badgeClass: "bg-blue-50 text-blue-700 border-blue-200"
-  },
-  "COMP-TEJU": {
-    id: "COMP-TEJU",
-    logo: "TJ",
-    name: "Teju Juice",
-    supportStatus: "Online",
-    supportTeam: "Sales & Customer Care",
-    badgeClass: "bg-orange-50 text-orange-700 border-orange-200"
-  },
-  "COMP-KING-HONEY": {
-    id: "COMP-KING-HONEY",
-    logo: "KH",
-    name: "King Honey",
-    supportStatus: "Online",
-    supportTeam: "Customer Support",
-    badgeClass: "bg-yellow-50 text-yellow-700 border-yellow-200"
-  },
-  "COMP-KING-EGGS": {
-    id: "COMP-KING-EGGS",
-    logo: "KE",
-    name: "King Eggs",
-    supportStatus: "Online",
-    supportTeam: "Sales & Customer Care",
-    badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200"
-  }
-};
+export const clientMessageCompanyDisplays: Record<string, ClientMessageCompanyDisplay> = {};
+
+function getCompanyDisplayMap() {
+  return getCompanies().reduce<Record<string, ClientMessageCompanyDisplay>>((map, company) => {
+    map[company.id] = {
+      id: company.id,
+      logo: company.name.slice(0, 2).toUpperCase(),
+      name: company.name,
+      supportStatus: "Online",
+      supportTeam: "Customer Support",
+      badgeClass: "bg-blue-50 text-blue-700 border-blue-200"
+    };
+    return map;
+  }, {});
+}
 
 export function getClientMessageCompanyDisplay(companyId?: string, companyName?: string) {
-  if (companyId && clientMessageCompanyDisplays[companyId]) return clientMessageCompanyDisplays[companyId];
-  const match = Object.values(clientMessageCompanyDisplays).find((company) => company.name === companyName);
+  const displayMap = getCompanyDisplayMap();
+  if (companyId && displayMap[companyId]) return displayMap[companyId];
+  const match = Object.values(displayMap).find((company) => company.name === companyName);
   return match ?? {
-    id: companyId ?? "COMP-AGAHOZO",
+    id: companyId ?? "",
     logo: (companyName ?? "KA").slice(0, 2).toUpperCase(),
-    name: companyName ?? "Agahozo Water",
+    name: companyName ?? "No company selected",
     supportStatus: "Online",
     supportTeam: "Customer Support",
     badgeClass: "bg-blue-50 text-blue-700 border-blue-200"
   };
 }
 
-const _seedMessages: ClientMessage[] = [
-  {
-    id: "CLMSG-001",
-    threadId: "CLTH-001",
-    companyId: "COMP-AGAHOZO",
-    companyName: "Agahozo Water",
-    supplierId: "SUP-001",
-    supplierName: "KingApp Beverage Pro",
-    clientId: "PORTAL-CL-001",
-    clientName: "Kigali Mart",
-    phone: "0788000001",
-    messageType: "Delivery question",
-    orderId: "CPO-DEMO-001",
-    subject: "Delivery time confirmation",
-    body: "Please confirm if today's delivery will arrive before 3 PM.",
-    fromRole: "client",
-    fromName: "Kigali Mart",
-    status: "New",
-    readByClient: true,
-    readByStaff: false,
-    createdAt: "2026-06-02T09:25:00.000Z"
-  },
-  {
-    id: "CLMSG-002",
-    threadId: "CLTH-002",
-    companyId: "COMP-TEJU",
-    companyName: "Teju Juice",
-    supplierId: "SUP-002",
-    supplierName: "Premium Water Depot",
-    clientId: "PORTAL-CL-002",
-    clientName: "Sunrise Shop",
-    phone: "0788000002",
-    messageType: "Payment question",
-    subject: "Balance statement",
-    body: "Can you send my current balance before I pay?",
-    fromRole: "client",
-    fromName: "Sunrise Shop",
-    status: "New",
-    readByClient: true,
-    readByStaff: false,
-    createdAt: "2026-06-02T10:05:00.000Z"
-  }
-];
+const _seedMessages: ClientMessage[] = [];
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -188,7 +122,7 @@ function makeId(prefix: string) {
 
 export function getCompanyForClientMessage(client: PortalClient, supplierId?: string) {
   if (supplierId && companyBySupplierId[supplierId]) return companyBySupplierId[supplierId];
-  return clientCompanyFallback[client.id] ?? { id: "COMP-AGAHOZO", name: "Agahozo Water" };
+  return clientCompanyFallback[client.id] ?? { id: "", name: "No company selected" };
 }
 
 export function getLinkedMessageCompaniesForClient(client: PortalClient) {

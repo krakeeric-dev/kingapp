@@ -13,8 +13,7 @@ import {
   type AnnouncementCenterItem
 } from "@/lib/announcementService";
 import type { AnnouncementPriority } from "@/lib/messageService";
-
-const companies = ["Agahozo Water", "Teju Juice", "King Honey", "King Eggs"];
+import { getCompanies } from "@/lib/companies-data";
 
 export default function CallCenterAnnouncementsPage() {
   return (
@@ -28,10 +27,11 @@ function AnnouncementsContent({ user }: { user: SessionUser }) {
   const [announcements, setAnnouncements] = useState<AnnouncementCenterItem[]>([]);
   const [query, setQuery] = useState("");
   const [companyFilter, setCompanyFilter] = useState("All Companies");
+  const companies = useMemo(() => getCompanies().map((company) => company.name), []);
   const [form, setForm] = useState({
     audience: "All users" as AnnouncementAudience,
     body: "",
-    companyName: "Agahozo Water",
+    companyName: "",
     priority: "Normal" as AnnouncementPriority,
     title: ""
   });

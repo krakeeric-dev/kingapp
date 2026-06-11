@@ -121,61 +121,9 @@ function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase();
 }
 
-const _seedMessages: InternalMessage[] = [
-  {
-    id: "MSG-001",
-    fromUser: "Alice Agent",
-    fromRole: "callcenter",
-    toUser: "Manager",
-    toRole: "manager",
-    subject: "Kigali Mart payment promise",
-    body: "Client promised to pay before Friday afternoon delivery.",
-    conversationId: "CONV-001",
-    companyName: "Agahozo Water",
-    messageType: "Text",
-    pinned: true,
-    status: "read",
-    deliveredAt: "2026-06-02T08:45:00.000Z",
-    readAt: "2026-06-02T08:55:00.000Z",
-    createdAt: "2026-06-02T08:44:00.000Z"
-  },
-  {
-    id: "MSG-002",
-    fromUser: "Manager",
-    fromRole: "manager",
-    toUser: "Call Center Agent",
-    toRole: "callcenter",
-    subject: "Confirm high balance clients",
-    body: "Please prioritize stores with unpaid balances before taking new orders.",
-    conversationId: "CONV-002",
-    companyName: "Agahozo Water",
-    messageType: "System notification",
-    status: "delivered",
-    deliveredAt: "2026-06-02T09:10:00.000Z",
-    createdAt: "2026-06-02T09:10:00.000Z"
-  }
-];
+const _seedMessages: InternalMessage[] = [];
 
-const _seedAnnouncements: TeamAnnouncement[] = [
-  {
-    id: "ANN-001",
-    title: "Meeting at 4 PM",
-    body: "Call center team review for delivery issues and payment promises.",
-    priority: "Important",
-    audience: "All",
-    createdBy: "Manager",
-    createdAt: "2026-06-02T09:00:00.000Z"
-  },
-  {
-    id: "ANN-002",
-    title: "Promotion update",
-    body: "Push Water 500ml reorder calls for priority retail clients today.",
-    priority: "Normal",
-    audience: "Agents",
-    createdBy: "Manager",
-    createdAt: "2026-06-02T09:30:00.000Z"
-  }
-];
+const _seedAnnouncements: TeamAnnouncement[] = [];
 
 export function getMessages() {
   const messages = readJson<InternalMessage[]>(MESSAGES_KEY, []);
@@ -262,7 +210,7 @@ export function getConversations(): Conversation[] {
       id,
       companyId: existing?.companyId ?? companyIdFromName(message.companyName),
       title: existing?.title ?? message.subject,
-      company: message.companyName ?? existing?.company ?? "Agahozo Water",
+      company: message.companyName ?? existing?.company ?? "No company selected",
       clientName: existing?.clientName ?? message.toUser,
       phone: existing?.phone ?? "Internal",
       pinned: existing?.pinned ?? Boolean(message.pinned),
@@ -278,10 +226,7 @@ export function getConversations(): Conversation[] {
 function companyIdFromName(companyName?: string) {
   if (!companyName) return undefined;
   return {
-    "Agahozo Water": "COMP-AGAHOZO",
-    "Teju Juice": "COMP-TEJU",
-    "King Honey": "COMP-KING-HONEY",
-    "King Eggs": "COMP-KING-EGGS"
+    "No company selected": ""
   }[companyName];
 }
 

@@ -16,43 +16,17 @@ const COMPANIES_KEY = "kingapp.companies";
 const ACTIVE_COMPANY_KEY = "kingapp.activeCompanyId";
 const DEFAULT_CREATED_AT = "2026-06-02T00:00:00.000Z";
 
-export const defaultCompanyId = "COMP-AGAHOZO";
-export const defaultCompanyName = "Agahozo Water";
+export const defaultCompanyId = "";
+export const defaultCompanyName = "No company selected";
 
-export const defaultCompanies: Company[] = [
-  {
-    id: "COMP-AGAHOZO",
-    name: "Agahozo Water",
-    type: "Beverage Distribution",
-    status: "active",
-    createdAt: DEFAULT_CREATED_AT,
-    updatedAt: DEFAULT_CREATED_AT
-  },
-  {
-    id: "COMP-TEJU",
-    name: "Teju Juice",
-    type: "Juice Distribution",
-    status: "active",
-    createdAt: DEFAULT_CREATED_AT,
-    updatedAt: DEFAULT_CREATED_AT
-  },
-  {
-    id: "COMP-KING-HONEY",
-    name: "King Honey",
-    type: "Honey Distribution",
-    status: "active",
-    createdAt: DEFAULT_CREATED_AT,
-    updatedAt: DEFAULT_CREATED_AT
-  },
-  {
-    id: "COMP-KING-EGGS",
-    name: "King Eggs",
-    type: "Fresh Goods Distribution",
-    status: "active",
-    createdAt: DEFAULT_CREATED_AT,
-    updatedAt: DEFAULT_CREATED_AT
-  }
-];
+export const defaultCompanies: Company[] = [];
+
+const retiredCompanyIds = new Set([
+  "COMP-AGAHOZO",
+  "COMP-TEJU",
+  "COMP-KING-HONEY",
+  "COMP-KING-EGGS"
+]);
 
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -78,16 +52,8 @@ function makeId(prefix: string) {
 
 export function getCompanies() {
   const current = readJson<Company[]>(COMPANIES_KEY, defaultCompanies);
-  const merged = [...current];
-  let changed = false;
-
-  defaultCompanies.forEach((company) => {
-    const exists = merged.some((item) => item.id === company.id);
-    if (!exists) {
-      merged.push(company);
-      changed = true;
-    }
-  });
+  const merged = current.filter((company) => !retiredCompanyIds.has(company.id));
+  const changed = merged.length !== current.length;
 
   if (changed) {
     writeJson(COMPANIES_KEY, merged);

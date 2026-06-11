@@ -26,6 +26,7 @@ import {
   filterByAssignedCompanies,
   getActiveCompanyId,
   getAssignedCompanyIds,
+  getCompanies,
   getCompanyWorkspaceId,
   setActiveCompanyId
 } from "@/lib/companies-data";
@@ -44,19 +45,24 @@ export type OneClickOrderInput = {
   quantity: number;
 };
 
-export const callCenterCompanies: CallCenterCompany[] = [
-  { id: "COMP-AGAHOZO", name: "Agahozo Water", industry: "Beverage Distribution", status: "Active" },
-  { id: "COMP-TEJU", name: "Teju Juice", industry: "Juice Distribution", status: "Active" },
-  { id: "COMP-KING-HONEY", name: "King Honey", industry: "Honey Distribution", status: "Active" },
-  { id: "COMP-KING-EGGS", name: "King Eggs", industry: "Fresh Goods Distribution", status: "Active" }
-];
+export const callCenterCompanies: CallCenterCompany[] = [];
+
+function getCallCenterCompanies() {
+  return getCompanies().map((company) => ({
+    id: company.id,
+    name: company.name,
+    industry: company.type,
+    status: company.status === "active" ? ("Active" as const) : ("Inactive" as const)
+  }));
+}
 
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
 function companyForIndex(index: number) {
-  return callCenterCompanies[index % callCenterCompanies.length];
+  const companies = getCallCenterCompanies();
+  return companies[index % Math.max(companies.length, 1)] ?? null;
 }
 
 export function companyForClient(client: Pick<CallCenterClient, "id" | "companyId" | "companyName">) {
@@ -65,7 +71,7 @@ export function companyForClient(client: Pick<CallCenterClient, "id" | "companyI
   }
   const digits = Number(client.id.replace(/\D/g, "")) || 1;
   const company = companyForIndex(digits - 1);
-  return { id: company.id, name: company.name };
+  return { id: company?.id ?? "", name: company?.name ?? "No company selected" };
 }
 
 export function companyForAgent(agent: Pick<CallCenterAgent, "id" | "companyId" | "companyName">) {
@@ -74,7 +80,7 @@ export function companyForAgent(agent: Pick<CallCenterAgent, "id" | "companyId" 
   }
   const digits = Number(agent.id.replace(/\D/g, "")) || 1;
   const company = companyForIndex(digits - 1);
-  return { id: company.id, name: company.name };
+  return { id: company?.id ?? "", name: company?.name ?? "No company selected" };
 }
 
 function readCompanyId() {
@@ -91,8 +97,9 @@ export function getActiveCallCenterCompanyForUser(user: SessionUser) {
 
 export function getAssignableCallCenterCompanies(user: SessionUser) {
   const assigned = getAssignedCompanyIds(user);
-  if (assigned.includes("all")) return callCenterCompanies;
-  return callCenterCompanies.filter((company) => assigned.includes(company.id));
+  const companies = getCallCenterCompanies();
+  if (assigned.includes("all")) return companies;
+  return companies.filter((company) => assigned.includes(company.id));
 }
 
 export function setActiveCallCenterCompany(companyId: string) {

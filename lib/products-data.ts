@@ -34,64 +34,9 @@ const PRODUCT_MASTER_KEY = "kingapp.productMaster";
 const PRICE_HISTORY_KEY = "kingapp.priceHistory";
 const AUDIT_LOG_KEY = "kingapp.auditLog";
 
-export const defaultProducts: ProductMaster[] = [
-  {
-    name: "Water 500ml",
-    companyId: "COMP-AGAHOZO",
-    companyName: "Agahozo Water",
-    itemCode: "WT-500",
-    unit: "Cartons",
-    category: "Bottled Water",
-    minimumStock: 100,
-    openingStock: 500,
-    pricePerCarton: 1999,
-    costPrice: 1200,
-    cartonSize: 24,
-    status: "Active"
-  },
-  {
-    name: "Water 1L",
-    companyId: "COMP-AGAHOZO",
-    companyName: "Agahozo Water",
-    itemCode: "WT-1000",
-    unit: "Cartons",
-    category: "Bottled Water",
-    minimumStock: 80,
-    openingStock: 300,
-    pricePerCarton: 2500,
-    costPrice: 1600,
-    cartonSize: 12,
-    status: "Active"
-  },
-  {
-    name: "Water 1.5L",
-    companyId: "COMP-AGAHOZO",
-    companyName: "Agahozo Water",
-    itemCode: "WT-1500",
-    unit: "Cartons",
-    category: "Bottled Water",
-    minimumStock: 60,
-    openingStock: 200,
-    pricePerCarton: 3000,
-    costPrice: 1900,
-    cartonSize: 12,
-    status: "Active"
-  },
-  {
-    name: "Water 5L",
-    companyId: "COMP-AGAHOZO",
-    companyName: "Agahozo Water",
-    itemCode: "WT-5000",
-    unit: "Cartons",
-    category: "Bottled Water",
-    minimumStock: 40,
-    openingStock: 0,
-    pricePerCarton: 5000,
-    costPrice: 3200,
-    cartonSize: 4,
-    status: "Active"
-  }
-];
+export const defaultProducts: ProductMaster[] = [];
+
+const retiredProductCodes = new Set(["WT-500", "WT-1000", "WT-1500", "WT-5000"]);
 
 function readJson<T>(key: string, fallback: T): T {
   const rawValue = window.localStorage.getItem(key);
@@ -138,7 +83,7 @@ export function productMasterKey(productName: string, itemCode: string) {
 }
 
 function productId(product: Pick<ProductMaster, "companyId" | "itemCode" | "name">) {
-  return `${product.companyId ?? "COMP-AGAHOZO"}::${product.itemCode || product.name}`.toUpperCase();
+  return `${product.companyId ?? ""}::${product.itemCode || product.name}`.toUpperCase();
 }
 
 function normalizeProduct(product: ProductMaster): ProductMaster {
@@ -149,8 +94,8 @@ function normalizeProduct(product: ProductMaster): ProductMaster {
   return {
     ...product,
     id: product.id ?? productId(product),
-    companyId: product.companyId ?? defaultProduct?.companyId ?? "COMP-AGAHOZO",
-    companyName: product.companyName ?? defaultProduct?.companyName ?? "Agahozo Water",
+    companyId: product.companyId ?? defaultProduct?.companyId ?? "",
+    companyName: product.companyName ?? defaultProduct?.companyName ?? "No company selected",
     costPrice: product.costPrice ?? defaultProduct?.costPrice ?? 0,
     cartonSize: product.cartonSize ?? defaultProduct?.cartonSize ?? 1,
     status: product.status ?? "Active"
@@ -162,8 +107,9 @@ export function ensureDefaultProducts() {
     PRODUCT_MASTER_KEY,
     defaultProducts
   );
-  const mergedProducts = currentProducts.map(normalizeProduct);
-  let changed = false;
+  const filteredProducts = currentProducts.filter((product) => !retiredProductCodes.has(product.itemCode));
+  const mergedProducts = filteredProducts.map(normalizeProduct);
+  let changed = filteredProducts.length !== currentProducts.length;
 
   defaultProducts.forEach((defaultProduct) => {
     const normalizedDefault = normalizeProduct(defaultProduct);

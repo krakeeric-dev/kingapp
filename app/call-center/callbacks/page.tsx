@@ -112,7 +112,7 @@ function CallbacksContent({ user }: { user: SessionUser }) {
           <Input defaultValue={new Date().toISOString().slice(0, 10)} label="Callback Date" name="callbackDate" type="date" />
           <Input defaultValue={new Date().toTimeString().slice(0, 5)} label="Callback Time" name="callbackTime" type="time" />
           <Input label="Reason" name="reason" />
-          <Input defaultValue="Alice Agent" label="Assigned Agent" name="assignedAgent" />
+          <Input defaultValue={user.displayName} label="Assigned Agent" name="assignedAgent" />
           <label className="block">
             <span className="mb-1 block text-xs font-bold uppercase tracking-normal text-slate-500">Priority</span>
             <select className="form-input" name="priority">

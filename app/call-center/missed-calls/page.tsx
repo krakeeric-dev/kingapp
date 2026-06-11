@@ -55,7 +55,7 @@ function MissedCallsContent({ user }: { user: SessionUser }) {
       callbackDate: new Date().toISOString().slice(0, 10),
       callbackTime: new Date().toTimeString().slice(0, 5),
       reason: call.reason || "Missed call callback",
-      assignedAgent: "Alice Agent",
+      assignedAgent: user.displayName,
       priority: "High",
       status: "Pending"
     });

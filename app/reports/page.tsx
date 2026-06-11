@@ -387,12 +387,7 @@ function ReportsContent({ user }: { user: SessionUser }) {
   );
 }
 
-const reportProducts = [
-  { key: "500ml", productName: "Water 500ml", itemCode: "WT-500" },
-  { key: "1L", productName: "Water 1L", itemCode: "WT-1000" },
-  { key: "1.5L", productName: "Water 1.5L", itemCode: "WT-1500" },
-  { key: "5L", productName: "Water 5L", itemCode: "WT-5000" }
-] as const;
+const reportProducts: Array<{ key: string; productName: string; itemCode: string }> = [];
 
 function safeArray<T>(loader: () => T[]): T[] {
   try {

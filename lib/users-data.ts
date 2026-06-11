@@ -47,152 +47,20 @@ export const defaultUsers: PlatformUser[] = [
     status: "active",
     createdAt: DEFAULT_CREATED_AT,
     updatedAt: DEFAULT_CREATED_AT
-  },
-  {
-    id: "USER-SUPERVISOR",
-    username: "supervisor",
-    password: "supervisor123",
-    name: "Supervisor",
-    displayName: "Supervisor",
-    role: "supervisor",
-    companyId: defaultCompanyId,
-    companyName: defaultCompanyName,
-    assignedCompanies: [defaultCompanyId],
-    phone: "",
-    email: "supervisor@kingapp.local",
-    status: "active",
-    createdAt: DEFAULT_CREATED_AT,
-    updatedAt: DEFAULT_CREATED_AT
-  },
-  {
-    id: "USER-STOREKEEPER",
-    username: "storekeeper",
-    password: "store123",
-    name: "Storekeeper",
-    displayName: "Storekeeper",
-    role: "storekeeper",
-    companyId: defaultCompanyId,
-    companyName: defaultCompanyName,
-    assignedCompanies: [defaultCompanyId],
-    phone: "",
-    email: "storekeeper@kingapp.local",
-    status: "active",
-    createdAt: DEFAULT_CREATED_AT,
-    updatedAt: DEFAULT_CREATED_AT
-  },
-  {
-    id: "USER-ACCOUNTANT",
-    username: "accountant",
-    password: "cashier123",
-    name: "Accountant",
-    displayName: "Accountant",
-    role: "accountant",
-    companyId: defaultCompanyId,
-    companyName: defaultCompanyName,
-    assignedCompanies: [defaultCompanyId],
-    phone: "",
-    email: "accountant@kingapp.local",
-    status: "active",
-    createdAt: DEFAULT_CREATED_AT,
-    updatedAt: DEFAULT_CREATED_AT
-  },
-  {
-    id: "USER-MANAGER",
-    username: "manager",
-    password: "manager123",
-    name: "Manager",
-    displayName: "Manager",
-    role: "manager",
-    companyId: defaultCompanyId,
-    companyName: defaultCompanyName,
-    assignedCompanies: [defaultCompanyId, "COMP-TEJU"],
-    phone: "",
-    email: "manager@kingapp.local",
-    status: "active",
-    createdAt: DEFAULT_CREATED_AT,
-    updatedAt: DEFAULT_CREATED_AT
-  },
-  {
-    id: "USER-MARKETER1",
-    username: "marketer1",
-    password: "marketer123",
-    name: "Marketer 1",
-    displayName: "Marketer 1",
-    role: "marketer",
-    companyId: defaultCompanyId,
-    companyName: defaultCompanyName,
-    assignedCompanies: [defaultCompanyId],
-    phone: "",
-    email: "marketer1@kingapp.local",
-    status: "active",
-    createdAt: DEFAULT_CREATED_AT,
-    updatedAt: DEFAULT_CREATED_AT
-  },
-  {
-    id: "USER-CALLCENTER",
-    username: "callcenter",
-    password: "call123",
-    name: "Call Center Agent",
-    displayName: "Call Center Agent",
-    role: "callcenter",
-    companyId: defaultCompanyId,
-    companyName: defaultCompanyName,
-    assignedCompanies: [defaultCompanyId],
-    phone: "",
-    email: "callcenter@kingapp.local",
-    status: "active",
-    createdAt: DEFAULT_CREATED_AT,
-    updatedAt: DEFAULT_CREATED_AT
-  },
-  {
-    id: "USER-AGAHOZO-AGENT",
-    username: "agahozo_agent",
-    password: "agahozo123",
-    name: "Agahozo Agent",
-    displayName: "Agahozo Agent",
-    role: "callcenter",
-    companyId: defaultCompanyId,
-    companyName: defaultCompanyName,
-    assignedCompanies: [defaultCompanyId],
-    phone: "",
-    email: "agahozo.agent@kingapp.local",
-    status: "active",
-    createdAt: DEFAULT_CREATED_AT,
-    updatedAt: DEFAULT_CREATED_AT
-  },
-  {
-    id: "USER-TEJU-AGENT",
-    username: "teju_agent",
-    password: "teju123",
-    name: "Teju Agent",
-    displayName: "Teju Agent",
-    role: "callcenter",
-    companyId: "COMP-TEJU",
-    companyName: "Teju Juice",
-    assignedCompanies: ["COMP-TEJU"],
-    phone: "",
-    email: "teju.agent@kingapp.local",
-    status: "active",
-    createdAt: DEFAULT_CREATED_AT,
-    updatedAt: DEFAULT_CREATED_AT
-  },
-  {
-    id: "USER-MULTI-AGENT",
-    username: "multi_agent",
-    password: "multi123",
-    name: "Multi Company Agent",
-    displayName: "Multi Company Agent",
-    role: "callcenter",
-    companyId: defaultCompanyId,
-    companyName: defaultCompanyName,
-    assignedCompanies: [defaultCompanyId, "COMP-TEJU"],
-    phone: "",
-    email: "multi.agent@kingapp.local",
-    status: "active",
-    createdAt: DEFAULT_CREATED_AT,
-    updatedAt: DEFAULT_CREATED_AT
   }
 ];
+
+const retiredDefaultUsernames = new Set([
+  "supervisor",
+  "storekeeper",
+  "accountant",
+  "manager",
+  "marketer1",
+  "callcenter",
+  "agahozo_agent",
+  "teju_agent",
+  "multi_agent"
+]);
 
 type LegacyUser = Partial<PlatformUser> & {
   username: string;
@@ -277,8 +145,8 @@ function normalizeUser(user: LegacyUser): PlatformUser {
 }
 
 function ensureDefaultUsers(users: PlatformUser[]) {
-  const mergedUsers = [...users];
-  let changed = false;
+  const mergedUsers = users.filter((user) => !retiredDefaultUsernames.has(user.username.toLowerCase()));
+  let changed = mergedUsers.length !== users.length;
 
   defaultUsers.forEach((defaultUser) => {
     const existingIndex = mergedUsers.findIndex(

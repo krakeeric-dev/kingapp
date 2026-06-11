@@ -1,28 +1,52 @@
 const STORAGE_KEYS = {
+  productionStartVersion: "kingapp.productionStart.version",
+  companies: "kingapp.companies",
   productMaster: "kingapp.productMaster",
+  priceHistory: "kingapp.priceHistory",
   loadingRecords: "kingapp.loadingRecords",
   salesRecords: "kingapp.salesRecords",
   cashRecords: "kingapp.cashRecords",
   returnRecords: "kingapp.returnRecords",
   expenseRecords: "kingapp.expenseRecords",
+  auditLog: "kingapp.auditLog",
   inventoryMovements: "kingapp.inventoryMovements",
   minimumStock: "kingapp.minimumStock",
+  rawMaterialMaster: "kingapp.rawMaterialMaster",
+  rawMaterialMinimums: "kingapp.rawMaterialMinimums",
   callCenterClients: "kingapp.callCenter.clients",
   callCenterAgents: "kingapp.callCenter.agents",
   callCenterQueueCalls: "kingapp.callCenter.queueCalls",
   callCenterMissedCalls: "kingapp.callCenter.missedCalls",
   callCenterCallbacks: "kingapp.callCenter.callbacks",
+  callCenterComplaints: "kingapp.callCenter.complaints",
+  callCenterPaymentFollowUps: "kingapp.callCenter.paymentFollowUps",
+  callCenterPendingOrders: "kingapp.callCenter.pendingOrders",
+  callCenterFollowUps: "kingapp.callCenter.followUps",
+  callCenterNumbers: "kingapp.callCenter.numbers",
+  callCenterManualCalls: "kingapp.callCenter.manualCalls",
+  callCenterCompanyMessages: "kingapp.callCenter.companyMessages",
   callCenterMessages: "kingapp.callCenter.messages",
   callCenterAnnouncements: "kingapp.callCenter.announcements",
+  callCenterNotifications: "kingapp.callCenter.internalNotifications",
   callCenterChatMessages: "kingapp.callCenter.chatMessages",
   clientPortalClients: "kingapp.clientPortal.clients",
   clientPortalSuppliers: "kingapp.clientPortal.suppliers",
   clientPortalSupplierClients: "kingapp.clientPortal.supplierClients",
   clientPortalOrders: "kingapp.clientPortal.orders",
   clientPortalMessages: "kingapp.clientPortal.messages",
+  marketerClients: "kingapp.marketerClients",
+  customerAccounts: "kingapp.customerAccounts",
+  customerDebts: "kingapp.customerDebts",
+  customerPayments: "kingapp.customerPayments",
+  customerDebtApprovals: "kingapp.customerDebtApprovals",
+  deliveryRecords: "kingapp.delivery.records",
+  deliveryDrivers: "kingapp.delivery.drivers",
+  deliveryVehicles: "kingapp.delivery.vehicles",
   rawMaterialMovements: "kingapp.rawMaterialMovements",
   telephonyRecordings: "kingapp.telephony.recordings"
 };
+
+const PRODUCTION_START_VERSION = "2026-06-11-clean-production-start";
 
 type ProductLike = {
   productName?: string;
@@ -77,6 +101,7 @@ function removeLegacyRows<T extends ProductLike>(key: string) {
 }
 
 export function cleanupLegacyDemoProductData() {
+  resetToCleanProductionStartOnce();
   removeLegacyRows(STORAGE_KEYS.loadingRecords);
   removeLegacyRows(STORAGE_KEYS.salesRecords);
   removeLegacyRows(STORAGE_KEYS.cashRecords);
@@ -85,6 +110,60 @@ export function cleanupLegacyDemoProductData() {
   removeLegacyRows(STORAGE_KEYS.inventoryMovements);
   removeLegacyRows(STORAGE_KEYS.minimumStock);
   cleanupKnownMockBusinessData();
+}
+
+function resetToCleanProductionStartOnce() {
+  if (typeof window === "undefined") return;
+  if (window.localStorage.getItem(STORAGE_KEYS.productionStartVersion) === PRODUCTION_START_VERSION) return;
+
+  [
+    STORAGE_KEYS.companies,
+    STORAGE_KEYS.productMaster,
+    STORAGE_KEYS.priceHistory,
+    STORAGE_KEYS.loadingRecords,
+    STORAGE_KEYS.salesRecords,
+    STORAGE_KEYS.cashRecords,
+    STORAGE_KEYS.returnRecords,
+    STORAGE_KEYS.expenseRecords,
+    STORAGE_KEYS.auditLog,
+    STORAGE_KEYS.inventoryMovements,
+    STORAGE_KEYS.minimumStock,
+    STORAGE_KEYS.rawMaterialMaster,
+    STORAGE_KEYS.rawMaterialMinimums,
+    STORAGE_KEYS.callCenterClients,
+    STORAGE_KEYS.callCenterAgents,
+    STORAGE_KEYS.callCenterQueueCalls,
+    STORAGE_KEYS.callCenterMissedCalls,
+    STORAGE_KEYS.callCenterCallbacks,
+    STORAGE_KEYS.callCenterComplaints,
+    STORAGE_KEYS.callCenterPaymentFollowUps,
+    STORAGE_KEYS.callCenterPendingOrders,
+    STORAGE_KEYS.callCenterFollowUps,
+    STORAGE_KEYS.callCenterNumbers,
+    STORAGE_KEYS.callCenterManualCalls,
+    STORAGE_KEYS.callCenterCompanyMessages,
+    STORAGE_KEYS.callCenterMessages,
+    STORAGE_KEYS.callCenterAnnouncements,
+    STORAGE_KEYS.callCenterNotifications,
+    STORAGE_KEYS.callCenterChatMessages,
+    STORAGE_KEYS.clientPortalClients,
+    STORAGE_KEYS.clientPortalSuppliers,
+    STORAGE_KEYS.clientPortalSupplierClients,
+    STORAGE_KEYS.clientPortalOrders,
+    STORAGE_KEYS.clientPortalMessages,
+    STORAGE_KEYS.marketerClients,
+    STORAGE_KEYS.customerAccounts,
+    STORAGE_KEYS.customerDebts,
+    STORAGE_KEYS.customerPayments,
+    STORAGE_KEYS.customerDebtApprovals,
+    STORAGE_KEYS.deliveryRecords,
+    STORAGE_KEYS.deliveryDrivers,
+    STORAGE_KEYS.deliveryVehicles,
+    STORAGE_KEYS.rawMaterialMovements,
+    STORAGE_KEYS.telephonyRecordings
+  ].forEach((key) => window.localStorage.removeItem(key));
+
+  window.localStorage.setItem(STORAGE_KEYS.productionStartVersion, PRODUCTION_START_VERSION);
 }
 
 function idStartsWith(record: unknown, prefixes: string[]) {
