@@ -8,21 +8,26 @@ import {
   BellRing,
   BookOpen,
   Box,
+  Building2,
   CalendarClock,
   ChevronDown,
   ChevronRight,
   ClipboardList,
   Clock,
+  Copy,
   CreditCard,
+  FileText,
   Gauge,
   Headphones,
   Home,
+  Keyboard,
   MessageCircle,
   MessageSquare,
   MessageSquareWarning,
   Megaphone,
   LogOut,
   MicOff,
+  MoreHorizontal,
   Pause,
   Phone,
   PhoneCall,
@@ -35,6 +40,7 @@ import {
   Truck,
   UserRound,
   UsersRound,
+  Volume2,
   WalletCards
 } from "lucide-react";
 import {
@@ -77,6 +83,7 @@ import {
   callCenterCompanies,
   createOneClickOrder,
   getActiveCallCenterCompanyForUser,
+  getAssignableCallCenterCompanies,
   getCompanyClients,
   getCompanyAgents,
   getCompanyCallbacks,
@@ -119,23 +126,17 @@ const normalizePhone = (value: string) => value.replace(/\D/g, "");
 
 const menuItems = [
   { label: "Dashboard", href: "/call-center", icon: Home, badge: "" },
-  { label: "Incoming Calls", href: "/call-center/queue", icon: PhoneIncoming, badge: "2" },
-  { label: "Softphone", href: "/call-center/softphone", icon: PhoneCall, badge: "" },
-  { label: "Live Monitor", href: "/call-center/live-monitor", icon: Bell, badge: "" },
-  { label: "Performance", href: "/call-center/performance", icon: Trophy, badge: "" },
-  { label: "Clients", href: "#clients", icon: UsersRound, badge: "" },
-  { label: "Orders", href: "#orders", icon: ClipboardList, badge: "" },
-  { label: "Follow Ups", href: "/call-center/callbacks", icon: CalendarClock, badge: "" },
+  { label: "Live Calls", href: "/call-center/softphone", icon: PhoneCall, badge: "" },
+  { label: "Call Queue", href: "/call-center/queue", icon: PhoneIncoming, badge: "1" },
   { label: "Messages", href: "/call-center/messages", icon: MessageSquare, badge: "" },
-  { label: "Chat", href: "/call-center/chat", icon: MessageCircle, badge: "" },
-  { label: "Announcements", href: "/call-center/announcements", icon: Megaphone, badge: "" },
+  { label: "Client Orders", href: "#orders", icon: ClipboardList, badge: "" },
   { label: "Complaints", href: "/call-center/complaints", icon: MessageSquareWarning, badge: "" },
-  { label: "Payments", href: "#payments", icon: CreditCard, badge: "" },
+  { label: "Callbacks", href: "/call-center/callbacks", icon: CalendarClock, badge: "" },
+  { label: "Clients", href: "#clients", icon: UsersRound, badge: "" },
+  { label: "Performance", href: "/call-center/performance", icon: Trophy, badge: "" },
   { label: "Recordings", href: "/call-center/recordings", icon: Radio, badge: "" },
-  { label: "Wallboard", href: "/call-center/wallboard", icon: Gauge, badge: "" },
-  { label: "Analytics", href: "/call-center/analytics", icon: BookOpen, badge: "" },
-  { label: "Settings", href: "/call-center/settings", icon: UserRound, badge: "" },
-  { label: "Go-Live Checklist", href: "/call-center/production-checklist", icon: ClipboardList, badge: "" }
+  { label: "Reports", href: "/call-center/analytics", icon: BookOpen, badge: "" },
+  { label: "Settings", href: "/call-center/settings", icon: UserRound, badge: "" }
 ];
 
 const toolItems = [
@@ -329,6 +330,15 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
     paymentsDue: payments.filter((payment) => payment.status !== "Closed").reduce((sum, payment) => sum + payment.amountDue, 0)
   };
   const messagingStats = getMessagingDashboardStats(user);
+  const availableCompanies = getAssignableCallCenterCompanies(user);
+  const activeCompanyName =
+    activeCompany === "all"
+      ? "All Companies"
+      : availableCompanies.find((company) => company.id === activeCompany)?.name ?? user.companyName;
+  const missedCalls = queueCalls.filter((call) => call.status === "Missed").length;
+  const clientMessages = messagingStats.unreadMessages;
+  const displayQueueCount = queueCalls.filter((call) => call.status === "Waiting" || call.status === "Incoming").length;
+  const activeCallsCount = queueCalls.filter((call) => call.status === "Active").length;
   const mtnMatchedClient = useMemo(() => {
     const phone = normalizePhone(mtnForm.callerPhone);
     const name = mtnForm.clientName.trim().toLowerCase();
@@ -625,140 +635,19 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
       <div className="flex min-h-screen">
         <CallCenterSidebar activeCompany={activeCompany} onLogout={onLogout} user={user} />
         <section className="min-w-0 flex-1">
-          <TopBar
+          <PremiumCallCenterHeader
+            activeCalls={activeCallsCount}
             activeCompany={activeCompany}
-            agentsOnline={agentsOnline}
-            callsInQueue={callsInQueue}
+            activeCompanyName={activeCompanyName}
+            callbacks={dueCallbacks.length}
+            companies={availableCompanies}
+            messages={clientMessages}
+            missedCalls={missedCalls}
             onCompanyChange={(companyId) => setActiveCompany(setActiveCallCenterCompany(companyId))}
-            assignedNumbers={assignedNumbers}
             user={user}
+            waitingQueue={displayQueueCount}
           />
           <div className="space-y-4 p-4 lg:p-6">
-            <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs font-black uppercase text-blue-700">Provider: MTN Physical Line</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-600">Status: Manual Logging Mode</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-black uppercase text-amber-700">Provider: Not Connected</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-600">Phone provider connection pending</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button className="primary-button" onClick={() => setMtnFormOpen((current) => !current)} type="button">
-                    <Phone className="h-4 w-4" />
-                    Log Incoming MTN Call
-                  </button>
-                </div>
-              </div>
-              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-                MTN physical line cannot trigger automatic popup until connected through GSM Gateway, 3CX, Asterisk, or SIP integration.
-              </div>
-            </section>
-
-            {mtnFormOpen ? (
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-black text-slate-950">Log Incoming MTN Call</h3>
-                    <p className="mt-1 text-sm font-semibold text-slate-500">Search by phone or client name, then save the manual call log.</p>
-                  </div>
-                  <button className="secondary-button" onClick={() => setMtnFormOpen(false)} type="button">Close</button>
-                </div>
-                <form className="grid gap-4 lg:grid-cols-5" onSubmit={saveMtnPhysicalCall}>
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-black uppercase text-slate-500">Caller phone number</span>
-                    <input
-                      className="form-input"
-                      onChange={(event) => setMtnForm((current) => ({ ...current, callerPhone: event.target.value }))}
-                      value={mtnForm.callerPhone}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-black uppercase text-slate-500">Client name auto-search</span>
-                    <input
-                      className="form-input"
-                      onChange={(event) => setMtnForm((current) => ({ ...current, clientName: event.target.value }))}
-                      value={mtnForm.clientName}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-black uppercase text-slate-500">Company</span>
-                    <select
-                      className="form-input"
-                      onChange={(event) => setMtnForm((current) => ({ ...current, companyId: event.target.value }))}
-                      value={mtnForm.companyId}
-                    >
-                      {callCenterCompanies.map((company) => (
-                        <option key={company.id} value={company.id}>{company.name}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-black uppercase text-slate-500">Reason for call</span>
-                    <select
-                      className="form-input"
-                      onChange={(event) => setMtnForm((current) => ({ ...current, reason: event.target.value as CallType }))}
-                      value={mtnForm.reason}
-                    >
-                      {["New Order", "Reorder", "Complaint", "Payment Follow-up", "Customer Care", "New Client Prospect"].map((reason) => (
-                        <option key={reason} value={reason}>{reason}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-black uppercase text-slate-500">Notes</span>
-                    <input
-                      className="form-input"
-                      onChange={(event) => setMtnForm((current) => ({ ...current, notes: event.target.value }))}
-                      value={mtnForm.notes}
-                    />
-                  </label>
-                  <div className="lg:col-span-5">
-                    {mtnMatchedClient ? (
-                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
-                        Client found: {mtnMatchedClient.clientName} - {mtnMatchedClient.phone} - {mtnMatchedClient.companyName}
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600">
-                        No exact client match yet. This will be saved as Unknown Caller unless you choose a suggestion.
-                      </div>
-                    )}
-                    {mtnClientSuggestions.length ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {mtnClientSuggestions.map((client) => (
-                          <button
-                            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50"
-                            key={client.id}
-                            onClick={() =>
-                              setMtnForm((current) => ({
-                                ...current,
-                                callerPhone: client.phone,
-                                clientName: client.clientName,
-                                companyId: client.companyId ?? current.companyId
-                              }))
-                            }
-                            type="button"
-                          >
-                            {client.clientName} - {client.phone}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-wrap gap-2 lg:col-span-5">
-                    <button className="primary-button" type="submit">Save MTN Call</button>
-                    <button className="secondary-button" onClick={() => setActionMode("order")} type="button">Create Order</button>
-                    <button className="secondary-button" onClick={() => setActionMode("complaint")} type="button">Complaint</button>
-                    <button className="secondary-button" onClick={() => setActionMode("payment")} type="button">Payment Follow-up</button>
-                    <button className="secondary-button" onClick={() => setActionMode("callback")} type="button">Schedule Callback</button>
-                  </div>
-                </form>
-              </section>
-            ) : null}
-
             {message ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
                 {message}
@@ -785,175 +674,75 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
               />
             ) : null}
 
-            <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
-              <div className="space-y-4">
-                <CurrentCallCard call={currentCall} client={selectedClient} onEnd={endCurrentCall} onMessage={setMessage} />
-                <AssignedNumbersCard numbers={assignedNumbers} />
-                <QuickActions active={actionMode} onSelect={setActionMode} />
-                <CallStats stats={stats} />
-              </div>
+            {mtnFormOpen ? (
+              <MtnCallLogger
+                clients={mtnClientSuggestions}
+                form={mtnForm}
+                matchedClient={mtnMatchedClient}
+                onChange={setMtnForm}
+                onClose={() => setMtnFormOpen(false)}
+                onSubmit={saveMtnPhysicalCall}
+              />
+            ) : null}
 
-              <div className="min-w-0 space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <KpiCard accent="green" icon={ShoppingCart} label="Today Orders" subtext="+13% vs yesterday" value={kpis.todayOrders.toLocaleString()} />
-                  <KpiCard accent="amber" icon={ClipboardList} label="Pending Orders" subtext="View all pending" value={kpis.pendingOrders.toLocaleString()} />
-                  <KpiCard accent="blue" icon={Truck} label="Deliveries Today" subtext="On the way: 6" value={kpis.deliveriesToday.toLocaleString()} />
-                  <KpiCard accent="red" icon={WalletCards} label="Payments Due" subtext={`From ${payments.length} clients`} value={`${formatMoney(kpis.paymentsDue)} RWF`} />
-                  <KpiCard accent="blue" icon={MessageSquare} label="Messages Today" subtext="Internal inbox" value={messagingStats.messagesToday.toLocaleString()} />
-                  <KpiCard accent="red" icon={MessageSquareWarning} label="Unread Messages" subtext="Need attention" value={messagingStats.unreadMessages.toLocaleString()} />
-                  <KpiCard accent="amber" icon={Megaphone} label="Announcements" subtext="Team broadcasts" value={messagingStats.announcements.toLocaleString()} />
-                  <KpiCard accent="red" icon={Bell} label="Urgent Alerts" subtext="Orders, complaints, callbacks" value={messagingStats.urgentAlerts.toLocaleString()} />
-                  <KpiCard accent="blue" icon={MessageCircle} label="Active Chats" subtext="Live team rooms" value={messagingStats.activeChats.toLocaleString()} />
-                  <KpiCard accent="green" icon={Clock} label="Response Time" subtext="Average today" value={messagingStats.responseTime} />
-                </div>
+            <div className="grid min-h-[calc(100vh-132px)] gap-4 xl:grid-cols-[360px_minmax(0,1fr)_360px]">
+              <CustomerCallList
+                activeId={selectedClient?.id ?? ""}
+                clients={filteredClients}
+                complaints={complaints}
+                onLogMtn={() => setMtnFormOpen((current) => !current)}
+                onSearch={setQuery}
+                onSelect={setSelectedClientId}
+                orders={orders}
+                query={query}
+                queueCalls={queueCalls}
+              />
 
-                <Panel id="orders" title="Pending Orders (Real Time)" action={<Link className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-black text-blue-700" href="/loading">View All Orders</Link>}>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="text-xs font-black uppercase text-slate-500">
-                        <tr>
-                          <th className="px-3 py-3">#</th>
-                          <th className="px-3 py-3">Client</th>
-                          <th className="px-3 py-3">Items</th>
-                          <th className="px-3 py-3">Total</th>
-                          <th className="px-3 py-3">Requested Delivery</th>
-                          <th className="px-3 py-3">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pendingOrders.slice(0, 6).map((order, index) => (
-                          <tr className="border-t border-slate-100" key={order.id}>
-                            <td className="px-3 py-3 font-bold">{index + 1}</td>
-                            <td className="px-3 py-3 font-black">{order.clientName}</td>
-                            <td className="px-3 py-3">{order.quantity} x {order.product}</td>
-                            <td className="px-3 py-3">{formatMoney(order.quantity * 2000)}</td>
-                            <td className="px-3 py-3">{order.deliveryDate}</td>
-                            <td className="px-3 py-3"><StatusPill label="Waiting Loading" tone="amber" /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </Panel>
+              <CustomerWorkspace
+                activeTab={tab}
+                client={selectedClient}
+                onTabChange={setTab}
+                orders={orders}
+                payments={payments}
+              />
 
-                <Panel title="Delivery Follow-Up">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="text-xs font-black uppercase text-slate-500">
-                        <tr>
-                          <th className="px-3 py-3">Client</th>
-                          <th className="px-3 py-3">Order</th>
-                          <th className="px-3 py-3">Truck</th>
-                          <th className="px-3 py-3">Driver</th>
-                          <th className="px-3 py-3">ETA</th>
-                          <th className="px-3 py-3">Status</th>
-                          <th className="px-3 py-3">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {deliveries.slice(0, 6).map((delivery) => (
-                          <tr className="border-t border-slate-100" key={delivery.id}>
-                            <td className="px-3 py-3 font-black">{delivery.clientName}</td>
-                            <td className="px-3 py-3">{delivery.orderId}</td>
-                            <td className="px-3 py-3">{delivery.truck}</td>
-                            <td className="px-3 py-3">{delivery.driver}</td>
-                            <td className="px-3 py-3">{delivery.etaStart} - {delivery.etaEnd}</td>
-                            <td className="px-3 py-3"><StatusPill label={delivery.status} tone={delivery.status === "Delivered" ? "green" : "blue"} /></td>
-                            <td className="px-3 py-3">
-                              <div className="flex flex-wrap gap-2">
-                                <Link className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-black text-blue-700" href="/delivery/routes">Follow Up</Link>
-                                <button className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-black text-amber-700" onClick={() => setMessage(`Driver notified for ${delivery.orderId}.`)} type="button">Notify Driver</button>
-                                <button className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-black text-slate-700" onClick={() => setMessage(`Reschedule request logged for ${delivery.orderId}.`)} type="button">Reschedule</button>
-                                <button className="rounded-lg bg-red-50 px-3 py-2 text-xs font-black text-red-700" onClick={() => setActionMode("complaint")} type="button">Complaint</button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {deliveries.length === 0 ? (
-                      <p className="px-3 py-4 text-sm font-semibold text-slate-500">No delivery records yet.</p>
-                    ) : null}
-                  </div>
-                </Panel>
-
-                <Panel title="Call Log (Today)">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="text-xs font-black uppercase text-slate-500">
-                        <tr>
-                          <th className="px-3 py-3">Time</th>
-                          <th className="px-3 py-3">Client</th>
-                          <th className="px-3 py-3">Number</th>
-                          <th className="px-3 py-3">Type</th>
-                          <th className="px-3 py-3">Outcome</th>
-                          <th className="px-3 py-3">Agent</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {todaysLogs.slice(0, 6).map((record) => (
-                          <tr className="border-t border-slate-100" key={record.id}>
-                            <td className="px-3 py-3">{record.time}</td>
-                            <td className="px-3 py-3 font-black">{record.clientName}</td>
-                            <td className="px-3 py-3">{record.phone}</td>
-                            <td className="px-3 py-3">{record.callType}</td>
-                            <td className="px-3 py-3"><StatusPill label={record.outcome} tone={record.outcome === "Closed" ? "green" : "blue"} /></td>
-                            <td className="px-3 py-3">{record.agent}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {todaysLogs.length === 0 ? (
-                      <p className="px-3 py-4 text-sm font-semibold text-slate-500">No calls logged today yet.</p>
-                    ) : null}
-                  </div>
-                </Panel>
-
-                <Panel id="reminders" title="Reminders & Callbacks">
-                  <div className="divide-y divide-slate-100">
-                    {dueCallbacks.slice(0, 4).map((callback) => (
-                      <div className="grid gap-3 py-3 sm:grid-cols-[120px_1fr_48px] sm:items-center" key={callback.id}>
-                        <div className="rounded-lg bg-purple-50 px-3 py-2 text-sm font-black text-purple-700">
-                          {callback.callbackDate === today() ? "Today" : callback.callbackDate}<br />{callback.callbackTime}
-                        </div>
-                        <div>
-                          <p className="font-black">{callback.clientName}</p>
-                          <p className="text-sm font-semibold text-slate-500">{callback.reason}</p>
-                          <p className="text-xs font-bold text-slate-400">Agent: {callback.assignedAgent}</p>
-                        </div>
-                        <button className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700" type="button">
-                          <PhoneCall className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </Panel>
-              </div>
-
-              {selectedClient ? (
-                <aside className="space-y-4">
-                  <ClientDetailsCard client={selectedClient} onSearch={setQuery} query={query} results={filteredClients} onSelect={setSelectedClientId} />
-                  <ClientTabs active={tab} client={selectedClient} orders={orders} payments={payments} onChange={setTab} />
-                  <ClientTimeline client={selectedClient} />
-                  <CurrentOrderCard
-                    actionMode={actionMode}
-                    callbackForm={callbackForm}
-                    complaintForm={complaintForm}
-                    onCallbackChange={setCallbackForm}
-                    onCallbackSubmit={scheduleCallback}
-                    onComplaintChange={setComplaintForm}
-                    onComplaintSubmit={saveComplaint}
-                    onOrderChange={setOrderForm}
-                    onOrderSubmit={sendOrder}
-                    onPaymentChange={setPaymentForm}
-                    onPaymentSubmit={savePaymentReminder}
-                    orderForm={orderForm}
-                    paymentForm={paymentForm}
-                    products={products}
-                  />
-                  <NotesCard client={selectedClient} noteDraft={noteDraft} onNoteChange={setNoteDraft} onSave={saveNote} />
-                </aside>
-              ) : null}
+              <aside className="space-y-4">
+                <ActiveCallPanel
+                  call={currentCall}
+                  client={selectedClient}
+                  onEnd={endCurrentCall}
+                  onMessage={setMessage}
+                />
+                <QuickActionGrid
+                  active={actionMode}
+                  onSelect={setActionMode}
+                />
+                {selectedClient ? (
+                  <>
+                    <CurrentOrderCard
+                      actionMode={actionMode}
+                      callbackForm={callbackForm}
+                      complaintForm={complaintForm}
+                      onCallbackChange={setCallbackForm}
+                      onCallbackSubmit={scheduleCallback}
+                      onComplaintChange={setComplaintForm}
+                      onComplaintSubmit={saveComplaint}
+                      onOrderChange={setOrderForm}
+                      onOrderSubmit={sendOrder}
+                      onPaymentChange={setPaymentForm}
+                      onPaymentSubmit={savePaymentReminder}
+                      orderForm={orderForm}
+                      paymentForm={paymentForm}
+                      products={products}
+                    />
+                    <NotesCard client={selectedClient} noteDraft={noteDraft} onNoteChange={setNoteDraft} onSave={saveNote} />
+                  </>
+                ) : (
+                  <Panel title="Quick Actions">
+                    <p className="text-sm font-semibold text-slate-500">Select a customer to create orders, payments, complaints, callbacks, or notes.</p>
+                  </Panel>
+                )}
+              </aside>
             </div>
           </div>
         </section>
@@ -1018,6 +807,641 @@ function CallCenterSidebar({
         <p className="mt-4 text-center text-xs font-semibold text-blue-200">Version 1.0.0</p>
       </div>
     </aside>
+  );
+}
+
+function PremiumCallCenterHeader({
+  activeCalls,
+  activeCompany,
+  activeCompanyName,
+  callbacks,
+  companies,
+  messages,
+  missedCalls,
+  onCompanyChange,
+  user,
+  waitingQueue
+}: {
+  activeCalls: number;
+  activeCompany: string;
+  activeCompanyName: string;
+  callbacks: number;
+  companies: Array<{ id: string; name: string }>;
+  messages: number;
+  missedCalls: number;
+  onCompanyChange: (companyId: string) => void;
+  user: SessionUser;
+  waitingQueue: number;
+}) {
+  const canSwitchCompany = user.role === "admin";
+
+  return (
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur lg:px-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-64 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <p className="text-[11px] font-black uppercase text-slate-400">Current Company</p>
+          <div className="mt-1 flex items-center gap-3">
+            <Building2 className="h-5 w-5 text-blue-700" />
+            {canSwitchCompany ? (
+              <select
+                className="w-full bg-transparent text-sm font-black uppercase text-slate-950 outline-none"
+                onChange={(event) => onCompanyChange(event.target.value)}
+                value={activeCompany}
+              >
+                <option value="all">All Companies</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>{company.name}</option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-sm font-black uppercase text-slate-950">{activeCompanyName}</p>
+            )}
+            <ChevronDown className="h-4 w-4 text-slate-400" />
+          </div>
+        </div>
+        <HeaderMetric icon={PhoneCall} label="Active Calls" value={activeCalls} tone="green" />
+        <HeaderMetric icon={UsersRound} label="Waiting Queue" value={waitingQueue} tone="amber" />
+        <HeaderMetric icon={PhoneOff} label="Missed Calls" value={missedCalls} tone="red" />
+        <HeaderMetric icon={MessageSquare} label="Messages" value={messages} tone="blue" />
+        <HeaderMetric icon={CalendarClock} label="Callbacks" value={callbacks} tone="purple" />
+        <div className="ml-auto flex items-center gap-4">
+          <button className="relative rounded-lg p-2 text-slate-700 hover:bg-slate-100" type="button">
+            <Bell className="h-5 w-5" />
+            <span className="absolute right-0 top-0 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white">
+              {messages + missedCalls}
+            </span>
+          </button>
+          <div className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-sm font-black text-white">
+              {user.displayName.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <p className="font-black text-slate-950">{user.displayName}</p>
+              <p className="text-xs font-semibold text-slate-500">{roleLabels[user.role]}</p>
+            </div>
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function HeaderMetric({
+  icon: Icon,
+  label,
+  tone,
+  value
+}: {
+  icon: typeof PhoneCall;
+  label: string;
+  tone: "green" | "amber" | "red" | "blue" | "purple";
+  value: number;
+}) {
+  const colors = {
+    amber: "text-orange-600",
+    blue: "text-blue-600",
+    green: "text-emerald-600",
+    purple: "text-purple-600",
+    red: "text-red-600"
+  };
+
+  return (
+    <article className="min-w-36 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <div className="flex items-center gap-3">
+        <Icon className={`h-5 w-5 ${colors[tone]}`} />
+        <div>
+          <p className="text-xs font-semibold text-slate-500">{label}</p>
+          <p className="mt-1 text-2xl font-black text-slate-950">{value.toLocaleString()}</p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function CustomerCallList({
+  activeId,
+  clients,
+  complaints,
+  onLogMtn,
+  onSearch,
+  onSelect,
+  orders,
+  query,
+  queueCalls
+}: {
+  activeId: string;
+  clients: CallCenterClient[];
+  complaints: ReturnType<typeof getComplaints>;
+  onLogMtn: () => void;
+  onSearch: (value: string) => void;
+  onSelect: (id: string) => void;
+  orders: PendingOrder[];
+  query: string;
+  queueCalls: QueueCall[];
+}) {
+  const [tab, setTab] = useState<"all" | "calls" | "messages">("all");
+  const filteredClients = clients.filter((client) => {
+    if (tab === "calls") return queueCalls.some((call) => call.clientId === client.id);
+    if (tab === "messages") return client.notes.length > 0;
+    return true;
+  });
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 p-4">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              className="form-input pl-9"
+              onChange={(event) => onSearch(event.target.value)}
+              placeholder="Search client, phone, or order"
+              value={query}
+            />
+          </div>
+          <button className="secondary-button !px-3" onClick={onLogMtn} type="button">
+            <Phone className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2 text-sm font-black">
+          {[
+            ["all", "All"],
+            ["calls", "Calls"],
+            ["messages", "Messages"]
+          ].map(([id, label]) => (
+            <button
+              className={`rounded-lg px-3 py-2 ${tab === id ? "bg-blue-600 text-white" : "bg-slate-50 text-slate-600"}`}
+              key={id}
+              onClick={() => setTab(id as "all" | "calls" | "messages")}
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="max-h-[calc(100vh-240px)] overflow-y-auto">
+        {filteredClients.map((client) => {
+          const call = queueCalls.find((item) => item.clientId === client.id);
+          const order = orders.find((item) => item.clientId === client.id);
+          const complaint = complaints.find((item) => item.clientId === client.id);
+          const status = call?.status === "Incoming"
+            ? "Incoming call"
+            : complaint
+              ? "Complaint"
+              : order
+                ? "Order request"
+                : client.currentBalance > 0
+                  ? "Payment inquiry"
+                  : "Client profile";
+
+          return (
+            <button
+              className={`flex w-full items-start gap-3 border-b border-slate-100 p-4 text-left transition ${
+                activeId === client.id ? "border-l-4 border-l-emerald-500 bg-blue-50/70" : "hover:bg-slate-50"
+              }`}
+              key={client.id}
+              onClick={() => onSelect(client.id)}
+              type="button"
+            >
+              <CustomerAvatar name={client.clientName} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="truncate font-black text-slate-950">{client.clientName}</p>
+                  <span className="text-xs font-semibold text-slate-500">{call?.startedAt ? new Date(call.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                </div>
+                <p className="text-sm font-semibold text-slate-600">{client.phone}</p>
+                <p className="mt-1 text-sm font-semibold text-slate-500">{client.companyName}</p>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-500">{status}</span>
+                  {call?.status === "Incoming" ? <PhoneCall className="h-4 w-4 text-emerald-600" /> : null}
+                  {client.notes.length ? <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-black text-white">{client.notes.length}</span> : null}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+        {!filteredClients.length ? (
+          <div className="p-4">
+            <EmptyDeskState text="No customer records yet." />
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function CustomerWorkspace({
+  client,
+  orders,
+  payments
+}: {
+  activeTab: DetailTab;
+  client?: CallCenterClient;
+  onTabChange: (tab: DetailTab) => void;
+  orders: PendingOrder[];
+  payments: ReturnType<typeof getPaymentFollowUps>;
+}) {
+  const [tab, setTab] = useState<"overview" | "history" | "orders" | "payments" | "complaints" | "notes" | "files">("overview");
+
+  if (!client) {
+    return (
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <EmptyDeskState text="No customer selected." />
+      </section>
+    );
+  }
+
+  const account = getCustomerAccounts().find((item) => item.phone.replace(/\D/g, "") === client.phone.replace(/\D/g, ""));
+  const customerPayments = account ? getCustomerPayments().filter((payment) => payment.customerId === account.customerId) : [];
+  const customerDebts = account ? getCustomerDebts().filter((debt) => debt.customerId === account.customerId) : [];
+  const currentBalance = account?.currentBalance ?? client.currentBalance;
+  const creditLimit = account?.creditLimit ?? 500_000;
+  const totalPayments = customerPayments.reduce((sum, payment) => sum + payment.amountPaid, 0);
+  const clientOrders = orders.filter((order) => order.clientId === client.id);
+  const timeline = getClientTimeline(client);
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 p-5">
+        <div className="flex flex-wrap items-center gap-4">
+          <CustomerAvatar large name={client.clientName} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-2xl font-black text-slate-950">{client.clientName}</h2>
+              {currentBalance === 0 ? <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-700">VIP</span> : null}
+            </div>
+            <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-slate-600">
+              {client.phone}
+              <Copy className="h-3.5 w-3.5 text-slate-400" />
+            </p>
+            <p className="text-sm font-black uppercase text-slate-700">{client.companyName}</p>
+          </div>
+          <SummaryTile label="Outstanding Balance" value={`${formatMoney(currentBalance)} RWF`} danger={currentBalance > 0} />
+          <SummaryTile label="Last Order" value={client.lastOrderDate || "Not recorded"} />
+          <SummaryTile label="Last Payment" value={customerPayments[0]?.date ?? client.lastPaymentDate ?? "Not recorded"} />
+        </div>
+      </div>
+
+      <div className="border-b border-slate-100 px-5">
+        <div className="flex gap-5 overflow-x-auto">
+          {[
+            ["overview", "Overview"],
+            ["history", "History"],
+            ["orders", "Orders"],
+            ["payments", "Payments"],
+            ["complaints", "Complaints"],
+            ["notes", "Notes"],
+            ["files", "Files"]
+          ].map(([id, label]) => (
+            <button
+              className={`border-b-2 py-4 text-sm font-black ${tab === id ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500"}`}
+              key={id}
+              onClick={() => setTab(id as typeof tab)}
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-4 p-5 xl:grid-cols-[1fr_1fr]">
+        {tab === "overview" ? (
+          <>
+            <Panel title="Customer Information">
+              <div className="divide-y divide-slate-100">
+                <DeskInfo label="Customer Type" value="Retail customer" />
+                <DeskInfo label="Phone" value={client.phone} />
+                <DeskInfo label="Alternative Phone" value="Not recorded" />
+                <DeskInfo label="Email" value="Not recorded" />
+                <DeskInfo label="Address" value={client.area} />
+              </div>
+            </Panel>
+            <Panel title="Statistics This Month">
+              <div className="divide-y divide-slate-100">
+                <DeskInfo label="Total Orders" value={clientOrders.length.toLocaleString()} />
+                <DeskInfo label="Total Amount" value={`${formatMoney(clientOrders.reduce((sum, order) => sum + order.quantity * 2000, 0))} RWF`} />
+                <DeskInfo label="Total Payments" value={`${formatMoney(totalPayments)} RWF`} />
+                <DeskInfo label="Outstanding" value={`${formatMoney(currentBalance)} RWF`} danger={currentBalance > 0} />
+                <DeskInfo label="Credit Limit" value={`${formatMoney(creditLimit)} RWF`} />
+              </div>
+            </Panel>
+            <div className="xl:col-span-2">
+              <RecentOrdersTable orders={clientOrders} />
+            </div>
+            <Panel title="Recent Notes">
+              <div className="space-y-2">
+                {client.notes.slice(0, 4).map((note) => (
+                  <p className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700" key={note}>{note}</p>
+                ))}
+                {!client.notes.length ? <EmptyDeskState text="No notes recorded yet." /> : null}
+              </div>
+            </Panel>
+          </>
+        ) : null}
+
+        {tab === "history" ? (
+          <div className="xl:col-span-2">
+            <Panel title="Unified Timeline">
+              <div className="space-y-3">
+                {timeline.map((item) => (
+                  <article className="rounded-lg border border-slate-100 bg-slate-50 p-3" key={`${item.type}-${item.id}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-black text-slate-950">{item.type}: {item.title}</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-600">{item.detail}</p>
+                      </div>
+                      <span className="text-xs font-bold text-slate-400">{item.createdAt.slice(0, 10)}</span>
+                    </div>
+                  </article>
+                ))}
+                {!timeline.length ? <EmptyDeskState text="No timeline activity yet." /> : null}
+              </div>
+            </Panel>
+          </div>
+        ) : null}
+
+        {tab === "orders" ? <div className="xl:col-span-2"><RecentOrdersTable orders={clientOrders} /></div> : null}
+        {tab === "payments" ? (
+          <Panel title="Payments">
+            <div className="space-y-2">
+              {payments.filter((payment) => payment.clientId === client.id).map((payment) => (
+                <Row key={payment.id} left={payment.promiseToPayDate} middle={`${formatMoney(payment.amountDue)} RWF`} right={payment.status} />
+              ))}
+              {!payments.filter((payment) => payment.clientId === client.id).length ? <EmptyDeskState text="No payment records yet." /> : null}
+            </div>
+          </Panel>
+        ) : null}
+        {tab === "complaints" ? <Panel title="Complaints"><EmptyDeskState text={customerDebts.length ? "Debt records are available under Payments." : "No complaints recorded yet."} /></Panel> : null}
+        {tab === "notes" ? <Panel title="Notes"><div className="space-y-2">{client.notes.map((note) => <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold" key={note}>{note}</p>)}{!client.notes.length ? <EmptyDeskState text="No notes recorded yet." /> : null}</div></Panel> : null}
+        {tab === "files" ? <Panel title="Files"><EmptyDeskState text="No files uploaded yet." /></Panel> : null}
+      </div>
+    </section>
+  );
+}
+
+function ActiveCallPanel({ call, client, onEnd, onMessage }: { call?: QueueCall; client?: CallCenterClient; onEnd: () => void; onMessage: (message: string) => void }) {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const displayName = call?.clientName ?? client?.clientName ?? "No active call";
+  const phone = call?.phone ?? client?.phone ?? "";
+  const timerStart = call?.acceptedAt ?? call?.startedAt;
+  const timerLabel = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
+
+  useEffect(() => {
+    if (!timerStart || !call || !["Incoming", "Active"].includes(call.status)) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const interval = window.setInterval(() => {
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - new Date(timerStart).getTime()) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [call, timerStart]);
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-lg bg-gradient-to-r from-[#061b33] to-[#0b2b52] px-4 py-3 text-white">
+        <div className="flex items-center justify-between">
+          <p className="flex items-center gap-2 text-sm font-black uppercase">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+            {call?.status === "Incoming" ? "Incoming Call" : call?.status === "Active" ? "Active Call" : "Call Controls"}
+          </p>
+          <p className="font-black">{timerLabel}</p>
+        </div>
+      </div>
+      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-5 text-center">
+        <p className="text-sm font-black text-emerald-700">{call ? "In Call" : "Ready"}</p>
+        <h3 className="mt-2 text-xl font-black text-slate-950">{displayName}</h3>
+        <p className="mt-1 font-semibold text-slate-600">{phone || "No number selected"}</p>
+        <p className="mt-1 text-lg font-black text-emerald-600">{timerLabel}</p>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        <CallControl icon={Pause} label="Hold" onClick={() => onMessage("Call placed on hold.")} />
+        <CallControl icon={MicOff} label="Mute" onClick={() => onMessage("Call muted.")} />
+        <CallControl icon={Volume2} label="Speaker" onClick={() => onMessage("Speaker enabled.")} primary />
+        <CallControl icon={PhoneIncoming} label="Transfer" onClick={() => onMessage("Transfer panel opened.")} />
+        <CallControl icon={FileText} label="Add Note" onClick={() => onMessage("Add note from the notes panel.")} />
+        <CallControl icon={Radio} label="Record" onClick={() => onMessage("Recording marked for provider integration.")} />
+        <CallControl icon={Keyboard} label="Keypad" onClick={() => onMessage("Keypad opened.")} />
+        <CallControl icon={UsersRound} label="Contacts" onClick={() => onMessage("Contacts opened.")} />
+        <CallControl icon={MoreHorizontal} label="More" onClick={() => onMessage("More actions opened.")} />
+      </div>
+      <button className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-4 text-sm font-black text-white shadow-sm hover:bg-red-600" onClick={onEnd} type="button">
+        <PhoneOff className="h-4 w-4" />
+        End Call
+      </button>
+    </section>
+  );
+}
+
+function QuickActionGrid({ active, onSelect }: { active: ActionMode; onSelect: (mode: ActionMode) => void }) {
+  const actions: Array<{ icon: typeof ShoppingCart; label: string; mode: ActionMode }> = [
+    { icon: ShoppingCart, label: "Create Order", mode: "order" },
+    { icon: CreditCard, label: "Receive Payment", mode: "payment" },
+    { icon: MessageSquareWarning, label: "Register Complaint", mode: "complaint" },
+    { icon: CalendarClock, label: "Create Callback", mode: "callback" },
+    { icon: MessageSquare, label: "Send Message", mode: "delivery" }
+  ];
+
+  return (
+    <Panel title="Quick Actions">
+      <div className="grid grid-cols-2 gap-2">
+        {actions.map((action) => (
+          <button
+            className={`flex items-center gap-2 rounded-lg border px-3 py-3 text-left text-xs font-black ${
+              active === action.mode ? "border-blue-300 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+            key={action.label}
+            onClick={() => onSelect(action.mode)}
+            type="button"
+          >
+            <action.icon className="h-4 w-4" />
+            {action.label}
+          </button>
+        ))}
+        <Link className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs font-black text-slate-700 hover:bg-slate-50" href="/customers">
+          <UserRound className="h-4 w-4" />
+          View Customer
+        </Link>
+      </div>
+    </Panel>
+  );
+}
+
+function MtnCallLogger({
+  clients,
+  form,
+  matchedClient,
+  onChange,
+  onClose,
+  onSubmit
+}: {
+  clients: CallCenterClient[];
+  form: MtnCallForm;
+  matchedClient: CallCenterClient | null;
+  onChange: (form: MtnCallForm) => void;
+  onClose: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-black text-slate-950">Log Incoming MTN Call</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-500">MTN Physical Line - Manual Logging</p>
+        </div>
+        <button className="secondary-button" onClick={onClose} type="button">Close</button>
+      </div>
+      <form className="grid gap-4 lg:grid-cols-5" onSubmit={onSubmit}>
+        <Field label="Caller Phone" onChange={(value) => onChange({ ...form, callerPhone: value })} value={form.callerPhone} />
+        <Field label="Client Name" onChange={(value) => onChange({ ...form, clientName: value })} value={form.clientName} />
+        <label className="block">
+          <span className="mb-1 block text-xs font-black uppercase text-slate-500">Reason</span>
+          <select className="form-input" onChange={(event) => onChange({ ...form, reason: event.target.value as CallType })} value={form.reason}>
+            {["New Order", "Reorder", "Complaint", "Payment Follow-up", "Customer Care", "New Client Prospect"].map((reason) => (
+              <option key={reason} value={reason}>{reason}</option>
+            ))}
+          </select>
+        </label>
+        <div className="lg:col-span-2">
+          <Field label="Notes" onChange={(value) => onChange({ ...form, notes: value })} value={form.notes} />
+        </div>
+        <div className="lg:col-span-5">
+          {matchedClient ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
+              Client found: {matchedClient.clientName} - {matchedClient.phone} - {matchedClient.companyName}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600">
+              No exact client match yet. This will be saved as an unknown caller unless you choose a suggestion.
+            </div>
+          )}
+          {clients.length ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {clients.map((client) => (
+                <button
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50"
+                  key={client.id}
+                  onClick={() => onChange({ ...form, callerPhone: client.phone, clientName: client.clientName, companyId: client.companyId ?? form.companyId })}
+                  type="button"
+                >
+                  {client.clientName} - {client.phone}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <button className="primary-button lg:col-span-5" type="submit">Save MTN Call</button>
+      </form>
+    </section>
+  );
+}
+
+function CustomerAvatar({ large = false, name }: { large?: boolean; name: string }) {
+  const initials =
+    name
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "KA";
+
+  return (
+    <div
+      className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-blue-700 font-black text-white shadow-sm ${
+        large ? "h-16 w-16 text-2xl" : "h-12 w-12 text-base"
+      }`}
+    >
+      {initials}
+    </div>
+  );
+}
+
+function SummaryTile({ danger = false, label, value }: { danger?: boolean; label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <p className="text-xs font-black text-slate-500">{label}</p>
+      <p className={`mt-2 text-lg font-black ${danger ? "text-red-600" : "text-slate-950"}`}>{value}</p>
+    </div>
+  );
+}
+
+function DeskInfo({ danger = false, label, value }: { danger?: boolean; label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between border-b border-slate-100 py-3 text-sm last:border-b-0">
+      <span className="font-semibold text-slate-500">{label}</span>
+      <span className={`text-right font-black ${danger ? "text-red-600" : "text-slate-800"}`}>{value}</span>
+    </div>
+  );
+}
+
+function RecentOrdersTable({ orders }: { orders: PendingOrder[] }) {
+  if (!orders.length) {
+    return <EmptyDeskState text="No orders recorded yet" />;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[620px] text-left text-sm">
+        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+          <tr>
+            <th className="px-3 py-3">Date</th>
+            <th className="px-3 py-3">Order No</th>
+            <th className="px-3 py-3">Items</th>
+            <th className="px-3 py-3">Amount</th>
+            <th className="px-3 py-3">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.slice(0, 4).map((order) => (
+            <tr className="border-t border-slate-100" key={order.id}>
+              <td className="px-3 py-3 font-semibold text-slate-600">{order.deliveryDate}</td>
+              <td className="px-3 py-3 font-black text-slate-900">{order.id}</td>
+              <td className="px-3 py-3 font-semibold text-slate-700">{order.product} ({order.quantity}ctn)</td>
+              <td className="px-3 py-3 font-black text-slate-900">{formatMoney(order.quantity * 2000)}</td>
+              <td className="px-3 py-3">
+                <StatusPill label={order.status} tone="blue" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function CallControl({
+  icon: Icon,
+  label,
+  onClick,
+  primary = false
+}: {
+  icon: typeof PhoneCall;
+  label: string;
+  onClick: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      className={`flex min-h-16 flex-col items-center justify-center gap-2 rounded-lg border px-3 py-3 text-xs font-black shadow-sm ${
+        primary ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+      }`}
+      onClick={onClick}
+      type="button"
+    >
+      <Icon className="h-5 w-5" />
+      {label}
+    </button>
+  );
+}
+
+function EmptyDeskState({ text }: { text: string }) {
+  return (
+    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm font-bold text-slate-500">
+      {text}
+    </div>
   );
 }
 
