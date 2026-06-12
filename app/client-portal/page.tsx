@@ -1,8 +1,32 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bell, Building2, Clock, LogOut, MessageSquare, PackageCheck, ShoppingCart, Truck, UserRound } from "lucide-react";
+import {
+  AlertTriangle,
+  Bell,
+  Building2,
+  CalendarClock,
+  ChevronDown,
+  ClipboardList,
+  CreditCard,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Headphones,
+  Home,
+  LogOut,
+  MapPin,
+  MessageSquare,
+  PackageCheck,
+  PhoneCall,
+  ReceiptText,
+  ShoppingCart,
+  Truck,
+  UserRound,
+  WalletCards
+} from "lucide-react";
+import { KingAppLogo } from "@/components/KingAppLogo";
 import {
   authenticatePortalClient,
   clearPortalSession,
@@ -13,24 +37,35 @@ import {
   getPortalSession,
   getSuppliersForClient,
   savePortalSession,
+  type ClientOrderStatus,
   type ClientPortalOrder,
   type PortalClient,
   type PortalSupplier
 } from "@/lib/client-portal-data";
-import { formatMoney } from "@/lib/sales-data";
 import {
+  getClientMessageCompanyDisplay,
   getClientMessageStats,
   getClientMessageThreads,
   getLinkedMessageCompaniesForClient,
   getMessagesForPortalClient
 } from "@/lib/clientMessageService";
-import { getDeliveryForOrder } from "@/lib/delivery-data";
 import {
   getCustomerAccounts,
   getCustomerDebts,
   getCustomerPayments,
   getCustomerStatement
 } from "@/lib/customer-accounts-data";
+import { getDeliveryForOrder } from "@/lib/delivery-data";
+import { formatMoney } from "@/lib/sales-data";
+
+const orderStatuses: ClientOrderStatus[] = [
+  "Pending",
+  "Approved",
+  "Loaded",
+  "Dispatched",
+  "Out for Delivery",
+  "Delivered"
+];
 
 export default function ClientPortalPage() {
   const [client, setClient] = useState<PortalClient | null>(null);
@@ -45,15 +80,10 @@ export default function ClientPortalPage() {
   useEffect(() => {
     const session = getPortalSession();
     setClient(session);
-    if (session) {
-      setSelectedSupplierId(getSuppliersForClient(session.id)[0]?.id ?? "");
-    }
+    if (session) setSelectedSupplierId(getSuppliersForClient(session.id)[0]?.id ?? "");
   }, []);
 
-  const suppliers = useMemo(
-    () => (client ? getSuppliersForClient(client.id) : []),
-    [client]
-  );
+  const suppliers = useMemo(() => (client ? getSuppliersForClient(client.id) : []), [client]);
   const selectedSupplier = useMemo(
     () => suppliers.find((supplier) => supplier.id === selectedSupplierId) ?? suppliers[0],
     [selectedSupplierId, suppliers]
@@ -63,11 +93,12 @@ export default function ClientPortalPage() {
     [client, selectedSupplier]
   );
   const clientOrders = useMemo(
-    () =>
-      client
-        ? getClientOrders().filter((order) => order.clientId === client.id)
-        : [],
+    () => (client ? getClientOrders().filter((order) => order.clientId === client.id) : []),
     [client, ordersVersion]
+  );
+  const supplierOrders = useMemo(
+    () => selectedSupplier ? clientOrders.filter((order) => order.supplierId === selectedSupplier.id) : clientOrders,
+    [clientOrders, selectedSupplier]
   );
   const clientMessages = useMemo(
     () => (client ? getMessagesForPortalClient(client) : []),
@@ -76,6 +107,10 @@ export default function ClientPortalPage() {
   const messageStats = getClientMessageStats(clientMessages);
   const messageThreads = getClientMessageThreads(clientMessages);
   const linkedMessageCompanies = client ? getLinkedMessageCompaniesForClient(client) : [];
+  const selectedCompanyDisplay =
+    selectedSupplier
+      ? linkedMessageCompanies.find((company) => company.supplierId === selectedSupplier.id)
+      : linkedMessageCompanies[0];
   const customerAccount = client
     ? getCustomerAccounts().find((account) => account.phone.replace(/\D/g, "") === client.phone.replace(/\D/g, ""))
     : null;
@@ -83,12 +118,27 @@ export default function ClientPortalPage() {
     ? getCustomerDebts().filter((debt) => debt.customerId === customerAccount.customerId && debt.balance > 0)
     : [];
   const customerPayments = customerAccount
-    ? getCustomerPayments().filter((payment) => payment.customerId === customerAccount.customerId)
+    ? getCustomerPayments()
+        .filter((payment) => payment.customerId === customerAccount.customerId)
+        .sort((first, second) => second.date.localeCompare(first.date))
     : [];
   const statementLines = customerAccount
     ? getCustomerStatement({ customerId: customerAccount.customerId, companyId: customerAccount.companyId })
     : [];
-  const total = catalog.reduce((sum, product) => {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const ordersThisMonth = supplierOrders.filter((order) => order.createdAt.slice(0, 7) === currentMonth).length;
+  const pendingOrders = supplierOrders.filter((order) => ["Pending", "Approved", "Loaded"].includes(order.status)).length;
+  const inTransitOrders = supplierOrders.filter((order) => ["Dispatched", "Out for Delivery"].includes(order.status)).length;
+  const unreadMessages = clientMessages.filter((item) => !item.readByClient).length;
+  const outstandingBalance = customerAccount?.currentBalance ?? customerDebts.reduce((sum, debt) => sum + debt.balance, 0);
+  const creditLimit = customerAccount?.creditLimit ?? 0;
+  const availableCredit = Math.max(0, creditLimit - outstandingBalance);
+  const lastPayment = customerPayments[0];
+  const totalPurchases = statementLines.reduce((sum, line) => sum + line.debit, 0);
+  const totalPayments = statementLines.reduce((sum, line) => sum + line.credit, 0);
+  const latestDeliveryOrder =
+    supplierOrders.find((order) => ["Dispatched", "Out for Delivery", "Loaded"].includes(order.status)) ?? supplierOrders[0];
+  const orderTotal = catalog.reduce((sum, product) => {
     const quantity = Number(quantities[product.itemCode]) || 0;
     return sum + quantity * product.clientPrice;
   }, 0);
@@ -97,31 +147,30 @@ export default function ClientPortalPage() {
     event.preventDefault();
     setError("");
     const authenticatedClient = authenticatePortalClient(username, password);
-
     if (!authenticatedClient) {
       setError("Invalid client login.");
       return;
     }
-
     savePortalSession(authenticatedClient);
     setClient(authenticatedClient);
     setSelectedSupplierId(getSuppliersForClient(authenticatedClient.id)[0]?.id ?? "");
   }
 
+  function logout() {
+    clearPortalSession();
+    setClient(null);
+    setPassword("");
+  }
+
   function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     if (!client) return;
 
     const parsedQuantities = Object.fromEntries(
-      Object.entries(quantities).map(([itemCode, value]) => [
-        itemCode,
-        Number(value) || 0
-      ])
+      Object.entries(quantities).map(([itemCode, value]) => [itemCode, Number(value) || 0])
     );
-    const hasQuantity = Object.values(parsedQuantities).some((value) => value > 0);
 
-    if (!hasQuantity) {
+    if (!Object.values(parsedQuantities).some((value) => value > 0)) {
       setError("Enter at least one quantity before submitting.");
       return;
     }
@@ -144,48 +193,27 @@ export default function ClientPortalPage() {
 
   if (!client) {
     return (
-      <main className="min-h-screen bg-slate-50 px-4 py-8">
+      <main className="min-h-screen bg-slate-100 px-4 py-8">
         <form
-          className="mx-auto mt-12 max-w-md rounded-lg border border-brand-100 bg-white p-6 shadow-executive"
+          className="mx-auto mt-12 max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-xl"
           onSubmit={handleLogin}
         >
-          <div className="mb-6 text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-brand-50 text-brand-800">
-              <UserRound className="h-7 w-7" />
-            </div>
-            <h1 className="text-2xl font-black text-slate-950">
-              Client Ordering Portal
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Sign in to order from your connected supplier.
+          <div className="mb-7 text-center">
+            <KingAppLogo className="mx-auto rounded-2xl" priority size={72} />
+            <h1 className="mt-5 text-3xl font-black text-slate-950">KingApp Client Portal</h1>
+            <p className="mt-2 text-sm font-semibold text-slate-500">
+              Sign in to place orders, track deliveries, and manage your account.
             </p>
           </div>
           <label className="block">
-            <span className="mb-1 block text-sm font-bold text-slate-700">
-              Username
-            </span>
-            <input
-              className="form-input"
-              onChange={(event) => setUsername(event.target.value)}
-              value={username}
-            />
+            <span className="mb-1 block text-sm font-bold text-slate-700">Username</span>
+            <input className="form-input" onChange={(event) => setUsername(event.target.value)} value={username} />
           </label>
           <label className="mt-4 block">
-            <span className="mb-1 block text-sm font-bold text-slate-700">
-              Password
-            </span>
-            <input
-              className="form-input"
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              value={password}
-            />
+            <span className="mb-1 block text-sm font-bold text-slate-700">Password</span>
+            <input className="form-input" onChange={(event) => setPassword(event.target.value)} type="password" value={password} />
           </label>
-          {error ? (
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-              {error}
-            </div>
-          ) : null}
+          {error ? <Alert tone="red">{error}</Alert> : null}
           <button className="primary-button mt-5 w-full">Sign in</button>
         </form>
       </main>
@@ -193,307 +221,169 @@ export default function ClientPortalPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <section className="app-card-soft p-5 sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-black uppercase tracking-normal text-brand-700">
-                Client Ordering Portal
-              </p>
-              <h1 className="mt-1 text-3xl font-black text-slate-950">
-                {client.clientName}
-              </h1>
-              <p className="mt-2 text-sm text-slate-600">
-                {client.ownerName} - {client.phone} - {client.location}
-              </p>
-            </div>
-            <button
-              className="secondary-button"
-              onClick={() => {
-                clearPortalSession();
-                setClient(null);
-              }}
-              type="button"
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </button>
-            <Link className="primary-button" href="/client-portal/messages">
-              <MessageSquare className="h-4 w-4" />
-              Messages
-            </Link>
-          </div>
-        </section>
+    <main className="min-h-screen bg-[#f4f7fb] text-slate-900">
+      <div className="grid min-h-screen lg:grid-cols-[300px_1fr]">
+        <ClientPortalSidebar client={client} unreadMessages={unreadMessages} onLogout={logout} />
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <PortalMetric label="Unread Messages" value={clientMessages.filter((item) => !item.readByClient).length} />
-          <PortalMetric label="Open Support Requests" value={messageStats.openSupportRequests} />
-          <PortalMetric label="Last Reply" value={messageStats.lastReply ? new Date(messageStats.lastReply).toLocaleDateString() : "-"} />
-          <PortalMetric label="Pending Replies" value={messageStats.waitingReply} />
-          <PortalMetric label="Current Balance" value={`${formatMoney(customerAccount?.currentBalance ?? 0)} RWF`} />
-          <PortalMetric label="Unpaid Invoices" value={customerDebts.length} />
-        </div>
+        <section className="min-w-0">
+          <ClientTopBar
+            client={client}
+            selectedSupplier={selectedSupplier}
+            suppliers={suppliers}
+            unreadMessages={unreadMessages}
+            onSupplierChange={(supplierId) => {
+              setSelectedSupplierId(supplierId);
+              setQuantities({});
+              setMessage("");
+              setError("");
+            }}
+          />
 
-        <section className="app-card p-5">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-black text-slate-950">Messages</h2>
-              <p className="text-sm font-semibold text-slate-500">Send delivery, payment, order, and support messages to your supplier.</p>
-            </div>
-            <Link className="secondary-button" href="/client-portal/messages">
-              <MessageSquare className="h-4 w-4" />
-              Open Messages
-            </Link>
-          </div>
-        </section>
+          <div className="mx-auto max-w-[1560px] space-y-6 p-4 sm:p-6">
+            {message ? <Alert tone="green">{message}</Alert> : null}
+            {error ? <Alert tone="red">{error}</Alert> : null}
 
-        <section className="app-card p-5">
-          <h2 className="text-xl font-black text-slate-950">Client Profile</h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-xs font-black uppercase text-slate-500">Preferred Supplier</p>
-              <p className="mt-2 text-lg font-black text-slate-950">{selectedSupplier?.name ?? "No supplier selected"}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-xs font-black uppercase text-slate-500">Linked Suppliers</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {linkedMessageCompanies.map((company) => (
-                  <span className={`rounded-full border px-3 py-1 text-xs font-black ${company.badgeClass}`} key={company.id}>
-                    ✓ {company.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
+            <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+              <section className="rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-blue-50 p-6 shadow-sm">
+                <div className="grid gap-4 md:grid-cols-[1fr_300px] md:items-center">
+                  <div>
+                    <p className="text-sm font-bold text-slate-600">Welcome back,</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                      <h1 className="text-3xl font-black text-slate-950">{client.clientName}</h1>
+                      <span className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-black text-white">Verified</span>
+                    </div>
+                    <p className="mt-3 max-w-xl text-sm font-semibold text-slate-600">
+                      Your account, orders, deliveries, messages, and statements are managed in one secure workspace.
+                    </p>
+                  </div>
+                  <div className="hidden justify-end md:flex">
+                    <div className="rounded-2xl border border-blue-100 bg-white/80 p-4 text-right shadow-sm">
+                      <p className="text-xs font-black uppercase text-blue-700">Current Supplier</p>
+                      <p className="mt-2 text-2xl font-black text-slate-950">{selectedSupplier?.name ?? "No supplier assigned"}</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-500">{selectedSupplier?.phone ?? "Supplier contact unavailable"}</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
 
-        <section className="app-card p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-brand-700" />
-            <h2 className="text-xl font-black text-slate-950">Connected Suppliers</h2>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {suppliers.map((supplier) => (
-              <SupplierCard
-                key={supplier.id}
-                onSelect={() => {
-                  setSelectedSupplierId(supplier.id);
-                  setQuantities({});
-                  setMessage("");
-                  setError("");
-                }}
-                selected={supplier.id === selectedSupplier?.id}
-                supplier={supplier}
+              <AccountSummary
+                availableCredit={availableCredit}
+                creditLimit={creditLimit}
+                lastPaymentAmount={lastPayment?.amountPaid ?? 0}
+                lastPaymentDate={lastPayment?.date ?? "No payment yet"}
+                outstandingBalance={outstandingBalance}
               />
-            ))}
-            {suppliers.length === 0 ? (
-              <p className="text-sm font-semibold text-slate-500">
-                No active suppliers are assigned to this client.
-              </p>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="app-card p-5">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-black text-slate-950">Recent Messages</h2>
-              <p className="text-sm font-semibold text-slate-500">Unread Messages: {clientMessages.filter((item) => !item.readByClient).length}</p>
             </div>
-            <Link className="secondary-button" href="/client-portal/messages">
-              <MessageSquare className="h-4 w-4" />
-              View All
-            </Link>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {messageThreads.slice(0, 4).map((thread) => (
-              <article className="rounded-lg border border-slate-200 bg-white p-4" key={thread.threadId}>
-                <p className="font-black text-slate-950">{thread.companyName}</p>
-                <p className="mt-1 text-sm font-semibold text-slate-500">Last reply: {new Date(thread.createdAt).toLocaleString()}</p>
-                <p className="mt-2 text-sm text-slate-600">{thread.subject}</p>
-              </article>
-            ))}
-            {!messageThreads.length ? <p className="text-sm font-semibold text-slate-500">No recent messages yet.</p> : null}
-          </div>
-        </section>
 
-        {message ? (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
-            {message}
-          </div>
-        ) : null}
-        {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-            {error}
-          </div>
-        ) : null}
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              <PortalKpi icon={WalletCards} label="Outstanding Balance" tone="red" value={`${formatMoney(outstandingBalance)} RWF`} />
+              <PortalKpi icon={ClipboardList} label="Pending Orders" linkLabel="View Orders" value={pendingOrders} />
+              <PortalKpi icon={ShoppingCart} label="Orders This Month" linkLabel="View Orders" tone="green" value={ordersThisMonth} />
+              <PortalKpi icon={Truck} label="Deliveries In Transit" linkLabel="Track Deliveries" value={inTransitOrders} />
+              <PortalKpi icon={MessageSquare} label="Unread Messages" link="/client-portal/messages" linkLabel="View Messages" tone="purple" value={unreadMessages} />
+            </section>
 
-        <form className="app-card p-5" onSubmit={submitOrder}>
-          <div className="mb-4 flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5 text-brand-700" />
-            <h2 className="text-xl font-black text-slate-950">
-              {selectedSupplier ? `${selectedSupplier.name} Product Catalog` : "Product Catalog"}
-            </h2>
-          </div>
-          <div className="grid gap-3">
-            {catalog.map((product) => {
-              const quantity = Number(quantities[product.itemCode]) || 0;
-              return (
-                <div
-                  className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-[1fr_140px_140px_160px] md:items-center"
-                  key={product.itemCode}
-                >
-                  <div>
-                    <h3 className="font-black text-slate-950">{product.name}</h3>
-                    <p className="text-sm font-semibold text-slate-500">
-                      {product.itemCode} - {product.unit}
-                    </p>
-                  </div>
-                  <p className="font-bold text-brand-800">
-                    {formatMoney(product.clientPrice)} RWF
-                  </p>
-                  <input
-                    className="form-input"
-                    min="0"
-                    onChange={(event) =>
-                      setQuantities((current) => ({
-                        ...current,
-                        [product.itemCode]: event.target.value
-                      }))
-                    }
-                    placeholder="0"
-                    type="number"
-                    value={quantities[product.itemCode] ?? ""}
+            <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+              <section className="space-y-6">
+                <div className="grid gap-6 2xl:grid-cols-[1fr_420px]">
+                  <Panel title="Recent Orders" action={<Link className="text-sm font-black text-blue-700" href="/client-orders">View All Orders</Link>}>
+                    <RecentOrdersTable orders={supplierOrders.slice(0, 6)} />
+                  </Panel>
+
+                  <Panel title="Delivery Tracking" action={<span className="text-sm font-black text-blue-700">View All</span>}>
+                    <DeliveryTrackingCard order={latestDeliveryOrder} />
+                  </Panel>
+                </div>
+
+                <div className="grid gap-6 2xl:grid-cols-[1fr_1fr]">
+                  <AccountStatement
+                    closingBalance={statementLines.at(-1)?.balance ?? outstandingBalance}
+                    openingBalance={customerAccount?.openingBalance ?? 0}
+                    totalPayments={totalPayments}
+                    totalPurchases={totalPurchases}
                   />
-                  <p className="text-right font-black text-slate-950">
-                    {formatMoney(quantity * product.clientPrice)} RWF
-                  </p>
+                  <RecentMessages threads={messageThreads.slice(0, 4)} unreadMessages={unreadMessages} />
                 </div>
-              );
-            })}
-          </div>
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-2xl font-black text-brand-800">
-              Total: {formatMoney(total)} RWF
-            </p>
-            <button className="primary-button" disabled={!selectedSupplier || catalog.length === 0}>
-              <PackageCheck className="h-4 w-4" />
-              Submit Order
-            </button>
-          </div>
-        </form>
 
-        <section className="app-card p-5">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-black text-slate-950">My Account Statement</h2>
-              <p className="text-sm font-semibold text-slate-500">View balance, unpaid invoices, and payment history.</p>
-            </div>
-            <button className="secondary-button" onClick={() => window.print()} type="button">
-              Download / Print Statement
-            </button>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-xs font-black uppercase text-slate-500">Balance</p>
-              <p className="mt-2 text-2xl font-black text-brand-800">{formatMoney(customerAccount?.currentBalance ?? 0)} RWF</p>
-              <p className="mt-1 text-sm font-semibold text-slate-500">Credit limit: {formatMoney(customerAccount?.creditLimit ?? 0)} RWF</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-xs font-black uppercase text-slate-500">Unpaid Invoices</p>
-              <p className="mt-2 text-2xl font-black text-red-700">{customerDebts.length}</p>
-              <p className="mt-1 text-sm font-semibold text-slate-500">{formatMoney(customerDebts.reduce((sum, debt) => sum + debt.balance, 0))} RWF outstanding</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-xs font-black uppercase text-slate-500">Last Payment</p>
-              <p className="mt-2 text-lg font-black text-slate-950">{customerPayments[0]?.date ?? "No payment yet"}</p>
-              <p className="mt-1 text-sm font-semibold text-slate-500">{customerPayments[0] ? `${formatMoney(customerPayments[0].amountPaid)} RWF` : "Payment history will appear here"}</p>
-            </div>
-          </div>
-          <div className="mt-4 overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Reference</th>
-                  <th>Debit</th>
-                  <th>Credit</th>
-                  <th>Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {statementLines.slice(-8).map((line, index) => (
-                  <tr key={`${line.reference}-${index}`}>
-                    <td>{line.date}</td>
-                    <td>{line.type}</td>
-                    <td>{line.reference}</td>
-                    <td>{formatMoney(line.debit)} RWF</td>
-                    <td>{formatMoney(line.credit)} RWF</td>
-                    <td className="font-black text-slate-950">{formatMoney(line.balance)} RWF</td>
-                  </tr>
-                ))}
-                {!statementLines.length ? <tr><td colSpan={6}>No account statement records yet.</td></tr> : null}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                <Panel title={selectedSupplier ? `${selectedSupplier.name} Product Catalog` : "Place Order"}>
+                  <form onSubmit={submitOrder}>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[720px] text-left text-sm">
+                        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                          <tr>
+                            <th className="px-3 py-3">Product</th>
+                            <th className="px-3 py-3">Item Code</th>
+                            <th className="px-3 py-3">Unit Price</th>
+                            <th className="px-3 py-3">Quantity</th>
+                            <th className="px-3 py-3 text-right">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {catalog.map((product) => {
+                            const quantity = Number(quantities[product.itemCode]) || 0;
+                            return (
+                              <tr className="border-t border-slate-100" key={product.itemCode}>
+                                <td className="px-3 py-3 font-black text-slate-950">{product.name}</td>
+                                <td className="px-3 py-3 font-semibold text-slate-500">{product.itemCode}</td>
+                                <td className="px-3 py-3 font-black text-slate-800">{formatMoney(product.clientPrice)} RWF</td>
+                                <td className="px-3 py-3">
+                                  <input
+                                    className="form-input max-w-28"
+                                    min="0"
+                                    onChange={(event) =>
+                                      setQuantities((current) => ({
+                                        ...current,
+                                        [product.itemCode]: event.target.value
+                                      }))
+                                    }
+                                    placeholder="0"
+                                    type="number"
+                                    value={quantities[product.itemCode] ?? ""}
+                                  />
+                                </td>
+                                <td className="px-3 py-3 text-right font-black text-slate-950">{formatMoney(quantity * product.clientPrice)} RWF</td>
+                              </tr>
+                            );
+                          })}
+                          {!catalog.length ? (
+                            <tr>
+                              <td className="px-3 py-10 text-center font-bold text-slate-500" colSpan={5}>No products available yet.</td>
+                            </tr>
+                          ) : null}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-2xl font-black text-blue-700">Total: {formatMoney(orderTotal)} RWF</p>
+                      <button className="primary-button" disabled={!selectedSupplier || catalog.length === 0}>
+                        <PackageCheck className="h-4 w-4" />
+                        Submit Order
+                      </button>
+                    </div>
+                  </form>
+                </Panel>
+              </section>
 
-        <section className="app-card p-5">
-          <h2 className="text-xl font-black text-slate-950">My Orders</h2>
-          <div className="mt-4 grid gap-3">
-            {clientOrders.map((order) => (
-              <article
-                className="rounded-lg border border-slate-200 bg-white p-4"
-                key={order.id}
-              >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h3 className="font-black text-slate-950">{order.id}</h3>
-                    <p className="text-sm text-slate-600">
-                      {new Date(order.createdAt).toLocaleString()}
-                    </p>
+              <aside className="space-y-6">
+                <QuickActions />
+                <Announcements />
+                <Panel title="My Account">
+                  <InfoRow label="Customer Name" value={client.clientName} />
+                  <InfoRow label="Owner" value={client.ownerName} />
+                  <InfoRow label="Phone" value={client.phone} />
+                  <InfoRow label="Address" value={client.location} />
+                  <InfoRow label="Preferred Supplier" value={selectedSupplier?.name ?? "No supplier selected"} />
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {linkedMessageCompanies.map((company) => (
+                      <span className={`rounded-full border px-3 py-1 text-xs font-black ${company.badgeClass}`} key={company.id}>
+                        {company.name}
+                      </span>
+                    ))}
+                    {!linkedMessageCompanies.length ? <span className="text-sm font-bold text-slate-500">No linked suppliers yet.</span> : null}
                   </div>
-                  <span className="status-badge border-brand-100 bg-brand-50 text-brand-800">
-                    {order.status}
-                  </span>
-                </div>
-                <p className="mt-3 font-bold text-brand-800">
-                  {order.totalQuantity} cartons - {formatMoney(order.totalAmount)} RWF
-                </p>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Supplier: {order.supplier} - Payment: {order.paymentStatus}
-                </p>
-                <DeliveryNotice order={order} />
-                <div className="mt-4">
-                  <Link className="secondary-button" href={`/client-portal/messages?orderId=${order.id}`}>
-                    <MessageSquare className="h-4 w-4" />
-                    Message about this order
-                  </Link>
-                </div>
-                {(order.notifications ?? []).length > 0 ? (
-                  <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-950">
-                      <Bell className="h-4 w-4 text-brand-700" />
-                      Notifications
-                    </div>
-                    <div className="space-y-2">
-                      {(order.notifications ?? []).slice(-4).reverse().map((notification) => (
-                        <p className="text-xs font-semibold text-slate-600" key={notification.id}>
-                          {new Date(notification.createdAt).toLocaleString()} - {notification.message}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </article>
-            ))}
-            {clientOrders.length === 0 ? (
-              <p className="text-sm font-semibold text-slate-500">
-                No orders submitted yet.
-              </p>
-            ) : null}
+                </Panel>
+              </aside>
+            </div>
           </div>
         </section>
       </div>
@@ -501,101 +391,430 @@ export default function ClientPortalPage() {
   );
 }
 
-function PortalMetric({ label, value }: { label: string; value: number | string }) {
+function ClientPortalSidebar({
+  client,
+  onLogout,
+  unreadMessages
+}: {
+  client: PortalClient;
+  onLogout: () => void;
+  unreadMessages: number;
+}) {
+  const items = [
+    { href: "/client-portal", icon: Home, label: "Dashboard" },
+    { href: "#place-order", icon: ShoppingCart, label: "Place Order" },
+    { href: "/client-orders", icon: FileText, label: "My Orders" },
+    { href: "#delivery", icon: Truck, label: "Delivery Tracking" },
+    { href: "#account", icon: WalletCards, label: "My Account" },
+    { href: "#statements", icon: ReceiptText, label: "Statements" },
+    { href: "/client-portal/messages", icon: MessageSquare, label: "Messages", badge: unreadMessages },
+    { href: "#complaints", icon: AlertTriangle, label: "Complaints" },
+    { href: "#callbacks", icon: PhoneCall, label: "Callbacks" },
+    { href: "#announcements", icon: Bell, label: "Announcements" },
+    { href: "#profile", icon: UserRound, label: "My Profile" }
+  ];
+
   return (
-    <article className="app-card p-5">
-      <p className="text-sm font-bold text-slate-500">{label}</p>
-      <p className="mt-3 text-2xl font-black text-brand-800">{value}</p>
+    <aside className="border-r border-slate-200 bg-white lg:sticky lg:top-0 lg:h-screen">
+      <div className="flex h-full flex-col">
+        <div className="bg-gradient-to-br from-blue-700 to-blue-600 p-6 text-white">
+          <div className="flex items-center gap-3">
+            <KingAppLogo className="rounded-xl" size={50} />
+            <div>
+              <h2 className="text-2xl font-black">KingApp</h2>
+              <p className="text-sm font-semibold text-blue-100">Client Portal</p>
+            </div>
+          </div>
+        </div>
+
+        <nav className="flex-1 space-y-1 overflow-y-auto p-4">
+          {items.map((item, index) => (
+            <Link
+              className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm font-black transition ${
+                index === 0 ? "bg-blue-600 text-white shadow-sm" : "text-slate-700 hover:bg-slate-100"
+              }`}
+              href={item.href}
+              key={item.label}
+            >
+              <span className="flex items-center gap-3">
+                <item.icon className="h-5 w-5" />
+                {item.label}
+              </span>
+              {item.badge ? <span className="rounded-full bg-blue-600 px-2 py-1 text-xs text-white">{item.badge}</span> : null}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="border-t border-slate-200 p-4">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+            <div className="flex items-center gap-3">
+              <Headphones className="h-8 w-8 text-blue-700" />
+              <div>
+                <p className="text-sm font-black text-slate-950">Need Support?</p>
+                <p className="text-xs font-semibold text-slate-500">We are here to help you.</p>
+                <p className="mt-1 text-sm font-black text-blue-700">{client.phone}</p>
+              </div>
+            </div>
+          </div>
+          <button className="mt-4 flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-100" onClick={onLogout} type="button">
+            <LogOut className="h-5 w-5" />
+            Logout
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function ClientTopBar({
+  client,
+  onSupplierChange,
+  selectedSupplier,
+  suppliers,
+  unreadMessages
+}: {
+  client: PortalClient;
+  onSupplierChange: (supplierId: string) => void;
+  selectedSupplier?: PortalSupplier;
+  suppliers: PortalSupplier[];
+  unreadMessages: number;
+}) {
+  return (
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-4 shadow-sm backdrop-blur sm:px-6">
+      <div className="mx-auto flex max-w-[1560px] flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <label className="relative block sm:min-w-80">
+          <Building2 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-700" />
+          <select
+            className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-4 pl-12 pr-10 text-sm font-black text-slate-900 shadow-sm outline-none focus:border-blue-300"
+            onChange={(event) => onSupplierChange(event.target.value)}
+            value={selectedSupplier?.id ?? ""}
+          >
+            {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
+            {!suppliers.length ? <option value="">No supplier assigned</option> : null}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        </label>
+
+        <div className="flex items-center justify-end gap-4">
+          <button className="relative rounded-xl p-3 text-slate-700 hover:bg-slate-100" type="button">
+            <Bell className="h-5 w-5" />
+            {unreadMessages ? <span className="absolute right-1 top-1 rounded-full bg-red-500 px-1.5 text-[10px] font-black text-white">{unreadMessages}</span> : null}
+          </button>
+          <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-sm font-black text-blue-700">
+              {getInitials(client.clientName)}
+            </div>
+            <div>
+              <p className="font-black text-slate-950">{client.clientName}</p>
+              <p className="text-xs font-semibold text-slate-500">Premium Customer</p>
+            </div>
+            <ChevronDown className="h-4 w-4 text-slate-400" />
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function AccountSummary({
+  availableCredit,
+  creditLimit,
+  lastPaymentAmount,
+  lastPaymentDate,
+  outstandingBalance
+}: {
+  availableCredit: number;
+  creditLimit: number;
+  lastPaymentAmount: number;
+  lastPaymentDate: string;
+  outstandingBalance: number;
+}) {
+  return (
+    <Panel title="Account Summary" action={<button className="text-sm font-black text-blue-700" onClick={() => window.print()} type="button">View Statement</button>}>
+      <InfoRow label="Credit Limit" value={`${formatMoney(creditLimit)} RWF`} />
+      <InfoRow danger label="Outstanding Balance" value={`${formatMoney(outstandingBalance)} RWF`} />
+      <InfoRow good label="Available Credit" value={`${formatMoney(availableCredit)} RWF`} />
+      <InfoRow label="Last Payment" value={`${formatMoney(lastPaymentAmount)} RWF`} />
+      <InfoRow label="Last Payment Date" value={lastPaymentDate} />
+    </Panel>
+  );
+}
+
+function PortalKpi({
+  icon: Icon,
+  label,
+  link = "#",
+  linkLabel,
+  tone = "blue",
+  value
+}: {
+  icon: typeof ShoppingCart;
+  label: string;
+  link?: string;
+  linkLabel?: string;
+  tone?: "blue" | "green" | "purple" | "red";
+  value: number | string;
+}) {
+  const toneClass = {
+    blue: "bg-blue-50 text-blue-700",
+    green: "bg-emerald-50 text-emerald-700",
+    purple: "bg-violet-50 text-violet-700",
+    red: "bg-red-50 text-red-600"
+  }[tone];
+  return (
+    <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold text-slate-500">{label}</p>
+          <p className={`mt-3 text-2xl font-black ${tone === "red" ? "text-red-600" : "text-slate-950"}`}>{value}</p>
+        </div>
+        <div className={`rounded-xl p-3 ${toneClass}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+      {linkLabel ? <Link className="mt-4 inline-block text-sm font-black text-blue-700" href={link}>{linkLabel}</Link> : null}
     </article>
   );
 }
 
-function DeliveryNotice({ order }: { order: ClientPortalOrder }) {
-  const delivery = getDeliveryForOrder(order.id);
-  const eta = formatEta(order.estimatedArrivalTime, order.estimatedArrivalEndTime);
-  const minutesAway = order.driverMinutesAway && order.status === "Out for Delivery"
-    ? `Driver is ${order.driverMinutesAway} minutes away.`
-    : "";
-  const status = delivery?.status ?? order.status;
-  const truck = delivery?.truck ?? order.deliveryTruck;
-  const driver = delivery?.driver ?? order.deliveryDriver ?? order.deliveryPerson;
-  const etaStart = delivery?.etaStart ?? order.estimatedArrivalTime;
-  const etaEnd = delivery?.etaEnd ?? order.estimatedArrivalEndTime;
-  const deliveryEta = formatEta(etaStart, etaEnd);
-
+function RecentOrdersTable({ orders }: { orders: ClientPortalOrder[] }) {
   return (
-    <div className="mt-4 rounded-lg border border-brand-100 bg-brand-50 p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-black uppercase tracking-normal text-brand-800">
-            <Truck className="h-4 w-4" />
-            Delivery Notice
-          </div>
-          <p className="mt-2 text-sm font-bold text-slate-800">
-            Order {order.id} - {status}
-          </p>
-          <p className="mt-1 text-sm text-slate-600">
-            Delivery date: {order.deliveryDate || "Waiting for supplier schedule"}
-          </p>
-          <p className="mt-1 text-lg font-black text-brand-900">
-            {deliveryEta || eta ? `Expected ${deliveryEta || eta}` : "ETA not assigned yet"}
-          </p>
-          {delivery?.deliveredAt ? (
-            <p className="mt-1 text-sm font-bold text-emerald-700">
-              Delivered: {new Date(delivery.deliveredAt).toLocaleString()}
-            </p>
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px] text-left text-sm">
+        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+          <tr>
+            <th className="px-3 py-3">Order No</th>
+            <th className="px-3 py-3">Date</th>
+            <th className="px-3 py-3">Status</th>
+            <th className="px-3 py-3">Amount</th>
+            <th className="px-3 py-3 text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((order) => (
+            <tr className="border-t border-slate-100" key={order.id}>
+              <td className="px-3 py-3 font-black text-slate-950">{order.id}</td>
+              <td className="px-3 py-3 font-semibold text-slate-600">{new Date(order.createdAt).toLocaleDateString()}</td>
+              <td className="px-3 py-3"><StatusBadge status={order.status} /></td>
+              <td className="px-3 py-3 font-black text-slate-950">{formatMoney(order.totalAmount)} RWF</td>
+              <td className="px-3 py-3 text-right">
+                <Link className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-50" href={`/client-portal/messages?orderId=${order.id}`}>View</Link>
+              </td>
+            </tr>
+          ))}
+          {!orders.length ? (
+            <tr><td className="px-3 py-10 text-center font-bold text-slate-500" colSpan={5}>No orders yet.</td></tr>
           ) : null}
-          {minutesAway ? (
-            <p className="mt-1 text-sm font-bold text-emerald-700">{minutesAway}</p>
-          ) : null}
-        </div>
-        <div className="rounded-lg bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-brand-700" />
-            {truck || "Truck pending"}
-          </div>
-          <p className="mt-1 text-xs text-slate-500">
-            Driver: {driver || "Pending"}
-          </p>
-        </div>
-      </div>
+        </tbody>
+      </table>
     </div>
   );
 }
 
-function SupplierCard({
-  onSelect,
-  selected,
-  supplier
+function DeliveryTrackingCard({ order }: { order?: ClientPortalOrder }) {
+  if (!order) return <EmptyState text="No deliveries yet." />;
+
+  const delivery = getDeliveryForOrder(order.id);
+  const eta = formatEta(delivery?.etaStart ?? order.estimatedArrivalTime, delivery?.etaEnd ?? order.estimatedArrivalEndTime);
+  const status = delivery?.status ?? order.status;
+  const driver = delivery?.driver ?? order.deliveryDriver ?? order.deliveryPerson ?? "Pending";
+  const truck = delivery?.truck ?? order.deliveryTruck ?? "Pending";
+
+  return (
+    <div>
+      <InfoRow label="Order No" value={order.id} />
+      <InfoRow label="Driver" value={driver} />
+      <InfoRow label="Truck" value={truck} />
+      <InfoRow label="Phone" value={order.phone} />
+      <InfoRow label="ETA" value={eta || "Not assigned yet"} />
+      <InfoRow label="Status" value={status} />
+      <div className="my-4 flex items-center justify-between gap-2">
+        {orderStatuses.map((item) => (
+          <span className={`h-2 flex-1 rounded-full ${orderStatuses.indexOf(item) <= orderStatuses.indexOf(order.status === "Paid" ? "Delivered" : order.status as ClientOrderStatus) ? "bg-blue-600" : "bg-slate-200"}`} key={item} title={item} />
+        ))}
+      </div>
+      <button className="primary-button w-full" type="button">
+        <MapPin className="h-4 w-4" />
+        Track Live
+      </button>
+    </div>
+  );
+}
+
+function QuickActions() {
+  const actions = [
+    { href: "#place-order", icon: ShoppingCart, label: "Place Order" },
+    { href: "#payments", icon: CreditCard, label: "Make Payment" },
+    { href: "/client-orders", icon: FileText, label: "My Orders" },
+    { href: "/client-portal/messages", icon: MessageSquare, label: "Messages" },
+    { href: "#complaints", icon: AlertTriangle, label: "Complaints" },
+    { href: "#callbacks", icon: CalendarClock, label: "Callbacks" }
+  ];
+  return (
+    <Panel title="Quick Actions">
+      <div className="grid grid-cols-2 gap-3">
+        {actions.map((action) => (
+          <Link className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-center text-xs font-black text-slate-700 hover:bg-blue-50 hover:text-blue-700" href={action.href} key={action.label}>
+            <action.icon className="h-6 w-6" />
+            {action.label}
+          </Link>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function AccountStatement({
+  closingBalance,
+  openingBalance,
+  totalPayments,
+  totalPurchases
 }: {
-  onSelect: () => void;
-  selected: boolean;
-  supplier: PortalSupplier;
+  closingBalance: number;
+  openingBalance: number;
+  totalPayments: number;
+  totalPurchases: number;
 }) {
   return (
-    <button
-      className={`rounded-lg border p-4 text-left transition ${
-        selected
-          ? "border-brand-500 bg-brand-50 shadow-sm"
-          : "border-slate-200 bg-white hover:border-brand-200"
-      }`}
-      onClick={onSelect}
-      type="button"
+    <Panel
+      title="Account Statement"
+      subtitle="This Month"
+      action={<button className="text-sm font-black text-blue-700" onClick={() => window.print()} type="button">View Full Statement</button>}
     >
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-brand-700 shadow-sm">
-          <Building2 className="h-5 w-5" />
-        </div>
-        <div>
-          <h3 className="font-black text-slate-950">{supplier.name}</h3>
-          <p className="mt-1 text-sm font-semibold text-slate-600">
-            {supplier.phone} - {supplier.location}
-          </p>
-          <p className="mt-2 text-xs font-bold uppercase tracking-normal text-brand-700">
-            {selected ? "Selected supplier" : "Open supplier"}
-          </p>
-        </div>
+      <InfoRow label="Opening Balance" value={`${formatMoney(openingBalance)} RWF`} />
+      <InfoRow label="Total Purchases" value={`${formatMoney(totalPurchases)} RWF`} />
+      <InfoRow label="Total Payments" value={`${formatMoney(totalPayments)} RWF`} />
+      <InfoRow danger={closingBalance > 0} label="Closing Balance" value={`${formatMoney(closingBalance)} RWF`} />
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <button className="secondary-button justify-center" onClick={() => window.print()} type="button">
+          <Download className="h-4 w-4 text-red-600" />
+          Download PDF
+        </button>
+        <button className="secondary-button justify-center" onClick={() => window.print()} type="button">
+          <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+          Download Excel
+        </button>
       </div>
-    </button>
+    </Panel>
   );
+}
+
+function RecentMessages({
+  threads,
+  unreadMessages
+}: {
+  threads: ReturnType<typeof getClientMessageThreads>;
+  unreadMessages: number;
+}) {
+  return (
+    <Panel title="Recent Messages" action={<Link className="text-sm font-black text-blue-700" href="/client-portal/messages">View All</Link>}>
+      <div className="space-y-4">
+        {threads.map((thread) => {
+          const company = getClientMessageCompanyDisplay(thread.companyId, thread.companyName);
+          return (
+            <Link className="flex items-start gap-3 rounded-lg border border-transparent p-2 hover:border-blue-100 hover:bg-blue-50" href="/client-portal/messages" key={thread.threadId}>
+              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-sm font-black ${company.badgeClass}`}>{company.logo}</div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="truncate font-black text-slate-950">{thread.companyName}</p>
+                  <span className="shrink-0 text-xs font-bold text-slate-500">{new Date(thread.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+                <p className="mt-1 line-clamp-1 text-sm font-semibold text-slate-500">{thread.subject}</p>
+              </div>
+              {unreadMessages ? <span className="mt-2 h-2.5 w-2.5 rounded-full bg-blue-600" /> : null}
+            </Link>
+          );
+        })}
+        {!threads.length ? <EmptyState text="No messages yet." /> : null}
+      </div>
+    </Panel>
+  );
+}
+
+function Announcements() {
+  return (
+    <Panel title="Announcements" action={<span className="text-sm font-black text-blue-700">View All</span>}>
+      <EmptyState text="No announcements yet." />
+    </Panel>
+  );
+}
+
+function Panel({
+  action,
+  children,
+  subtitle,
+  title
+}: {
+  action?: ReactNode;
+  children: ReactNode;
+  subtitle?: string;
+  title: string;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-black text-slate-950">{title} {subtitle ? <span className="font-semibold text-slate-500">({subtitle})</span> : null}</h2>
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function InfoRow({
+  danger = false,
+  good = false,
+  label,
+  value
+}: {
+  danger?: boolean;
+  good?: boolean;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-slate-100 py-3 text-sm last:border-b-0">
+      <span className="font-semibold text-slate-500">{label}</span>
+      <span className={`text-right font-black ${danger ? "text-red-600" : good ? "text-emerald-600" : "text-slate-950"}`}>{value}</span>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const className =
+    status === "Delivered" || status === "Paid"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : status === "Out for Delivery" || status === "Dispatched"
+        ? "border-blue-200 bg-blue-50 text-blue-700"
+        : status === "Cancelled" || status === "Rejected"
+          ? "border-red-200 bg-red-50 text-red-700"
+          : "border-amber-200 bg-amber-50 text-amber-700";
+  return <span className={`rounded-md border px-2.5 py-1 text-xs font-black ${className}`}>{status}</span>;
+}
+
+function Alert({ children, tone }: { children: ReactNode; tone: "green" | "red" }) {
+  return (
+    <div className={`rounded-xl border px-4 py-3 text-sm font-bold ${tone === "green" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>
+      {children}
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-500">
+      {text}
+    </div>
+  );
+}
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "KA";
 }
