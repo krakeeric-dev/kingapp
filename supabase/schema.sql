@@ -11,8 +11,13 @@ create table if not exists public.users (
 
 create table if not exists public.companies (
   id text primary key,
+  code text not null default '',
   name text not null,
   type text not null default 'Business',
+  phone text not null default '',
+  email text not null default '',
+  address text not null default '',
+  logo text not null default '',
   status text not null default 'active',
   payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
@@ -168,45 +173,15 @@ create policy "KingApp demo read audit logs" on public.audit_logs for select usi
 create policy "KingApp demo write audit logs" on public.audit_logs for insert with check (true);
 create policy "KingApp demo update audit logs" on public.audit_logs for update using (true) with check (true);
 
+alter table public.companies add column if not exists code text not null default '';
+alter table public.companies add column if not exists phone text not null default '';
+alter table public.companies add column if not exists email text not null default '';
+alter table public.companies add column if not exists address text not null default '';
+alter table public.companies add column if not exists logo text not null default '';
+
 insert into public.users (id, payload)
 values
-  ('admin', '{"username":"admin","password":"admin123","displayName":"System Admin","role":"admin","phone":"","email":"","status":"active","createdAt":"2026-05-30T00:00:00.000Z","updatedAt":"2026-05-30T00:00:00.000Z"}'),
-  ('supervisor', '{"username":"supervisor","password":"supervisor123","displayName":"Supervisor","role":"supervisor","phone":"","email":"","status":"active","createdAt":"2026-05-30T00:00:00.000Z","updatedAt":"2026-05-30T00:00:00.000Z"}'),
-  ('storekeeper', '{"username":"storekeeper","password":"store123","displayName":"Storekeeper","role":"storekeeper","phone":"","email":"","status":"active","createdAt":"2026-05-30T00:00:00.000Z","updatedAt":"2026-05-30T00:00:00.000Z"}'),
-  ('accountant', '{"username":"accountant","password":"cashier123","displayName":"Accountant","role":"accountant","phone":"","email":"","status":"active","createdAt":"2026-05-30T00:00:00.000Z","updatedAt":"2026-05-30T00:00:00.000Z"}'),
-  ('manager', '{"username":"manager","password":"manager123","displayName":"Manager","role":"manager","phone":"","email":"","status":"active","createdAt":"2026-05-30T00:00:00.000Z","updatedAt":"2026-05-30T00:00:00.000Z"}'),
-  ('marketer1', '{"username":"marketer1","password":"marketer123","displayName":"Marketer 1","role":"marketer","phone":"","email":"","status":"active","createdAt":"2026-05-30T00:00:00.000Z","updatedAt":"2026-05-30T00:00:00.000Z"}')
-on conflict (id) do update
-set payload = excluded.payload,
-    updated_at = now();
-
-insert into public.products (id, payload)
-values
-  ('WT-500', '{"name":"Water 500ml","itemCode":"WT-500","unit":"Cartons","category":"Bottled Water","minimumStock":100,"openingStock":500,"pricePerCarton":1999}'),
-  ('WT-1000', '{"name":"Water 1L","itemCode":"WT-1000","unit":"Cartons","category":"Bottled Water","minimumStock":80,"openingStock":300,"pricePerCarton":2500}'),
-  ('WT-1500', '{"name":"Water 1.5L","itemCode":"WT-1500","unit":"Cartons","category":"Bottled Water","minimumStock":60,"openingStock":200,"pricePerCarton":3000}')
-on conflict (id) do update
-set payload = excluded.payload,
-    updated_at = now();
-
-insert into public.companies (id, name, type, status, payload)
-values
-  ('COMP-AGAHOZO', 'Agahozo Water', 'Beverage Distribution', 'active', '{"name":"Agahozo Water"}'::jsonb),
-  ('COMP-TEJU', 'Teju Juice', 'Juice Distribution', 'active', '{"name":"Teju Juice"}'::jsonb),
-  ('COMP-KING-HONEY', 'King Honey', 'Honey Distribution', 'active', '{"name":"King Honey"}'::jsonb),
-  ('COMP-KING-EGGS', 'King Eggs', 'Fresh Goods Distribution', 'active', '{"name":"King Eggs"}'::jsonb)
-on conflict (id) do update
-set name = excluded.name,
-    type = excluded.type,
-    status = excluded.status,
-    payload = excluded.payload,
-    updated_at = now();
-
-insert into public.inventory_movements (id, payload)
-values
-  ('DEFAULT-OPENING-WT-500', '{"id":"DEFAULT-OPENING-WT-500","date":"2026-05-30","productName":"Water 500ml","itemCode":"WT-500","movementType":"Opening Stock","quantity":500,"reference":"Default Product Master","user":"System","notes":"Cartons - Bottled Water"}'),
-  ('DEFAULT-OPENING-WT-1000', '{"id":"DEFAULT-OPENING-WT-1000","date":"2026-05-30","productName":"Water 1L","itemCode":"WT-1000","movementType":"Opening Stock","quantity":300,"reference":"Default Product Master","user":"System","notes":"Cartons - Bottled Water"}'),
-  ('DEFAULT-OPENING-WT-1500', '{"id":"DEFAULT-OPENING-WT-1500","date":"2026-05-30","productName":"Water 1.5L","itemCode":"WT-1500","movementType":"Opening Stock","quantity":200,"reference":"Default Product Master","user":"System","notes":"Cartons - Bottled Water"}')
+  ('admin', '{"id":"USER-ADMIN","username":"admin","password":"admin123","name":"System Admin","displayName":"System Admin","role":"admin","companyId":"all","companyName":"All Companies","assignedCompanies":["all"],"phone":"","email":"admin@kingapp.local","status":"active","createdAt":"2026-05-30T00:00:00.000Z","updatedAt":"2026-05-30T00:00:00.000Z"}')
 on conflict (id) do update
 set payload = excluded.payload,
     updated_at = now();

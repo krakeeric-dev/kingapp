@@ -1,5 +1,6 @@
 import { defaultProducts } from "@/lib/products-data";
 import { defaultUsers } from "@/lib/users-data";
+import { defaultCompanies } from "@/lib/companies-data";
 import {
   fetchSupabaseTable,
   isSupabaseConfigured,
@@ -23,6 +24,13 @@ const configs: LocalTableConfig<unknown>[] = [
     getId: (record) => (record as { username: string }).username,
     seed: defaultUsers,
     seedCloudWhenEmpty: true
+  },
+  {
+    localKey: "kingapp.companies",
+    table: "companies",
+    getId: (record) => (record as { id: string }).id,
+    getUpdatedAt: (record) => (record as { updatedAt?: string }).updatedAt,
+    seed: defaultCompanies
   },
   {
     localKey: "kingapp.productMaster",

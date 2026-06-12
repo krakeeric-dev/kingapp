@@ -1,4 +1,5 @@
 import { defaultUsers, getUsers, type PlatformUser } from "@/lib/users-data";
+import { getCompanyById } from "@/lib/companies-data";
 import { canLoginOffline } from "@/lib/storage";
 
 export type UserRole =
@@ -73,6 +74,13 @@ export function authenticateUser(
 
   if (!user) {
     return null;
+  }
+
+  if (user.role !== "admin" && user.companyId) {
+    const company = getCompanyById(user.companyId);
+    if (!company || company.status !== "active") {
+      return null;
+    }
   }
 
   const { password: _password, ...sessionUser } = user;
