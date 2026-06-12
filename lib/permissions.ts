@@ -53,6 +53,9 @@ export type PermissionKey =
   | "callcenter.recordings.view"
   | "callcenter.messages.view"
   | "callcenter.messages.send"
+  | "callcenter.whatsapp.view"
+  | "callcenter.whatsapp.manage"
+  | "callcenter.whatsapp.reply"
   | "callcenter.complaints.manage"
   | "callcenter.callbacks.manage"
   | "clientorders.view"
@@ -181,6 +184,9 @@ export const permissionGroups: PermissionGroup[] = [
       { key: "callcenter.recordings.view", label: "View Recordings" },
       { key: "callcenter.messages.view", label: "View Messages" },
       { key: "callcenter.messages.send", label: "Send Messages" },
+      { key: "callcenter.whatsapp.view", label: "View WhatsApp Desk" },
+      { key: "callcenter.whatsapp.manage", label: "Manage WhatsApp Chats" },
+      { key: "callcenter.whatsapp.reply", label: "Reply on WhatsApp" },
       { key: "callcenter.complaints.manage", label: "Manage Complaints" },
       { key: "callcenter.callbacks.manage", label: "Manage Callbacks" }
     ]
@@ -244,6 +250,9 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "customers.debts.view",
     "customers.debts.approve",
     "customers.statements.view",
+    "callcenter.view",
+    "callcenter.whatsapp.view",
+    "callcenter.whatsapp.manage",
     "reports.view",
     "reports.export",
     "reports.print",
@@ -261,6 +270,9 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "customers.view",
     "customers.debts.view",
     "customers.debts.approve",
+    "callcenter.view",
+    "callcenter.whatsapp.view",
+    "callcenter.whatsapp.manage",
     "expenses.view",
     "reports.view",
     "reports.export",
@@ -279,6 +291,7 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "inventory.receive",
     "delivery.view",
     "delivery.dispatch",
+    "callcenter.whatsapp.view",
     "product.view",
     "rawmaterials.view",
     "rawmaterials.update",
@@ -304,6 +317,7 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "customers.debts.view",
     "customers.payments.record",
     "customers.statements.view",
+    "callcenter.whatsapp.view",
     "product.view",
     "rawmaterials.view",
     "expenses.view",
@@ -321,6 +335,9 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "callcenter.calls.transfer",
     "callcenter.messages.view",
     "callcenter.messages.send",
+    "callcenter.whatsapp.view",
+    "callcenter.whatsapp.manage",
+    "callcenter.whatsapp.reply",
     "callcenter.complaints.manage",
     "callcenter.callbacks.manage"
   ],
@@ -338,6 +355,7 @@ export const routePermissions: Record<string, PermissionKey[]> = {
   "/call-center/missed-calls": ["callcenter.view", "callcenter.callbacks.manage"],
   "/call-center/callbacks": ["callcenter.view", "callcenter.callbacks.manage"],
   "/call-center/messages": ["callcenter.view", "callcenter.messages.view"],
+  "/call-center/whatsapp": ["callcenter.whatsapp.view"],
   "/call-center/chat": ["callcenter.view", "callcenter.messages.view"],
   "/call-center/announcements": ["callcenter.view", "callcenter.messages.view"],
   "/call-center/settings": ["callcenter.view"],
@@ -395,6 +413,7 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/call-center/missed-calls": ["admin", "callcenter"],
   "/call-center/callbacks": ["admin", "callcenter"],
   "/call-center/messages": ["admin", "callcenter"],
+  "/call-center/whatsapp": ["admin", "manager", "supervisor", "callcenter", "accountant", "storekeeper"],
   "/call-center/chat": ["admin", "callcenter"],
   "/call-center/announcements": ["admin", "callcenter"],
   "/call-center/settings": ["admin"],
