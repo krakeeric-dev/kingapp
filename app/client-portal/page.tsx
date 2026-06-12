@@ -34,6 +34,7 @@ import {
   formatEta,
   getCatalogForClientSupplier,
   getClientOrders,
+  getPortalClients,
   getPortalSession,
   getSuppliersForClient,
   savePortalSession,
@@ -56,7 +57,12 @@ import {
   getCustomerStatement
 } from "@/lib/customer-accounts-data";
 import { getDeliveryForOrder } from "@/lib/delivery-data";
+import { logAuditEvent } from "@/lib/loading-data";
 import { formatMoney } from "@/lib/sales-data";
+import { getSession } from "@/lib/storage";
+import type { SessionUser } from "@/lib/auth";
+
+const ADMIN_CLIENT_VIEW_KEY = "kingapp.clientPortal.adminViewClientId";
 
 const orderStatuses: ClientOrderStatus[] = [
   "Pending",
@@ -76,8 +82,22 @@ export default function ClientPortalPage() {
   const [error, setError] = useState("");
   const [ordersVersion, setOrdersVersion] = useState(0);
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
+  const [adminUser, setAdminUser] = useState<SessionUser | null>(null);
+  const [adminClientSearch, setAdminClientSearch] = useState("");
 
   useEffect(() => {
+    const appSession = getSession();
+    if (appSession?.role === "admin") {
+      const savedClientId = window.localStorage.getItem(ADMIN_CLIENT_VIEW_KEY) ?? "";
+      const adminClient = getPortalClients().find((item) => item.id === savedClientId) ?? null;
+      setAdminUser(appSession);
+      setClient(adminClient);
+      if (adminClient) {
+        setSelectedSupplierId(getSuppliersForClient(adminClient.id)[0]?.id ?? "");
+      }
+      return;
+    }
+
     const session = getPortalSession();
     setClient(session);
     if (session) setSelectedSupplierId(getSuppliersForClient(session.id)[0]?.id ?? "");
@@ -142,6 +162,22 @@ export default function ClientPortalPage() {
     const quantity = Number(quantities[product.itemCode]) || 0;
     return sum + quantity * product.clientPrice;
   }, 0);
+  const adminClients = useMemo(() => {
+    if (!adminUser) return [];
+    const term = adminClientSearch.trim().toLowerCase();
+    return getPortalClients().filter((portalClient) => {
+      const linkedSuppliers = getSuppliersForClient(portalClient.id);
+      const searchable = [
+        portalClient.clientName,
+        portalClient.ownerName,
+        portalClient.phone,
+        portalClient.location,
+        portalClient.supplier,
+        ...linkedSuppliers.map((supplier) => `${supplier.name} ${supplier.phone} ${supplier.location}`)
+      ].join(" ").toLowerCase();
+      return !term || searchable.includes(term);
+    });
+  }, [adminClientSearch, adminUser]);
 
   function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -162,9 +198,56 @@ export default function ClientPortalPage() {
     setPassword("");
   }
 
+  function enterAdminClientView(portalClient: PortalClient) {
+    if (!adminUser) return;
+    window.localStorage.setItem(ADMIN_CLIENT_VIEW_KEY, portalClient.id);
+    setClient(portalClient);
+    setSelectedSupplierId(getSuppliersForClient(portalClient.id)[0]?.id ?? "");
+    setQuantities({});
+    setMessage("");
+    setError("");
+    logAuditEvent({
+      action: "admin_entered_client_portal",
+      companyId: portalClient.supplier,
+      companyName: portalClient.supplier,
+      module: "Client Portal",
+      newValue: { clientId: portalClient.id, clientName: portalClient.clientName },
+      recordId: portalClient.id,
+      reason: `Admin entered client portal as ${portalClient.clientName}`,
+      status: "success",
+      user: adminUser
+    });
+  }
+
+  function exitAdminClientView() {
+    if (adminUser && client) {
+      logAuditEvent({
+        action: "admin_exited_client_portal",
+        companyId: client.supplier,
+        companyName: client.supplier,
+        module: "Client Portal",
+        oldValue: { clientId: client.id, clientName: client.clientName },
+        recordId: client.id,
+        reason: `Admin exited client view for ${client.clientName}`,
+        status: "success",
+        user: adminUser
+      });
+    }
+    window.localStorage.removeItem(ADMIN_CLIENT_VIEW_KEY);
+    setClient(null);
+    setSelectedSupplierId("");
+    setQuantities({});
+    setMessage("");
+    setError("");
+  }
+
   function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!client) return;
+    if (adminUser) {
+      setError("Admin client view is read-only for order submission.");
+      return;
+    }
 
     const parsedQuantities = Object.fromEntries(
       Object.entries(quantities).map(([itemCode, value]) => [itemCode, Number(value) || 0])
@@ -189,6 +272,76 @@ export default function ClientPortalPage() {
     } catch (orderError) {
       setError(orderError instanceof Error ? orderError.message : "Order could not be submitted.");
     }
+  }
+
+  if (adminUser && !client) {
+    return (
+      <main className="min-h-screen bg-[#f4f7fb] p-4 sm:p-6">
+        <section className="mx-auto max-w-6xl space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-4">
+                <KingAppLogo className="rounded-xl" size={60} />
+                <div>
+                  <p className="text-sm font-black uppercase text-blue-700">Admin Mode</p>
+                  <h1 className="text-3xl font-black text-slate-950">Open Client Portal</h1>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    Select a client to view the portal exactly as that customer.
+                  </p>
+                </div>
+              </div>
+              <Link className="secondary-button" href="/dashboard">Back to Dashboard</Link>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+            Admin client view is read-first. Order submission is disabled to prevent accidental client orders.
+          </div>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-black text-slate-950">Client List</h2>
+                <p className="text-sm font-semibold text-slate-500">Search by client name, phone, company, supplier, or location.</p>
+              </div>
+              <input
+                className="form-input sm:max-w-sm"
+                onChange={(event) => setAdminClientSearch(event.target.value)}
+                placeholder="Search clients..."
+                value={adminClientSearch}
+              />
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {adminClients.map((portalClient) => {
+                const clientSuppliers = getSuppliersForClient(portalClient.id);
+                return (
+                  <button
+                    className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
+                    key={portalClient.id}
+                    onClick={() => enterAdminClientView(portalClient)}
+                    type="button"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-black text-blue-700">
+                        {getInitials(portalClient.clientName)}
+                      </div>
+                      <div>
+                        <h3 className="font-black text-slate-950">{portalClient.clientName}</h3>
+                        <p className="mt-1 text-sm font-semibold text-slate-500">{portalClient.phone} - {portalClient.location}</p>
+                        <p className="mt-2 text-xs font-black uppercase text-blue-700">
+                          {clientSuppliers.map((supplier) => supplier.name).join(", ") || "No supplier linked"}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+              {!adminClients.length ? <EmptyState text="No clients yet." /> : null}
+            </div>
+          </section>
+        </section>
+      </main>
+    );
   }
 
   if (!client) {
@@ -223,9 +376,23 @@ export default function ClientPortalPage() {
   return (
     <main className="min-h-screen bg-[#f4f7fb] text-slate-900">
       <div className="grid min-h-screen lg:grid-cols-[300px_1fr]">
-        <ClientPortalSidebar client={client} unreadMessages={unreadMessages} onLogout={logout} />
+        <ClientPortalSidebar adminMode={!!adminUser} client={client} unreadMessages={unreadMessages} onLogout={adminUser ? exitAdminClientView : logout} />
 
         <section className="min-w-0">
+          {adminUser ? (
+            <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 sm:px-6">
+              <div className="mx-auto flex max-w-[1560px] flex-col gap-3 text-sm font-bold text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <span className="font-black uppercase">Admin Mode</span>
+                  <span className="mx-2">Viewing as:</span>
+                  <span className="font-black">{client.clientName}</span>
+                </div>
+                <button className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-black text-amber-900 hover:bg-amber-100" onClick={exitAdminClientView} type="button">
+                  Exit Client View
+                </button>
+              </div>
+            </div>
+          ) : null}
           <ClientTopBar
             client={client}
             selectedSupplier={selectedSupplier}
@@ -355,9 +522,9 @@ export default function ClientPortalPage() {
                     </div>
                     <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-2xl font-black text-blue-700">Total: {formatMoney(orderTotal)} RWF</p>
-                      <button className="primary-button" disabled={!selectedSupplier || catalog.length === 0}>
+                      <button className="primary-button" disabled={!!adminUser || !selectedSupplier || catalog.length === 0}>
                         <PackageCheck className="h-4 w-4" />
-                        Submit Order
+                        {adminUser ? "Order Entry Disabled in Admin Mode" : "Submit Order"}
                       </button>
                     </div>
                   </form>
@@ -392,10 +559,12 @@ export default function ClientPortalPage() {
 }
 
 function ClientPortalSidebar({
+  adminMode = false,
   client,
   onLogout,
   unreadMessages
 }: {
+  adminMode?: boolean;
   client: PortalClient;
   onLogout: () => void;
   unreadMessages: number;
@@ -458,7 +627,7 @@ function ClientPortalSidebar({
           </div>
           <button className="mt-4 flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-100" onClick={onLogout} type="button">
             <LogOut className="h-5 w-5" />
-            Logout
+            {adminMode ? "Exit Client View" : "Logout"}
           </button>
         </div>
       </div>

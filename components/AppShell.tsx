@@ -188,9 +188,15 @@ const navItems: NavItem[] = [
   },
   {
     href: "/client-portal",
-    label: "Client Portal",
+    label: "Open As Client",
     icon: UserRound,
-    roles: getAllowedRoles("/client-portal")
+    roles: ["admin"]
+  },
+  {
+    href: "/client-portal/messages",
+    label: "Client Messages",
+    icon: MessageSquare,
+    roles: ["admin"]
   },
   {
     href: "/supplier-dashboard",

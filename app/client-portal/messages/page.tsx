@@ -6,6 +6,7 @@ import { ArrowLeft, MessageSquare, Paperclip, Send } from "lucide-react";
 import {
   clearPortalSession,
   getClientOrders,
+  getPortalClients,
   getPortalSession,
   type PortalClient
 } from "@/lib/client-portal-data";
@@ -19,6 +20,9 @@ import {
   type ClientMessage,
   type ClientMessageType
 } from "@/lib/clientMessageService";
+import { getSession } from "@/lib/storage";
+
+const ADMIN_CLIENT_VIEW_KEY = "kingapp.clientPortal.adminViewClientId";
 
 const messageTypes: ClientMessageType[] = [
   "General message",
@@ -43,7 +47,13 @@ export default function ClientPortalMessagesPage() {
   });
 
   useEffect(() => {
-    const session = getPortalSession();
+    const appSession = getSession();
+    const adminClientId = appSession?.role === "admin"
+      ? window.localStorage.getItem(ADMIN_CLIENT_VIEW_KEY) ?? ""
+      : "";
+    const session = adminClientId
+      ? getPortalClients().find((item) => item.id === adminClientId) ?? null
+      : getPortalSession();
     setClient(session);
     if (session) {
       const loadedMessages = getMessagesForPortalClient(session);
@@ -105,7 +115,7 @@ export default function ClientPortalMessagesPage() {
         <section className="mx-auto max-w-md rounded-lg border border-brand-100 bg-white p-6 text-center shadow-executive">
           <MessageSquare className="mx-auto h-10 w-10 text-brand-700" />
           <h1 className="mt-4 text-2xl font-black text-slate-950">Client Messages</h1>
-          <p className="mt-2 text-sm font-semibold text-slate-500">Sign in to the client portal before opening messages.</p>
+          <p className="mt-2 text-sm font-semibold text-slate-500">Open a client view before reading messages.</p>
           <Link className="primary-button mt-5 w-full" href="/client-portal">Open Client Portal</Link>
         </section>
       </main>
@@ -127,7 +137,11 @@ export default function ClientPortalMessagesPage() {
               <button
                 className="secondary-button"
                 onClick={() => {
-                  clearPortalSession();
+                  if (getSession()?.role === "admin") {
+                    window.localStorage.removeItem(ADMIN_CLIENT_VIEW_KEY);
+                  } else {
+                    clearPortalSession();
+                  }
                   window.location.href = "/client-portal";
                 }}
                 type="button"
