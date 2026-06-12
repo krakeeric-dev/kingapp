@@ -20,6 +20,7 @@ import type { SessionUser } from "@/lib/auth";
 import {
   getActiveCompanyId,
   getCompanies,
+  getCompanyById,
   setActiveCompanyId
 } from "@/lib/companies-data";
 import { getExecutiveCompanyMetrics } from "@/lib/executive-data";
@@ -70,6 +71,7 @@ function ReportsContent({ user }: { user: SessionUser }) {
   const scopedReturnRecords = useMemo(() => scopeRecords(returnRecords, companyId, user), [companyId, returnRecords, user]);
   const scopedInventoryMovements = useMemo(() => scopeRecords(inventoryMovements, companyId, user), [companyId, inventoryMovements, user]);
   const companyMetrics = useMemo(() => getExecutiveCompanyMetrics(), [companyId]);
+  const selectedCompany = companyId === "all" ? null : getCompanyById(companyId);
 
   const inventorySummary = useMemo(
     () => {
@@ -224,6 +226,26 @@ function ReportsContent({ user }: { user: SessionUser }) {
       </div>
 
       <section className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm">
+        <div className="mb-5 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            {selectedCompany?.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt={`${selectedCompany.name} logo`} className="h-14 w-14 rounded-lg border border-slate-200 bg-white object-contain p-1" src={selectedCompany.logo} />
+            ) : (
+              <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-brand-100 bg-brand-50 text-sm font-black text-brand-800">
+                KA
+              </div>
+            )}
+            <div>
+              <p className="text-xs font-black uppercase text-brand-700">Report Entity</p>
+              <h3 className="text-xl font-black text-slate-950">{selectedCompany?.name ?? "KingApp Group"}</h3>
+            </div>
+          </div>
+          <div className="text-sm font-bold text-slate-600 sm:text-right">
+            <p>TIN: {selectedCompany?.tinNumber || "Not recorded"}</p>
+            <p>{selectedCompany?.type ?? "All Companies"}</p>
+          </div>
+        </div>
         <div className="mb-4 flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-brand-700" />
           <h3 className="text-lg font-bold text-slate-950">Company Comparison Summary</h3>

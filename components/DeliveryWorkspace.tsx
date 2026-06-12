@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
 import { KingAppLogo } from "@/components/KingAppLogo";
-import { getCompanies, getCompanyName, getCompanyWorkspaceId } from "@/lib/companies-data";
+import { getCompanies, getCompanyById, getCompanyName, getCompanyWorkspaceId } from "@/lib/companies-data";
 import type { ClientPortalOrder } from "@/lib/client-portal-data";
 import { logAuditEvent } from "@/lib/loading-data";
 import { formatMoney } from "@/lib/sales-data";
@@ -848,13 +848,21 @@ function DispatchPassCopy({
 }) {
   const now = new Date();
   const productRows = parseProductSummary(record.productSummary);
+  const company = getCompanyById(record.companyId);
+  const companyLogo = company?.logo ?? "";
+  const tinNumber = company?.tinNumber ?? "";
 
   return (
     <section className="dispatch-pass-page mx-auto min-h-[267mm] max-w-[190mm] bg-white p-2 text-black">
       <div className="border-2 border-black p-5">
         <div className="flex items-start justify-between gap-4 border-b-2 border-black pb-4">
           <div className="flex items-center gap-3">
-            <KingAppLogo size={54} />
+            {companyLogo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt={`${record.companyName} logo`} className="h-14 w-14 object-contain" src={companyLogo} />
+            ) : (
+              <KingAppLogo size={54} />
+            )}
             <div>
               <p className="text-sm font-bold uppercase">{record.companyName}</p>
               <h1 className="text-2xl font-black">KINGAPP DISPATCH GATE PASS</h1>
@@ -869,6 +877,7 @@ function DispatchPassCopy({
 
         <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
           <PrintInfo label="Company Name" value={record.companyName} />
+          <PrintInfo label="TIN Number" value={tinNumber || "Not recorded"} />
           <PrintInfo label="Dispatch Number" value={record.id} />
           <PrintInfo label="Date" value={record.date} />
           <PrintInfo label="Time" value={now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} />

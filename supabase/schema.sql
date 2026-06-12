@@ -14,6 +14,7 @@ create table if not exists public.companies (
   code text not null default '',
   name text not null,
   type text not null default 'Business',
+  tin_number text not null default '',
   phone text not null default '',
   email text not null default '',
   address text not null default '',
@@ -174,6 +175,7 @@ create policy "KingApp demo write audit logs" on public.audit_logs for insert wi
 create policy "KingApp demo update audit logs" on public.audit_logs for update using (true) with check (true);
 
 alter table public.companies add column if not exists code text not null default '';
+alter table public.companies add column if not exists tin_number text not null default '';
 alter table public.companies add column if not exists phone text not null default '';
 alter table public.companies add column if not exists email text not null default '';
 alter table public.companies add column if not exists address text not null default '';

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
-import { Archive, Building2, Pencil, Plus, Power, Trash2, X } from "lucide-react";
+import { Archive, Building2, ImagePlus, Pencil, Plus, Power, Trash2, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import type { SessionUser } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/loading-data";
@@ -26,6 +26,7 @@ type CompanyForm = {
   name: string;
   phone: string;
   status: CompanyStatus;
+  tinNumber: string;
   type: string;
 };
 
@@ -39,8 +40,12 @@ const emptyForm: CompanyForm = {
   name: "",
   phone: "",
   status: "active",
+  tinNumber: "",
   type: ""
 };
+
+const allowedLogoTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/svg+xml"];
+const maxLogoSize = 5 * 1024 * 1024;
 
 export default function CompaniesPage() {
   return (
@@ -70,8 +75,8 @@ function CompaniesContent({ user }: { user: SessionUser }) {
 
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.name.trim() || !form.code.trim() || !form.type.trim()) {
-      setMessage("Company name, company code, and business type are required.");
+    if (!form.name.trim() || !form.code.trim() || !form.type.trim() || !form.tinNumber.trim()) {
+      setMessage("Company name, company code, business type, and TIN number are required.");
       return;
     }
 
@@ -91,6 +96,34 @@ function CompaniesContent({ user }: { user: SessionUser }) {
         status: "success",
         user
       });
+      if (oldCompany?.tinNumber !== form.tinNumber) {
+        logAuditEvent({
+          action: "company_tin_updated",
+          companyId: editingId,
+          companyName: form.name,
+          module: "Companies",
+          newValue: { tinNumber: form.tinNumber },
+          oldValue: { tinNumber: oldCompany?.tinNumber ?? "" },
+          recordId: editingId,
+          reason: "Company TIN updated",
+          status: "success",
+          user
+        });
+      }
+      if (oldCompany?.logo !== form.logo) {
+        logAuditEvent({
+          action: !form.logo ? "company_logo_removed" : oldCompany?.logo ? "company_logo_changed" : "company_logo_uploaded",
+          companyId: editingId,
+          companyName: form.name,
+          module: "Companies",
+          newValue: { hasLogo: Boolean(form.logo) },
+          oldValue: { hasLogo: Boolean(oldCompany?.logo) },
+          recordId: editingId,
+          reason: !form.logo ? "Company logo removed" : oldCompany?.logo ? "Company logo changed" : "Company logo uploaded",
+          status: "success",
+          user
+        });
+      }
       setEditingId("");
       setMessage("Company updated.");
     } else {
@@ -123,8 +156,33 @@ function CompaniesContent({ user }: { user: SessionUser }) {
       name: company.name,
       phone: company.phone,
       status: company.status,
+      tinNumber: company.tinNumber,
       type: company.type
     });
+  }
+
+  function handleLogoUpload(file: File | null) {
+    if (!file) return;
+    if (!allowedLogoTypes.includes(file.type)) {
+      setMessage("Logo must be JPG, JPEG, PNG, WEBP, or SVG.");
+      return;
+    }
+    if (file.size > maxLogoSize) {
+      setMessage("Logo must be 5 MB or smaller.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setForm((current) => ({ ...current, logo: String(reader.result ?? "") }));
+      setMessage(editingId ? "Logo ready. Save changes to apply." : "Logo ready. Add company to save.");
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeLogo() {
+    setForm((current) => ({ ...current, logo: "" }));
+    setMessage("Logo removed from form. Save changes to apply.");
   }
 
   function toggleStatus(company: Company) {
@@ -228,15 +286,38 @@ function CompaniesContent({ user }: { user: SessionUser }) {
           <Field label="Business Type">
             <input className="form-input" onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))} value={form.type} />
           </Field>
+          <Field label="TIN Number">
+            <input className="form-input" onChange={(event) => setForm((current) => ({ ...current, tinNumber: event.target.value }))} value={form.tinNumber} />
+          </Field>
           <Field label="Phone">
             <input className="form-input" onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} value={form.phone} />
           </Field>
           <Field label="Email">
             <input className="form-input" onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} type="email" value={form.email} />
           </Field>
-          <Field label="Logo">
-            <input className="form-input" onChange={(event) => setForm((current) => ({ ...current, logo: event.target.value }))} value={form.logo} />
-          </Field>
+          <div className="lg:col-span-2">
+            <span className="mb-2 block text-sm font-bold text-slate-700">Company Logo</span>
+            <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center">
+              <CompanyLogoPreview logo={form.logo} name={form.name} />
+              <div className="flex flex-wrap gap-2">
+                <label className="primary-button cursor-pointer">
+                  <ImagePlus className="h-4 w-4" />
+                  Upload Company Logo
+                  <input
+                    accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml"
+                    className="sr-only"
+                    onChange={(event) => handleLogoUpload(event.target.files?.[0] ?? null)}
+                    type="file"
+                  />
+                </label>
+                {form.logo ? (
+                  <button className="secondary-button" onClick={removeLogo} type="button">
+                    Remove Logo
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
           <Field label="Address">
             <input className="form-input" onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} value={form.address} />
           </Field>
@@ -271,6 +352,7 @@ function CompaniesContent({ user }: { user: SessionUser }) {
               <tr>
                 <th>Company</th>
                 <th>Code</th>
+                <th>TIN</th>
                 <th>Business Type</th>
                 <th>Contact</th>
                 <th>Status</th>
@@ -283,6 +365,7 @@ function CompaniesContent({ user }: { user: SessionUser }) {
               <tr>
                 <td className="font-black text-slate-950">All Companies</td>
                 <td>-</td>
+                <td>-</td>
                 <td>Admin workspace</td>
                 <td>-</td>
                 <td><StatusBadge status="active" /></td>
@@ -293,10 +376,16 @@ function CompaniesContent({ user }: { user: SessionUser }) {
               {companies.map((company) => (
                 <tr key={company.id}>
                   <td>
-                    <div className="font-black text-slate-950">{company.name}</div>
-                    <div className="text-xs font-semibold text-slate-500">{company.address || "No address recorded"}</div>
+                    <div className="flex items-center gap-3">
+                      <CompanyLogoPreview logo={company.logo} name={company.name} small />
+                      <div>
+                        <div className="font-black text-slate-950">{company.name}</div>
+                        <div className="text-xs font-semibold text-slate-500">{company.address || "No address recorded"}</div>
+                      </div>
+                    </div>
                   </td>
                   <td>{company.code || "-"}</td>
+                  <td>{company.tinNumber || "-"}</td>
                   <td>{company.type || "-"}</td>
                   <td>
                     <div className="text-sm font-semibold text-slate-700">{company.phone || "-"}</div>
@@ -324,7 +413,7 @@ function CompaniesContent({ user }: { user: SessionUser }) {
               ))}
               {!companies.length ? (
                 <tr>
-                  <td className="text-center text-sm font-semibold text-slate-500" colSpan={8}>
+                  <td className="text-center text-sm font-semibold text-slate-500" colSpan={9}>
                     No companies yet. Add your first company to begin setup.
                   </td>
                 </tr>
@@ -332,6 +421,29 @@ function CompaniesContent({ user }: { user: SessionUser }) {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        {companies.map((company) => (
+          <article className="app-card p-5" key={`profile-${company.id}`}>
+            <div className="flex items-start gap-4">
+              <CompanyLogoPreview logo={company.logo} name={company.name} />
+              <div>
+                <p className="text-xs font-black uppercase text-brand-700">Company Profile</p>
+                <h3 className="mt-1 text-xl font-black text-slate-950">{company.name}</h3>
+                <p className="mt-1 text-sm font-semibold text-slate-500">{company.code || "No company code"}</p>
+              </div>
+              <div className="ml-auto"><StatusBadge status={company.status} /></div>
+            </div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <ProfileItem label="TIN Number" value={company.tinNumber} />
+              <ProfileItem label="Business Type" value={company.type} />
+              <ProfileItem label="Phone" value={company.phone} />
+              <ProfileItem label="Email" value={company.email} />
+              <ProfileItem label="Address" value={company.address} wide />
+            </div>
+          </article>
+        ))}
       </section>
 
       {removeTarget ? (
@@ -396,10 +508,35 @@ function CompaniesContent({ user }: { user: SessionUser }) {
   );
 }
 
+function CompanyLogoPreview({ logo, name, small = false }: { logo: string; name: string; small?: boolean }) {
+  const sizeClass = small ? "h-12 w-12" : "h-20 w-20";
+  if (logo) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img alt={`${name || "Company"} logo`} className={`${sizeClass} rounded-lg border border-slate-200 bg-white object-contain p-1`} src={logo} />
+    );
+  }
+
+  return (
+    <div className={`${sizeClass} flex items-center justify-center rounded-lg border border-brand-100 bg-brand-50 text-sm font-black text-brand-800`}>
+      {(name || "KA").slice(0, 2).toUpperCase()}
+    </div>
+  );
+}
+
+function ProfileItem({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={wide ? "sm:col-span-2" : ""}>
+      <p className="text-xs font-black uppercase text-slate-400">{label}</p>
+      <p className="mt-1 text-sm font-bold text-slate-800">{value || "Not recorded"}</p>
+    </div>
+  );
+}
+
 function Field({ children, label }: { children: ReactNode; label: string }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-bold text-slate-700">{label}</span>
+      <span className="mb-1 block text-sm font-bold text-slate-700">{label}</span>
       {children}
     </label>
   );
@@ -408,10 +545,9 @@ function Field({ children, label }: { children: ReactNode; label: string }) {
 function StatusBadge({ status }: { status: CompanyStatus }) {
   const classes =
     status === "active"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      ? "bg-emerald-50 text-emerald-700"
       : status === "archived"
-        ? "border-amber-200 bg-amber-50 text-amber-700"
-        : "border-slate-200 bg-slate-50 text-slate-600";
-
-  return <span className={`status-badge ${classes}`}>{status === "active" ? "Active" : status === "archived" ? "Archived" : "Inactive"}</span>;
+        ? "bg-slate-100 text-slate-600"
+        : "bg-amber-50 text-amber-700";
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-black capitalize ${classes}`}>{status}</span>;
 }

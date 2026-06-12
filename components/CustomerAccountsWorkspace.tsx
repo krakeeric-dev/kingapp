@@ -13,7 +13,7 @@ import {
   WalletCards
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
-import { getCompanies } from "@/lib/companies-data";
+import { getCompanies, getCompanyById } from "@/lib/companies-data";
 import {
   getCustomerAccounts,
   getCustomerDashboard,
@@ -548,6 +548,11 @@ function StatementsView({
   selectedCustomerId: string;
   statementLines: CustomerStatementLine[];
 }) {
+  const company = getCompanyById(selectedCustomer?.companyId);
+  const companyLogo = company?.logo ?? "";
+  const companyName = company?.name ?? selectedCustomer?.companyName ?? "KingApp";
+  const tinNumber = company?.tinNumber ?? "";
+
   return (
     <section className="app-card p-5">
       <div className="no-print grid gap-3 md:grid-cols-[1fr_180px_180px_auto] md:items-end">
@@ -569,13 +574,24 @@ function StatementsView({
       </div>
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
         <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-sm font-black uppercase text-brand-700">KingApp Customer Statement</p>
-            <h3 className="mt-1 text-2xl font-black text-slate-950">{selectedCustomer?.name ?? "No customer"}</h3>
-            <p className="mt-1 text-sm text-slate-600">{selectedCustomer?.phone} - {selectedCustomer?.location}</p>
+          <div className="flex items-start gap-3">
+            {companyLogo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt={`${companyName} logo`} className="h-14 w-14 rounded-lg border border-slate-200 bg-white object-contain p-1" src={companyLogo} />
+            ) : (
+              <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-brand-100 bg-brand-50 text-sm font-black text-brand-800">
+                KA
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-black uppercase text-brand-700">KingApp Customer Statement</p>
+              <h3 className="mt-1 text-2xl font-black text-slate-950">{selectedCustomer?.name ?? "No customer"}</h3>
+              <p className="mt-1 text-sm text-slate-600">{selectedCustomer?.phone} - {selectedCustomer?.location}</p>
+            </div>
           </div>
           <div className="text-sm font-bold text-slate-600 sm:text-right">
-            <p>{selectedCustomer?.companyName}</p>
+            <p>{companyName}</p>
+            <p>TIN: {tinNumber || "Not recorded"}</p>
             <p>{dateFrom} to {dateTo}</p>
           </div>
         </div>

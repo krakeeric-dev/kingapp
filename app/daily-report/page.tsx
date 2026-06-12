@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download, Printer, ScrollText, Search } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { KingAppLogo } from "@/components/KingAppLogo";
+import type { SessionUser } from "@/lib/auth";
+import { getActiveCompanyId, getCompanyById } from "@/lib/companies-data";
 import {
   formatDate,
   getLoadingRecords,
@@ -34,12 +37,12 @@ type Filters = {
 export default function DailyReportPage() {
   return (
     <AppShell allowedRoles={["admin", "manager", "supervisor", "accountant"]}>
-      {() => <DailyReportContent />}
+      {(user) => <DailyReportContent user={user} />}
     </AppShell>
   );
 }
 
-function DailyReportContent() {
+function DailyReportContent({ user }: { user: SessionUser }) {
   const [loadingRecords, setLoadingRecords] = useState<LoadingRecord[]>([]);
   const [salesRecords, setSalesRecords] = useState<SalesRecord[]>([]);
   const [cashRecords, setCashRecords] = useState<CashRecord[]>([]);
@@ -274,6 +277,11 @@ function DailyReportContent() {
     window.print();
   }
 
+  const company = getCompanyById(getActiveCompanyId(user));
+  const companyName = company?.name ?? (getActiveCompanyId(user) === "all" ? "KingApp Group" : user.companyName);
+  const companyLogo = company?.logo ?? "";
+  const tinNumber = company?.tinNumber ?? "";
+
   return (
     <div className="space-y-6">
       <div className="no-print app-card-soft p-5 sm:p-6">
@@ -448,14 +456,20 @@ function DailyReportContent() {
         <header className="rounded-lg bg-gradient-to-r from-brand-950 to-brand-700 p-5 text-white">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white/15 text-xl font-black text-white">
-                K
-              </div>
+              {companyLogo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img alt={`${companyName} logo`} className="h-14 w-14 rounded-lg bg-white object-contain p-1" src={companyLogo} />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white p-1">
+                  <KingAppLogo size={44} />
+                </div>
+              )}
               <div>
-                <h1 className="text-2xl font-black text-white">KingApp</h1>
+                <h1 className="text-2xl font-black text-white">{companyName}</h1>
                 <p className="text-sm font-semibold text-emerald-100">
                   Sales & Stock Management
                 </p>
+                <p className="text-xs font-bold text-emerald-100">TIN: {tinNumber || "Not recorded"}</p>
               </div>
             </div>
             <div className="text-left sm:text-right">

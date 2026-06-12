@@ -7,6 +7,7 @@ export type Company = {
   id: string;
   code: string;
   name: string;
+  tinNumber: string;
   type: string;
   phone: string;
   email: string;
@@ -107,6 +108,7 @@ function normalizeCompany(company: Partial<Company> & { id: string; name: string
     id: company.id,
     code: company.code ?? "",
     name: company.name,
+    tinNumber: company.tinNumber ?? "",
     type: company.type ?? "",
     phone: company.phone ?? "",
     email: company.email ?? "",
@@ -206,13 +208,14 @@ export function filterByAssignedCompanies<T extends object>(
   });
 }
 
-export function createCompany(input: Pick<Company, "address" | "code" | "email" | "logo" | "name" | "phone" | "status" | "type">) {
+export function createCompany(input: Pick<Company, "address" | "code" | "email" | "logo" | "name" | "phone" | "status" | "tinNumber" | "type">) {
   const now = new Date().toISOString();
   const company: Company = {
     ...input,
     id: makeId("COMP"),
     code: input.code.trim(),
     name: input.name.trim(),
+    tinNumber: input.tinNumber.trim(),
     type: input.type.trim(),
     phone: input.phone.trim(),
     email: input.email.trim(),
@@ -224,7 +227,7 @@ export function createCompany(input: Pick<Company, "address" | "code" | "email" 
   return saveCompanies([company, ...getCompanies({ includeArchived: true })]);
 }
 
-export function updateCompany(companyId: string, updates: Pick<Company, "address" | "code" | "email" | "logo" | "name" | "phone" | "status" | "type">) {
+export function updateCompany(companyId: string, updates: Pick<Company, "address" | "code" | "email" | "logo" | "name" | "phone" | "status" | "tinNumber" | "type">) {
   return saveCompanies(
     getCompanies({ includeArchived: true }).map((company) =>
       company.id === companyId
@@ -233,6 +236,7 @@ export function updateCompany(companyId: string, updates: Pick<Company, "address
             ...updates,
             code: updates.code.trim(),
             name: updates.name.trim(),
+            tinNumber: updates.tinNumber.trim(),
             type: updates.type.trim(),
             phone: updates.phone.trim(),
             email: updates.email.trim(),
