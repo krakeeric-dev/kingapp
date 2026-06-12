@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Archive, Building2, ImagePlus, Pencil, Plus, Power, Trash2, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import type { SessionUser } from "@/lib/auth";
@@ -62,6 +62,7 @@ function CompaniesContent({ user }: { user: SessionUser }) {
   const [message, setMessage] = useState("");
   const [removeTarget, setRemoveTarget] = useState<Company | null>(null);
   const [removeMode, setRemoveMode] = useState<RemoveMode>("archive");
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
   const users = useMemo(() => getUsers(), [companies]);
   const linkedSummary = removeTarget ? getCompanyLinkedRecordSummary(removeTarget.id) : { total: 0, byKey: [] };
 
@@ -141,6 +142,19 @@ function CompaniesContent({ user }: { user: SessionUser }) {
         status: "success",
         user
       });
+      if (createdCompany.logo) {
+        logAuditEvent({
+          action: "company_logo_uploaded",
+          companyId: createdCompany.id,
+          companyName: createdCompany.name,
+          module: "Companies",
+          newValue: { hasLogo: true },
+          recordId: createdCompany.id,
+          reason: "Company logo uploaded",
+          status: "success",
+          user
+        });
+      }
       setMessage("Company created.");
     }
     setForm(emptyForm);
@@ -277,6 +291,47 @@ function CompaniesContent({ user }: { user: SessionUser }) {
       <section className="app-card p-5">
         <h3 className="text-lg font-black text-slate-950">{editingId ? "Edit Company" : "Add Company"}</h3>
         <form className="mt-4 grid gap-4 lg:grid-cols-3" onSubmit={save}>
+          <div className="rounded-lg border border-brand-100 bg-brand-50/60 p-4 lg:col-span-3">
+            <p className="text-sm font-black uppercase text-brand-800">Company identity</p>
+            <p className="mt-1 text-sm font-semibold text-slate-600">
+              TIN number and logo saved here appear on company profiles and printable documents.
+            </p>
+            <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_2fr]">
+              <Field label="TIN Number">
+                <input
+                  className="form-input"
+                  onChange={(event) => setForm((current) => ({ ...current, tinNumber: event.target.value }))}
+                  placeholder="Enter company TIN"
+                  required
+                  value={form.tinNumber}
+                />
+              </Field>
+              <div>
+                <span className="mb-2 block text-sm font-bold text-slate-700">Company Logo</span>
+                <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center">
+                  <CompanyLogoPreview logo={form.logo} name={form.name} />
+                  <div className="flex flex-wrap gap-2">
+                    <button className="primary-button" onClick={() => logoInputRef.current?.click()} type="button">
+                      <ImagePlus className="h-4 w-4" />
+                      Upload Company Logo
+                    </button>
+                    <input
+                      accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml"
+                      className="hidden"
+                      onChange={(event) => handleLogoUpload(event.target.files?.[0] ?? null)}
+                      ref={logoInputRef}
+                      type="file"
+                    />
+                    {form.logo ? (
+                      <button className="secondary-button" onClick={removeLogo} type="button">
+                        Remove Logo
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <Field label="Company Name">
             <input className="form-input" onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} value={form.name} />
           </Field>
@@ -286,38 +341,12 @@ function CompaniesContent({ user }: { user: SessionUser }) {
           <Field label="Business Type">
             <input className="form-input" onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))} value={form.type} />
           </Field>
-          <Field label="TIN Number">
-            <input className="form-input" onChange={(event) => setForm((current) => ({ ...current, tinNumber: event.target.value }))} value={form.tinNumber} />
-          </Field>
           <Field label="Phone">
             <input className="form-input" onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} value={form.phone} />
           </Field>
           <Field label="Email">
             <input className="form-input" onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} type="email" value={form.email} />
           </Field>
-          <div className="lg:col-span-2">
-            <span className="mb-2 block text-sm font-bold text-slate-700">Company Logo</span>
-            <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center">
-              <CompanyLogoPreview logo={form.logo} name={form.name} />
-              <div className="flex flex-wrap gap-2">
-                <label className="primary-button cursor-pointer">
-                  <ImagePlus className="h-4 w-4" />
-                  Upload Company Logo
-                  <input
-                    accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml"
-                    className="sr-only"
-                    onChange={(event) => handleLogoUpload(event.target.files?.[0] ?? null)}
-                    type="file"
-                  />
-                </label>
-                {form.logo ? (
-                  <button className="secondary-button" onClick={removeLogo} type="button">
-                    Remove Logo
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
           <Field label="Address">
             <input className="form-input" onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} value={form.address} />
           </Field>
