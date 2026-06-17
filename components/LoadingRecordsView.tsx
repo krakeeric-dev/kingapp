@@ -1,15 +1,18 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { LockOpen, Search } from "lucide-react";
+import { Download, LockOpen, Printer, Search } from "lucide-react";
+import { KingAppLogo } from "@/components/KingAppLogo";
 import type { SessionUser } from "@/lib/auth";
 import type { LoadingRecord } from "@/lib/loading-data";
 import {
   formatDate,
+  logAuditEvent,
   statusChipClass,
   statusLabels,
   unlockLoadingRecord
 } from "@/lib/loading-data";
+import { getCompanyById } from "@/lib/companies-data";
 
 type LoadingRecordsViewProps = {
   records: LoadingRecord[];
@@ -34,6 +37,7 @@ export function LoadingRecordsView({
   const [unlockRecordId, setUnlockRecordId] = useState("");
   const [unlockReason, setUnlockReason] = useState("");
   const [unlockError, setUnlockError] = useState("");
+  const [printRecord, setPrintRecord] = useState<LoadingRecord | null>(null);
 
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
@@ -71,8 +75,24 @@ export function LoadingRecordsView({
     setUnlockReason("");
   }
 
+  function printLoadingNote(record: LoadingRecord, action: "print" | "pdf") {
+    setPrintRecord(record);
+    logAuditEvent({
+      action: action === "print" ? "loading_note_printed" : "loading_note_pdf_requested",
+      companyId: user.companyId,
+      companyName: user.companyName,
+      module: "Loading",
+      recordId: record.id,
+      reason: action === "print" ? "Loading note printed" : "Loading note PDF requested",
+      status: "success",
+      user
+    });
+    window.setTimeout(() => window.print(), 120);
+  }
+
   return (
-    <div className="space-y-4">
+    <>
+    <div className="space-y-4 print:hidden">
       {showAdminFilters ? (
         <div className="app-card p-4">
           <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
@@ -140,6 +160,7 @@ export function LoadingRecordsView({
               <th className="px-4 py-3">Truck</th>
               <th className="px-4 py-3 text-right">Cartons</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Loading Note</th>
               {user.role === "admin" ? <th className="px-4 py-3">Admin</th> : null}
             </tr>
           </thead>
@@ -164,6 +185,26 @@ export function LoadingRecordsView({
                   >
                     {statusLabels[record.status]}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="secondary-button !px-3 !py-2 !text-xs"
+                      onClick={() => printLoadingNote(record, "print")}
+                      type="button"
+                    >
+                      <Printer className="h-4 w-4" />
+                      Print
+                    </button>
+                    <button
+                      className="secondary-button !px-3 !py-2 !text-xs"
+                      onClick={() => printLoadingNote(record, "pdf")}
+                      type="button"
+                    >
+                      <Download className="h-4 w-4" />
+                      PDF
+                    </button>
+                  </div>
                 </td>
                 {user.role === "admin" ? (
                   <td className="px-4 py-3">
@@ -257,6 +298,24 @@ export function LoadingRecordsView({
                 Unlock
               </button>
             ) : null}
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <button
+                className="secondary-button w-full"
+                onClick={() => printLoadingNote(record, "print")}
+                type="button"
+              >
+                <Printer className="h-4 w-4" />
+                Print Loading Note
+              </button>
+              <button
+                className="secondary-button w-full"
+                onClick={() => printLoadingNote(record, "pdf")}
+                type="button"
+              >
+                <Download className="h-4 w-4" />
+                Download PDF
+              </button>
+            </div>
           </article>
         ))}
       </div>
@@ -307,6 +366,186 @@ export function LoadingRecordsView({
           </form>
         </div>
       ) : null}
+    </div>
+    {printRecord ? (
+      <LoadingNotePreview
+        company={getCompanyById(user.companyId)}
+        onClose={() => setPrintRecord(null)}
+        onPrint={() => window.print()}
+        record={printRecord}
+        user={user}
+      />
+    ) : null}
+    {printRecord ? (
+      <div className="hidden print:block">
+        <PrintableLoadingNote
+          company={getCompanyById(user.companyId)}
+          record={printRecord}
+          user={user}
+        />
+      </div>
+    ) : null}
+    </>
+  );
+}
+
+function LoadingNotePreview({
+  company,
+  onClose,
+  onPrint,
+  record,
+  user
+}: {
+  company: ReturnType<typeof getCompanyById>;
+  onClose: () => void;
+  onPrint: () => void;
+  record: LoadingRecord;
+  user: SessionUser;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 print:hidden">
+      <div className="mx-auto max-w-5xl rounded-xl bg-white p-4 shadow-2xl">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-xl font-black text-slate-950">Loading Note Preview</h3>
+            <p className="text-sm font-semibold text-slate-500">Use Print and choose “Save as PDF” to download a PDF copy.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className="primary-button" onClick={onPrint} type="button">
+              <Printer className="h-4 w-4" />
+              Print
+            </button>
+            <button className="secondary-button" onClick={onPrint} type="button">
+              <Download className="h-4 w-4" />
+              Download PDF
+            </button>
+            <button className="secondary-button" onClick={onClose} type="button">Close</button>
+          </div>
+        </div>
+        <PrintableLoadingNote company={company} record={record} user={user} />
+      </div>
+    </div>
+  );
+}
+
+function PrintableLoadingNote({
+  company,
+  record,
+  user
+}: {
+  company: ReturnType<typeof getCompanyById>;
+  record: LoadingRecord;
+  user: SessionUser;
+}) {
+  const loadingTime = new Date(record.submittedAt ?? record.createdAt).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  const companyName = company?.name || user.companyName || "Company";
+  const tinNumber = company?.tinNumber || "TIN not recorded";
+  const logo = company?.logo;
+
+  return (
+    <section className="print-page mx-auto min-h-[297mm] max-w-[210mm] border border-slate-300 bg-white p-8 text-slate-950 shadow-lg">
+      <div className="flex items-start justify-between gap-6 border-b-2 border-slate-950 pb-5">
+        <div className="flex items-center gap-4">
+          {logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img alt={`${companyName} logo`} className="h-20 w-20 rounded-lg object-contain" src={logo} />
+          ) : (
+            <KingAppLogo className="rounded-lg" size={80} />
+          )}
+          <div>
+            <h1 className="text-2xl font-black uppercase tracking-wide">{companyName}</h1>
+            <p className="mt-1 text-sm font-bold">TIN: {tinNumber}</p>
+            <p className="mt-2 text-lg font-black uppercase">Professional Loading Note</p>
+          </div>
+        </div>
+        <div className="text-right text-sm">
+          <p className="font-black uppercase text-slate-500">Loading Number</p>
+          <p className="text-lg font-black">{record.id}</p>
+          <p className="mt-3 font-bold">Date: {formatDate(record.date)}</p>
+          <p className="font-bold">Time: {loadingTime}</p>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
+        <NoteField label="Driver Name" value="" />
+        <NoteField label="Driver Phone" value="" />
+        <NoteField label="Vehicle Plate Number" value={record.truck} />
+        <NoteField label="Marketer Name" value={record.marketerName} />
+        <NoteField label="Route" value="" />
+        <NoteField label="Client Name" value="Not linked" />
+        <NoteField label="Client Phone" value="Not linked" />
+        <NoteField label="Client Location" value="Not linked" />
+      </div>
+
+      <table className="mt-7 w-full border-collapse text-sm">
+        <thead>
+          <tr className="bg-slate-100">
+            <th className="border border-slate-400 px-3 py-3 text-left">Product</th>
+            <th className="border border-slate-400 px-3 py-3 text-right">Quantity Loaded</th>
+            <th className="border border-slate-400 px-3 py-3 text-left">Unit</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="border border-slate-400 px-3 py-3 font-bold">{record.productName}</td>
+            <td className="border border-slate-400 px-3 py-3 text-right font-bold">{record.loadedCartons.toLocaleString()}</td>
+            <td className="border border-slate-400 px-3 py-3">Cartons</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div className="mt-5 grid grid-cols-[1fr_220px] gap-5">
+        <div className="rounded-lg border border-slate-300 p-4">
+          <p className="text-xs font-black uppercase text-slate-500">Comments</p>
+          <p className="mt-2 min-h-20 text-sm font-semibold">{record.notes || "No comments recorded."}</p>
+        </div>
+        <div className="rounded-lg border-2 border-slate-950 p-4 text-center">
+          <p className="text-xs font-black uppercase text-slate-500">Total Cartons</p>
+          <p className="mt-4 text-4xl font-black">{record.loadedCartons.toLocaleString()}</p>
+        </div>
+      </div>
+
+      <div className="mt-8 grid grid-cols-[1fr_150px] gap-6">
+        <div>
+          <h3 className="text-sm font-black uppercase">Signature Area</h3>
+          <div className="mt-6 grid grid-cols-2 gap-x-10 gap-y-8 text-sm">
+            <SignatureLine label="Storekeeper" value={record.storekeeperName} />
+            <SignatureLine label="Driver" />
+            <SignatureLine label="Marketer" value={record.marketerName} />
+            <SignatureLine label="Supervisor" />
+          </div>
+        </div>
+        <div className="flex h-36 flex-col items-center justify-center border-2 border-dashed border-slate-500 text-center">
+          <div className="grid grid-cols-3 gap-1">
+            {Array.from({ length: 9 }).map((_, index) => (
+              <span className="h-5 w-5 bg-slate-900" key={index} />
+            ))}
+          </div>
+          <p className="mt-3 text-xs font-black uppercase">Scan to verify loading</p>
+          <p className="mt-1 text-[10px] font-semibold text-slate-500">QR Code Placeholder</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function NoteField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-b border-slate-400 pb-2">
+      <p className="text-[11px] font-black uppercase text-slate-500">{label}</p>
+      <p className="mt-1 min-h-5 font-bold">{value || "____________________________"}</p>
+    </div>
+  );
+}
+
+function SignatureLine({ label, value = "" }: { label: string; value?: string }) {
+  return (
+    <div>
+      <div className="border-b border-slate-950 pb-2 font-semibold">{value}</div>
+      <p className="mt-2 text-xs font-black uppercase text-slate-500">{label}</p>
     </div>
   );
 }
