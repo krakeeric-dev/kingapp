@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { Download, LockOpen, Printer, Search } from "lucide-react";
+import { Download, LockOpen, MessageSquare, Printer, Search } from "lucide-react";
 import { KingAppLogo } from "@/components/KingAppLogo";
 import type { SessionUser } from "@/lib/auth";
 import type { LoadingRecord } from "@/lib/loading-data";
@@ -389,7 +389,7 @@ export function LoadingRecordsView({
   );
 }
 
-function LoadingNotePreview({
+  function LoadingNotePreview({
   company,
   onClose,
   onPrint,
@@ -402,6 +402,13 @@ function LoadingNotePreview({
   record: LoadingRecord;
   user: SessionUser;
 }) {
+  function shareWhatsApp() {
+    const text = encodeURIComponent(
+      `KINGAPP LOADING NOTE\nLoading No: ${record.id}\nCompany: ${company?.name || user.companyName || "Company"}\nDate: ${formatDate(record.date)}\nVehicle: ${record.truck}\nMarketer: ${record.marketerName}\nProduct: ${record.productName}\nTotal Cartons: ${record.loadedCartons.toLocaleString()}`
+    );
+    window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
+  }
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 print:hidden">
       <div className="mx-auto max-w-5xl rounded-xl bg-white p-4 shadow-2xl">
@@ -418,6 +425,10 @@ function LoadingNotePreview({
             <button className="secondary-button" onClick={onPrint} type="button">
               <Download className="h-4 w-4" />
               Download PDF
+            </button>
+            <button className="secondary-button" onClick={shareWhatsApp} type="button">
+              <MessageSquare className="h-4 w-4" />
+              Share WhatsApp
             </button>
             <button className="secondary-button" onClick={onClose} type="button">Close</button>
           </div>

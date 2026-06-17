@@ -199,6 +199,12 @@ const navItems: NavItem[] = [
     roles: ["admin"]
   },
   {
+    href: "/client-portal/messages",
+    label: "Messages",
+    icon: MessageSquare,
+    roles: getAllowedRoles("/client-portal/messages").filter((role) => role !== "admin")
+  },
+  {
     href: "/supplier-dashboard",
     label: "Suppliers",
     icon: Building2,
@@ -651,6 +657,12 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
         ) : null}
 
         <section className="mx-auto max-w-[1600px] px-4 pb-24 pt-5 sm:px-6 lg:px-8 lg:py-8">
+          <MobileRoleHome
+            isOnline={isOnline}
+            pathname={pathname}
+            user={user}
+            visibleNav={mobileVisibleNav}
+          />
           {children(user)}
         </section>
         <MobileBottomNav
@@ -875,6 +887,98 @@ function getMobileNavItems(visibleNav: NavItem[]) {
     );
 
   return items.slice(0, 4);
+}
+
+function MobileRoleHome({
+  isOnline,
+  pathname,
+  user,
+  visibleNav
+}: {
+  isOnline: boolean;
+  pathname: string;
+  user: SessionUser;
+  visibleNav: NavItem[];
+}) {
+  const shortcuts = getMobileRoleShortcuts(user.role, visibleNav);
+
+  if (pathname.startsWith("/call-center") || shortcuts.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="no-print mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:hidden">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase text-brand-700">{roleLabels[user.role]} Mobile Home</p>
+          <h2 className="mt-1 text-lg font-black text-slate-950">{user.displayName}</h2>
+        </div>
+        <Link
+          className={`rounded-full px-3 py-1 text-xs font-black ${isOnline ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+          href="/sync-status"
+        >
+          {isOnline ? "Online" : "Offline"}
+        </Link>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        {shortcuts.map((item) => (
+          <Link
+            className="flex min-h-20 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-black text-slate-800 shadow-sm active:scale-[0.99]"
+            href={item.href}
+            key={`${item.href}-${item.label}`}
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-700 text-white">
+              <item.icon className="h-5 w-5" />
+            </span>
+            <span>{item.label}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function getMobileRoleShortcuts(role: UserRole, visibleNav: NavItem[]) {
+  const routeLabels: Partial<Record<string, string>> = {
+    "/customers": "Client List",
+    "/customers/debts": "Debt Requests",
+    "/customers/debts/approvals": "Approvals",
+    "/customers/payments": "Payments",
+    "/customers/statements": "Statements",
+    "/delivery": "Delivery",
+    "/loading": "Loading",
+    "/inventory": "Inventory",
+    "/raw-materials": "Raw Materials",
+    "/returns": "Returns",
+    "/cash": "Cash",
+    "/sales": "Sales",
+    "/confirm-loading": "Confirm",
+    "/reports": "Reports",
+    "/daily-report": "Reports",
+    "/client-portal": "Place Order",
+    "/client-orders": "My Orders",
+    "/sync-status": "Sync"
+  };
+  const priorityByRole: Record<UserRole, string[]> = {
+    admin: ["/dashboard", "/loading", "/sales", "/cash", "/inventory", "/delivery"],
+    manager: ["/dashboard", "/customers/debts/approvals", "/reports", "/daily-report", "/inventory", "/delivery"],
+    supervisor: ["/dashboard", "/customers/debts/approvals", "/loading", "/sales", "/returns", "/reports"],
+    storekeeper: ["/loading", "/inventory", "/raw-materials", "/returns", "/delivery", "/sync-status"],
+    marketer: ["/sales", "/customers", "/delivery", "/client-portal/messages", "/customers/debts/approvals", "/sync-status"],
+    accountant: ["/cash", "/customers/debts", "/customers/payments", "/customers/statements", "/expenses", "/daily-report"],
+    callcenter: [],
+    supplier: ["/supplier-dashboard", "/client-orders", "/delivery", "/client-portal/messages", "/reports", "/sync-status"],
+    client: ["/client-portal", "/client-orders", "/delivery", "/customers/statements", "/client-portal/messages", "/sync-status"]
+  };
+
+  return priorityByRole[role]
+    .map((href) => visibleNav.find((item) => item.href === href))
+    .filter((item): item is NavItem => Boolean(item))
+    .map((item) => ({
+      ...item,
+      label: routeLabels[item.href] ?? item.label
+    }))
+    .slice(0, 6);
 }
 
 function shortMobileLabel(label: string) {
