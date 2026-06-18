@@ -39,6 +39,8 @@ function ChatContent({ user }: { user: SessionUser }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [channels, setChannels] = useState<ChatChannel[]>([]);
   const [selectedChannel, setSelectedChannel] = useState("call-center");
+  const [clientThreadsCount, setClientThreadsCount] = useState(0);
+  const [loadError, setLoadError] = useState("");
   const [query, setQuery] = useState("");
   const [replyToId, setReplyToId] = useState<string | undefined>();
   const [draft, setDraft] = useState({
@@ -48,36 +50,49 @@ function ChatContent({ user }: { user: SessionUser }) {
   });
 
   useEffect(() => {
-    const loadedChannels = getChatChannelsForUser(user);
-    setChannels(loadedChannels);
-    setMessages(getChatMessagesForUser(user));
-    setSelectedChannel((current) => loadedChannels.some((channel) => channel.id === current) ? current : loadedChannels[0]?.id ?? "call-center");
+    refreshChatState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const selected = channels.find((channel) => channel.id === selectedChannel) ?? channels[0];
+  const selected = channels.find((channel) => channel.id === selectedChannel) ?? channels[0] ?? null;
+  const activeChannelId = selected?.id ?? "";
   const channelMessages = useMemo(() => {
     const search = query.trim().toLowerCase();
     return messages
-      .filter((message) => message.channelId === selectedChannel)
+      .filter((message) => message.channelId === activeChannelId)
       .filter((message) => !search || `${message.body} ${message.author} ${message.mention ?? ""}`.toLowerCase().includes(search))
       .sort((first, second) => first.createdAt.localeCompare(second.createdAt));
-  }, [messages, query, selectedChannel]);
+  }, [activeChannelId, messages, query]);
 
   const pinnedMessages = channelMessages.filter((message) => message.pinned && !message.deleted);
   const replyTarget = messages.find((message) => message.id === replyToId);
-  const clientThreads = getClientMessageThreads(getMessagesForStaff(user));
+
+  function refreshChatState() {
+    const loaded = safeLoadChat(user);
+    const loadedClientThreads = safeLoadClientThreads(user);
+    setChannels(loaded.channels);
+    setMessages(loaded.messages);
+    setClientThreadsCount(loadedClientThreads.filter((thread) => thread.status !== "Closed").length);
+    setLoadError(loaded.error ?? "");
+    setSelectedChannel((current) =>
+      loaded.channels.some((channel) => channel.id === current)
+        ? current
+        : loaded.channels[0]?.id ?? ""
+    );
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!selected) return;
     if (!draft.body.trim() && !draft.attachmentName.trim()) return;
     sendChatMessage({
       attachmentName: draft.attachmentName || undefined,
       body: draft.body,
-      channelId: selectedChannel,
+      channelId: selected.id,
       mention: draft.mention || undefined,
       replyToId
     }, user);
-    setMessages(getChatMessagesForUser(user));
+    refreshChatState();
     setDraft({ attachmentName: "", body: "", mention: "" });
     setReplyToId(undefined);
   }
@@ -86,7 +101,7 @@ function ChatContent({ user }: { user: SessionUser }) {
     const nextBody = window.prompt("Edit message", message.body);
     if (!nextBody?.trim()) return;
     editChatMessage(message.id, nextBody);
-    setMessages(getChatMessagesForUser(user));
+    refreshChatState();
   }
 
   return (
@@ -99,9 +114,14 @@ function ChatContent({ user }: { user: SessionUser }) {
         <div className="max-h-[690px] overflow-y-auto p-4">
           <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 p-3">
             <p className="text-xs font-black uppercase text-blue-700">Client Support Queue</p>
-            <p className="mt-2 text-2xl font-black text-slate-950">{clientThreads.filter((thread) => thread.status !== "Closed").length}</p>
+            <p className="mt-2 text-2xl font-black text-slate-950">{clientThreadsCount}</p>
             <p className="mt-1 text-xs font-semibold text-slate-600">Open client portal threads</p>
           </div>
+          {loadError ? (
+            <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+              Chat data is temporarily unavailable. The page is safe to use.
+            </div>
+          ) : null}
           <ChannelGroup channels={channels.filter((channel) => !channel.companyId)} label="Company Operations" selectedChannel={selectedChannel} setSelectedChannel={setSelectedChannel} />
           <ChannelGroup channels={channels.filter((channel) => channel.companyId)} label="Multi-company Channels" selectedChannel={selectedChannel} setSelectedChannel={setSelectedChannel} />
         </div>
@@ -113,10 +133,10 @@ function ChatContent({ user }: { user: SessionUser }) {
             <div className="flex items-start gap-3">
               <div className="rounded-xl bg-blue-50 p-3 text-blue-700"><MessageCircle className="h-5 w-5" /></div>
               <div>
-                <h3 className="text-2xl font-black text-slate-950">{selected.name}</h3>
+                <h3 className="text-2xl font-black text-slate-950">{selected?.name ?? "Team Chat"}</h3>
                 <p className="text-sm font-semibold text-slate-500">
                   <span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-500" />
-                  {selected.onlineCount} online - Typing indicator active
+                  {selected?.onlineCount ?? 0} online - Typing indicator active
                 </p>
               </div>
             </div>
@@ -141,6 +161,19 @@ function ChatContent({ user }: { user: SessionUser }) {
         ) : null}
 
         <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50/70 p-5">
+          {!selected || channelMessages.length === 0 ? (
+            <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center">
+              <div>
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+                  <MessageCircle className="h-7 w-7" />
+                </div>
+                <h4 className="mt-4 text-lg font-black text-slate-950">No chat messages yet</h4>
+                <p className="mt-2 max-w-md text-sm font-semibold text-slate-500">
+                  Team conversations will appear here when messages are sent in an allowed company channel.
+                </p>
+              </div>
+            </div>
+          ) : null}
           {channelMessages.map((message) => {
             const mine = message.author === user.displayName;
             const replied = message.replyToId ? messages.find((item) => item.id === message.replyToId) : undefined;
@@ -158,9 +191,9 @@ function ChatContent({ user }: { user: SessionUser }) {
                   <div className={`mt-3 flex flex-wrap items-center gap-2 text-xs font-bold ${mine ? "text-blue-100" : "text-slate-500"}`}>
                     <span>{message.createdAt.slice(11, 16)}{message.edited ? " - edited" : ""}</span>
                     <button onClick={() => setReplyToId(message.id)} type="button"><Reply className="h-4 w-4" /></button>
-                    <button onClick={() => { pinChatMessage(message.id); setMessages(getChatMessagesForUser(user)); }} type="button"><Pin className="h-4 w-4" /></button>
+                    <button onClick={() => { pinChatMessage(message.id); refreshChatState(); }} type="button"><Pin className="h-4 w-4" /></button>
                     <button onClick={() => editMessage(message)} type="button"><Edit3 className="h-4 w-4" /></button>
-                    <button onClick={() => { deleteChatMessage(message.id); setMessages(getChatMessagesForUser(user)); }} type="button"><Trash2 className="h-4 w-4" /></button>
+                    <button onClick={() => { deleteChatMessage(message.id); refreshChatState(); }} type="button"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </div>
               </article>
@@ -178,14 +211,14 @@ function ChatContent({ user }: { user: SessionUser }) {
           <div className="grid gap-3 lg:grid-cols-[150px_1fr_190px_auto]">
             <label className="relative block">
               <AtSign className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-              <input className="form-input pl-9" onChange={(event) => setDraft((current) => ({ ...current, mention: event.target.value }))} placeholder="@mention" value={draft.mention} />
+              <input className="form-input pl-9" disabled={!selected} onChange={(event) => setDraft((current) => ({ ...current, mention: event.target.value }))} placeholder="@mention" value={draft.mention} />
             </label>
-              <input className="form-input" onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))} placeholder={`Message ${selected?.name ?? "channel"}`} value={draft.body} />
+              <input className="form-input" disabled={!selected} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))} placeholder={`Message ${selected?.name ?? "channel"}`} value={draft.body} />
             <label className="relative block">
               <Paperclip className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-              <input className="form-input pl-9" onChange={(event) => setDraft((current) => ({ ...current, attachmentName: event.target.value }))} placeholder="Attach file" value={draft.attachmentName} />
+              <input className="form-input pl-9" disabled={!selected} onChange={(event) => setDraft((current) => ({ ...current, attachmentName: event.target.value }))} placeholder="Attach file" value={draft.attachmentName} />
             </label>
-            <button className="primary-button"><Send className="h-4 w-4" /> Send</button>
+            <button className="primary-button disabled:cursor-not-allowed disabled:opacity-50" disabled={!selected}><Send className="h-4 w-4" /> Send</button>
           </div>
         </form>
       </section>
@@ -198,6 +231,11 @@ function ChannelGroup({ channels, label, selectedChannel, setSelectedChannel }: 
     <div className="mb-5">
       <p className="mb-2 text-xs font-black uppercase text-slate-400">{label}</p>
       <div className="space-y-2">
+        {channels.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-500">
+            No chat messages yet
+          </div>
+        ) : null}
         {channels.map((channel) => {
           return (
             <button
@@ -218,4 +256,28 @@ function ChannelGroup({ channels, label, selectedChannel, setSelectedChannel }: 
       </div>
     </div>
   );
+}
+
+function safeLoadChat(user: SessionUser): { channels: ChatChannel[]; error?: string; messages: ChatMessage[] } {
+  try {
+    const channels = getChatChannelsForUser(user);
+    const messages = getChatMessagesForUser(user);
+    return {
+      channels: Array.isArray(channels) ? channels : [],
+      messages: Array.isArray(messages) ? messages : []
+    };
+  } catch (error) {
+    console.error("[KingApp] CCRM chat data load failed", error);
+    return { channels: [], error: "chat-load-failed", messages: [] };
+  }
+}
+
+function safeLoadClientThreads(user: SessionUser) {
+  try {
+    const messages = getMessagesForStaff(user);
+    return getClientMessageThreads(Array.isArray(messages) ? messages : []);
+  } catch (error) {
+    console.error("[KingApp] CCRM client thread load failed", error);
+    return [];
+  }
 }
