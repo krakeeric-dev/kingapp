@@ -309,7 +309,7 @@ export function createOneClickOrder(
     notifications: [
       {
         id: `NTF-${Date.now()}`,
-        message: "Order received from Call Center. Waiting for supplier approval.",
+        message: "Order received from Customer Care & Relationship Management (CCRM). Waiting for supplier approval.",
         createdAt: new Date().toISOString()
       }
     ]

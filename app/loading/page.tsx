@@ -431,7 +431,7 @@ function LoadingContent({ user }: { user: SessionUser }) {
 
       {(user.role === "storekeeper" || user.role === "admin") && pendingOrders.length > 0 ? (
         <section className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-950">Pending Orders from Call Center</h3>
+          <h3 className="text-lg font-bold text-slate-950">Pending Orders from Customer Care & Relationship Management (CCRM)</h3>
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {pendingOrders.map((order) => (
               <article className="rounded-lg border border-brand-100 bg-brand-50 p-4" key={order.id}>

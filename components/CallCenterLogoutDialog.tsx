@@ -10,7 +10,7 @@ export function CallCenterLogoutDialog({
       <section className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#061b33] p-6 text-white shadow-2xl">
         <h2 className="text-xl font-black">Are you sure you want to logout?</h2>
         <p className="mt-2 text-sm font-semibold text-blue-100">
-          Your Call Center session will close and you will return to login.
+          Your Customer Care & Relationship Management (CCRM) session will close and you will return to login.
         </p>
         <div className="mt-6 flex gap-3">
           <button

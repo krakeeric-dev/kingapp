@@ -179,7 +179,7 @@ function ExecutiveContent() {
               ["Add Company", "/admin/companies"],
               ["Add User", "/admin/users"],
               ["View All Reports", "/reports"],
-              ["Open Call Center", "/call-center"],
+              ["Open Customer Care & Relationship Management (CCRM)", "/call-center"],
               ["View Cash", "/cash"],
               ["View Inventory", "/inventory"],
               ["View Client Orders", "/client-orders"]

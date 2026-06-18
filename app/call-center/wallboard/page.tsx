@@ -12,7 +12,7 @@ type Summary = ReturnType<typeof getCallCenterSummary>;
 
 export default function CallCenterWallboardPage() {
   return (
-    <CallCenterShell title="Call Center Wallboard" subtitle="Live TV Operations Display">
+    <CallCenterShell title="Customer Care & Relationship Management (CCRM) Wallboard" subtitle="Live TV Operations Display">
       {(user) => <WallboardContent user={user} />}
     </CallCenterShell>
   );

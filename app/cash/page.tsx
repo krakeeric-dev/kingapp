@@ -334,7 +334,7 @@ function CashContent({ user }: { user: SessionUser }) {
 
       {paymentFollowUps.length > 0 ? (
         <section className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-950">Payment Follow-ups from Call Center</h3>
+          <h3 className="text-lg font-bold text-slate-950">Payment Follow-ups from Customer Care & Relationship Management (CCRM)</h3>
           <div className="mt-4 overflow-x-auto">
             <table className="data-table">
               <thead>

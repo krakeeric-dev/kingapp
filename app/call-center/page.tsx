@@ -105,6 +105,7 @@ import {
 } from "@/lib/messageService";
 import { filterDeliveriesForUser, getDeliveryRecords, type DeliveryRecord } from "@/lib/delivery-data";
 import { getCustomerAccounts, getCustomerDebts, getCustomerPayments } from "@/lib/customer-accounts-data";
+import { ccrmMission, getCcrmIntelligence } from "@/lib/ccrm-data";
 
 type ActionMode = "order" | "payment" | "complaint" | "delivery" | "callback";
 type DetailTab = "orders" | "payments" | "notes";
@@ -126,21 +127,21 @@ const normalizePhone = (value: string) => value.replace(/\D/g, "");
 
 const menuItems = [
   { label: "Dashboard", href: "/call-center", icon: Home, badge: "" },
-  { label: "Live Calls", href: "/call-center/softphone", icon: PhoneCall, badge: "" },
+  { label: "Customer Care", href: "/call-center/softphone", icon: PhoneCall, badge: "" },
   { label: "Call Queue", href: "/call-center/queue", icon: PhoneIncoming, badge: "1" },
-  { label: "Messages", href: "/call-center/messages", icon: MessageSquare, badge: "" },
+  { label: "Unified Comms", href: "/call-center/messages", icon: MessageSquare, badge: "" },
   { label: "Client Orders", href: "#orders", icon: ClipboardList, badge: "" },
-  { label: "Complaints", href: "/call-center/complaints", icon: MessageSquareWarning, badge: "" },
+  { label: "Product Issues", href: "/call-center/complaints", icon: MessageSquareWarning, badge: "" },
   { label: "Callbacks", href: "/call-center/callbacks", icon: CalendarClock, badge: "" },
   { label: "Clients", href: "#clients", icon: UsersRound, badge: "" },
   { label: "Performance", href: "/call-center/performance", icon: Trophy, badge: "" },
   { label: "Recordings", href: "/call-center/recordings", icon: Radio, badge: "" },
-  { label: "Reports", href: "/call-center/analytics", icon: BookOpen, badge: "" },
+  { label: "Intelligence", href: "/call-center/analytics", icon: BookOpen, badge: "" },
   { label: "Settings", href: "/call-center/settings", icon: UserRound, badge: "" }
 ];
 
 const toolItems = [
-  { label: "Client Search", href: "#clients", icon: Search },
+  { label: "Customer Search", href: "#clients", icon: Search },
   { label: "Order Quick Entry", href: "#current-order", icon: Box },
   { label: "Callback List", href: "/call-center/callbacks", icon: PhoneCall },
   { label: "Reminders", href: "#reminders", icon: CalendarClock }
@@ -339,6 +340,7 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
   const clientMessages = messagingStats.unreadMessages;
   const displayQueueCount = queueCalls.filter((call) => call.status === "Waiting" || call.status === "Incoming").length;
   const activeCallsCount = queueCalls.filter((call) => call.status === "Active").length;
+  const ccrmIntelligence = getCcrmIntelligence(user);
   const mtnMatchedClient = useMemo(() => {
     const phone = normalizePhone(mtnForm.callerPhone);
     const name = mtnForm.clientName.trim().toLowerCase();
@@ -407,7 +409,7 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
   }
 
   function rejectCall(call: QueueCall) {
-    markCallMissed(call.id, "Rejected from Call Center desk");
+    markCallMissed(call.id, "Rejected from Customer Care & Relationship Management (CCRM) desk");
     updateCurrentAgentStatus("Available");
     setQueueCalls(getCompanyQueueCalls(user));
     setFocusedCallId("");
@@ -570,7 +572,7 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
       saveQueueCalls(
         getQueueCalls().map((call) =>
           call.id === currentCall.id
-            ? { ...call, status: "Closed", endedAt, notes: ["Call ended from Call Center desk", ...call.notes] }
+            ? { ...call, status: "Closed", endedAt, notes: ["Call ended from Customer Care & Relationship Management (CCRM) desk", ...call.notes] }
             : call
         )
       );
@@ -685,6 +687,39 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
               />
             ) : null}
 
+            <section className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+              <div className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
+                <p className="text-xs font-black uppercase text-blue-700">CCRM Mission</p>
+                <h2 className="mt-2 text-2xl font-black text-slate-950">Customer Care & Relationship Management</h2>
+                <p className="mt-2 text-sm font-semibold text-slate-500">
+                  Hear the voice of customers every day, detect problems early, protect product quality, and strengthen customer relationships.
+                </p>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {ccrmMission.map((item) => (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700" key={item}>
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-xl border border-red-100 bg-white p-5 shadow-sm">
+                <p className="text-xs font-black uppercase text-red-600">Executive Alert Center</p>
+                <div className="mt-4 space-y-3">
+                  {ccrmIntelligence.executiveAlerts.map((alert) => (
+                    <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3" key={alert.issue}>
+                      <p className="font-black text-red-800">{alert.issue}</p>
+                      <p className="mt-1 text-sm font-semibold text-red-700">{alert.action}</p>
+                    </div>
+                  ))}
+                  {!ccrmIntelligence.executiveAlerts.length ? (
+                    <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">
+                      No executive alerts right now.
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </section>
+
             <div className="grid min-h-[calc(100vh-132px)] gap-4 xl:grid-cols-[360px_minmax(0,1fr)_360px]">
               <CustomerCallList
                 activeId={selectedClient?.id ?? ""}
@@ -772,7 +807,7 @@ function CallCenterSidebar({
           <KingAppLogo size={48} />
           <div>
             <h1 className="text-2xl font-black tracking-wide">KINGAPP</h1>
-            <p className="text-xs font-semibold text-blue-200">Powering Distribution</p>
+            <p className="text-xs font-semibold text-blue-200">Customer Relationships</p>
           </div>
         </div>
       </div>
@@ -1468,7 +1503,7 @@ function TopBar({
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-4 shadow-sm backdrop-blur lg:px-7">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <h2 className="text-2xl font-black text-slate-950">Call Center Office</h2>
+          <h2 className="text-2xl font-black text-slate-950">Customer Care & Relationship Management (CCRM) Office</h2>
           <p className="text-sm font-black text-blue-700">Client Calls Team</p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
@@ -1498,7 +1533,7 @@ function TopBar({
             </div>
             <div>
               <p className="font-black text-slate-950">{user.displayName}</p>
-              <p className="text-xs font-semibold text-slate-500">Call Center Agent</p>
+              <p className="text-xs font-semibold text-slate-500">Customer Care & Relationship Management (CCRM) Agent</p>
             </div>
             <ChevronDown className="h-4 w-4 text-slate-500" />
           </div>
@@ -1575,7 +1610,7 @@ function AssignedNumbersCard({ numbers }: { numbers: CallCenterNumber[] }) {
           </article>
         ))}
         {!numbers.length ? (
-          <p className="text-sm font-semibold text-slate-500">No call center number assigned.</p>
+          <p className="text-sm font-semibold text-slate-500">No CCRM number assigned.</p>
         ) : null}
       </div>
     </Panel>

@@ -37,7 +37,7 @@ export function CallCenterMobileBlock({
           <Monitor className="h-8 w-8" />
         </div>
         <h1 className="mt-6 text-2xl font-black">
-          Call Center is available on desktop only.
+          Customer Care & Relationship Management (CCRM) is available on desktop only.
         </h1>
         <p className="mt-3 text-sm font-semibold text-blue-100">
           Please open KingApp on a desktop or laptop.

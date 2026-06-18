@@ -48,7 +48,7 @@ const messageTypes: MessageType[] = ["Text", "Image", "File", "Voice note", "Sys
 
 export default function CallCenterMessagesPage() {
   return (
-    <CallCenterShell title="Messages" subtitle="Client Conversation Center">
+    <CallCenterShell title="Unified Communication Center" subtitle="Customer timelines for text, photos, videos, voice notes, and documents">
       {(user) => <MessagesContent user={user} />}
     </CallCenterShell>
   );

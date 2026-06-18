@@ -29,7 +29,7 @@ export default function ProductionChecklistPage() {
               <ClipboardCheck className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-lg font-black">Call Center Production Checklist</h3>
+              <h3 className="text-lg font-black">Customer Care & Relationship Management (CCRM) Production Checklist</h3>
               <p className="text-sm font-semibold text-slate-500">
                 Use this before connecting real 3CX, Twilio, Asterisk, SIP, IP phone, or fixed-line gateways.
               </p>

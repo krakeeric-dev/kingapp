@@ -126,7 +126,7 @@ function CallCenterNumbersContent({ admin }: { admin: SessionUser }) {
     setNumbers(saveCallCenterNumber({ ...numberForm, id: editingNumberId || undefined }));
     setNumberForm(emptyNumberForm);
     setEditingNumberId("");
-    setMessage("Call center number saved.");
+    setMessage("CCRM number saved.");
   }
 
   function editNumber(number: CallCenterNumber) {
@@ -171,7 +171,7 @@ function CallCenterNumbersContent({ admin }: { admin: SessionUser }) {
             <PhoneCall className="h-6 w-6" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-slate-950">Call Center Numbers</h2>
+            <h2 className="text-2xl font-black text-slate-950">Customer Care & Relationship Management (CCRM) Numbers</h2>
             <p className="mt-1 text-sm text-slate-600">
               Manage company phone lines, agent assignment, manual call logs, and company message logs.
             </p>

@@ -204,7 +204,7 @@ export default function ClientPortalMessagesPage() {
           <section className="flex min-h-0 flex-col rounded-lg border border-slate-200 bg-white shadow-sm">
             <header className="border-b border-slate-100 p-5">
               <h2 className="text-xl font-black text-slate-950">Message Thread</h2>
-              <p className="text-sm font-semibold text-slate-500">Supplier and call center replies appear here.</p>
+              <p className="text-sm font-semibold text-slate-500">Supplier and CCRM replies appear here.</p>
             </header>
             <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50/70 p-5">
               {selectedThread.map((message) => {

@@ -175,9 +175,9 @@ export const permissionGroups: PermissionGroup[] = [
     ]
   },
   {
-    title: "Call Center",
+    title: "Customer Care & Relationship Management (CCRM)",
     permissions: [
-      { key: "callcenter.view", label: "View Call Center" },
+      { key: "callcenter.view", label: "View Customer Care & Relationship Management (CCRM)" },
       { key: "callcenter.queue.manage", label: "Manage Queue" },
       { key: "callcenter.calls.answer", label: "Answer Calls" },
       { key: "callcenter.calls.transfer", label: "Transfer Calls" },

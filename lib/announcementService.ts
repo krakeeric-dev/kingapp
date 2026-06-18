@@ -9,7 +9,7 @@ import {
 export type AnnouncementAudience =
   | "All users"
   | "Managers"
-  | "Call Center"
+  | "Customer Care & Relationship Management (CCRM)"
   | "Storekeepers"
   | "Sales Team"
   | "Specific company";
@@ -23,7 +23,7 @@ export type AnnouncementCenterItem = TeamAnnouncement & {
 export const announcementAudiences: AnnouncementAudience[] = [
   "All users",
   "Managers",
-  "Call Center",
+  "Customer Care & Relationship Management (CCRM)",
   "Storekeepers",
   "Sales Team",
   "Specific company"
@@ -37,7 +37,7 @@ export const announcementPriorities: AnnouncementPriority[] = [
 ];
 
 function normalizeAudience(audience: TeamAnnouncement["audience"]): AnnouncementAudience {
-  if (audience === "All" || audience === "Agents") return audience === "All" ? "All users" : "Call Center";
+  if (audience === "All" || audience === "Agents") return audience === "All" ? "All users" : "Customer Care & Relationship Management (CCRM)";
   return audience;
 }
 

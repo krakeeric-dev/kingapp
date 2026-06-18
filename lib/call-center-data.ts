@@ -260,7 +260,7 @@ export function addCallLog(input: Omit<CallLog, "id" | "agent">, user: SessionUs
     action: "call_logged",
     companyId: user.companyId,
     companyName: user.companyName,
-    module: "Call Center",
+    module: "Customer Care & Relationship Management (CCRM)",
     newValue: record,
     recordId: record.id,
     reason: "Call logged",
@@ -298,10 +298,10 @@ export function addPendingOrder(
     action: "order_created",
     companyId: record.companyId,
     companyName: record.companyName,
-    module: "Call Center Orders",
+    module: "Customer Care & Relationship Management (CCRM) Orders",
     newValue: record,
     recordId: record.id,
-    reason: "Call center order created",
+    reason: "CCRM order created",
     status: "success",
     user
   });

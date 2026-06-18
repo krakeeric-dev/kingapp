@@ -74,7 +74,7 @@ function DevToolsContent({ user }: { user: { companyId: string; companyName: str
       </section>
       {message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{message}</div> : null}
       <section className="app-card p-5">
-        <h2 className="text-lg font-black text-slate-950">Call Center Provider Checks</h2>
+        <h2 className="text-lg font-black text-slate-950">Customer Care & Relationship Management (CCRM) Provider Checks</h2>
         <div className="mt-4 flex flex-wrap gap-3">
           <button className="secondary-button" onClick={simulateIncomingCall} type="button">
             <PhoneCall className="h-4 w-4" />

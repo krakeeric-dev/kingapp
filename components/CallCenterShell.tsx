@@ -55,14 +55,14 @@ type CallCenterShellProps = {
 
 const menuItems = [
   { label: "Dashboard", href: "/call-center", icon: Home, badge: "" },
-  { label: "Calls", href: "/call-center/queue", icon: PhoneIncoming, badge: "2" },
+  { label: "Customer Care", href: "/call-center/queue", icon: PhoneIncoming, badge: "2" },
   { label: "WhatsApp", href: "/call-center/whatsapp", icon: MessageCircle, badge: "" },
-  { label: "Email", href: "/call-center/messages", icon: Mail, badge: "" },
-  { label: "Tickets", href: "/call-center/complaints", icon: MessageSquareWarning, badge: "" },
+  { label: "Unified Comms", href: "/call-center/messages", icon: Mail, badge: "" },
+  { label: "Tickets & Issues", href: "/call-center/complaints", icon: MessageSquareWarning, badge: "" },
   { label: "Orders", href: "/call-center#orders", icon: ClipboardList, badge: "" },
   { label: "Dispatch", href: "/delivery", icon: Box, badge: "" },
   { label: "Customers", href: "/customers", icon: UsersRound, badge: "" },
-  { label: "Reports", href: "/call-center/analytics", icon: BookOpen, badge: "" },
+  { label: "Intelligence", href: "/call-center/analytics", icon: BookOpen, badge: "" },
   { label: "Softphone", href: "/call-center/softphone", icon: PhoneCall, badge: "" },
   { label: "Live Monitor", href: "/call-center/live-monitor", icon: Bell, badge: "" },
   { label: "Performance", href: "/call-center/performance", icon: Trophy, badge: "" },
@@ -74,13 +74,13 @@ const menuItems = [
   { label: "Payments", href: "/call-center#payments", icon: CreditCard, badge: "" },
   { label: "Recordings", href: "/call-center/recordings", icon: Radio, badge: "" },
   { label: "Wallboard", href: "/call-center/wallboard", icon: Gauge, badge: "" },
-  { label: "Analytics", href: "/call-center/analytics", icon: BookOpen, badge: "" },
+  { label: "CCRM Analytics", href: "/call-center/analytics", icon: BookOpen, badge: "" },
   { label: "Settings", href: "/call-center/settings", icon: UserRound, badge: "" },
-  { label: "Go-Live Checklist", href: "/call-center/production-checklist", icon: ClipboardList, badge: "" }
+  { label: "CCRM Readiness", href: "/call-center/production-checklist", icon: ClipboardList, badge: "" }
 ];
 
 const toolItems = [
-  { label: "Client Search", href: "/call-center#clients", icon: Search },
+  { label: "Customer Search", href: "/call-center#clients", icon: Search },
   { label: "Order Quick Entry", href: "/call-center#current-order", icon: Box },
   { label: "Callback List", href: "/call-center/callbacks", icon: PhoneCall },
   { label: "Reminders", href: "/call-center#reminders", icon: CalendarClock }
@@ -88,8 +88,8 @@ const toolItems = [
 
 export function CallCenterShell({
   children,
-  subtitle = "Client Calls Team",
-  title = "Call Center Office"
+  subtitle = "Voice of Customer Operations",
+  title = "Customer Care & Relationship Management (CCRM) Office"
 }: CallCenterShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -175,7 +175,7 @@ export function CallCenterShell({
               <div>
                 <h1 className="text-2xl font-black tracking-wide">KINGAPP</h1>
                 <p className="text-xs font-semibold text-blue-200">
-                  Powering Distribution
+                  Customer Relationships
                 </p>
               </div>
             </div>
@@ -266,7 +266,7 @@ export function CallCenterShell({
                   <div>
                     <p className="font-black text-slate-950">{user.displayName}</p>
                     <p className="text-xs font-semibold text-slate-500">
-                      Call Center Agent
+                      Customer Care & Relationship Management (CCRM) Agent
                     </p>
                   </div>
                   <ChevronDown className="h-4 w-4 text-slate-500" />

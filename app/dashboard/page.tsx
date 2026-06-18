@@ -853,7 +853,7 @@ function DashboardContent({ user }: { user: SessionUser }) {
             <p className="mt-1 max-w-4xl text-sm font-semibold text-slate-500">
               {isMarketerDashboard
                 ? "Your assigned loads, confirmed sales, returns, cash given, and collection progress."
-                : "Beverage distribution, outsourcing operations, call center follow-up, stock movement, and cash collection control."}
+                : "Beverage distribution, outsourcing operations, CCRM follow-up, stock movement, and cash collection control."}
             </p>
           </div>
           <label className="block w-full max-w-xs">
@@ -1144,10 +1144,10 @@ function ManagerCallCenterReport({
     <section className="rounded-xl border border-brand-100 bg-white p-4 shadow-[0_16px_45px_rgba(15,35,80,0.07)]">
       <div className="mb-4">
         <h3 className="text-sm font-black uppercase tracking-normal text-slate-950">
-          Call Center Summary Reports
+          Customer Care & Relationship Management (CCRM) Summary Reports
         </h3>
         <p className="mt-1 text-xs font-bold text-slate-500">
-          Manager read-only view. Call center agents handle calls and admin controls settings.
+          Manager read-only view. CCRM agents handle calls and admin controls settings.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">

@@ -26,7 +26,7 @@ export const roleLabels: Record<UserRole, string> = {
   accountant: "Accountant",
   manager: "Manager",
   marketer: "Marketer",
-  callcenter: "Call Center Agent",
+  callcenter: "Customer Care & Relationship Management (CCRM) Agent",
   supplier: "Supplier",
   client: "Client"
 };

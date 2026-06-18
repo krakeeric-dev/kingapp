@@ -92,7 +92,7 @@ const navItems: NavItem[] = [
   },
   {
     href: "/call-center",
-    label: "Call Center",
+    label: "CCRM",
     icon: PhoneCall,
     roles: getAllowedRoles("/call-center")
   },
@@ -711,7 +711,7 @@ function BrandBlock({ companyName }: { companyName?: string }) {
 }
 
 function groupNavItems(items: NavItem[]): NavGroup[] {
-  const groupOrder = ["Main", "Operations", "Client Network", "Call Center", "Management"];
+  const groupOrder = ["Main", "Operations", "Client Network", "CCRM", "Management"];
   const groups = new Map<string, NavItem[]>();
 
   items.forEach((item) => {
@@ -726,7 +726,7 @@ function groupNavItems(items: NavItem[]): NavGroup[] {
 
 function getNavGroupTitle(href: string) {
   if (href === "/dashboard" || href === "/executive") return "Main";
-  if (href.startsWith("/call-center")) return "Call Center";
+  if (href.startsWith("/call-center")) return "CCRM";
   if (href === "/client-orders" || href === "/supplier-dashboard" || href === "/client-portal" || href.startsWith("/customers")) return "Client Network";
   if (href.startsWith("/admin") || href === "/reports" || href === "/daily-report" || href === "/sync-status") return "Management";
   return "Operations";

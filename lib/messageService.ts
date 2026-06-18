@@ -59,7 +59,7 @@ export type TeamAnnouncement = {
     | "All users"
     | "Managers"
     | "Agents"
-    | "Call Center"
+    | "Customer Care & Relationship Management (CCRM)"
     | "Storekeepers"
     | "Sales Team"
     | "Specific company";
@@ -258,7 +258,7 @@ export function getNotificationsForUser(user: SessionUser) {
 export function getAnnouncementsForUser(user: SessionUser) {
   const workspaceId = getCompanyWorkspaceId(user);
   return getAnnouncements().filter((announcement) => {
-    if (announcement.audience === "All" || announcement.audience === "All users" || announcement.audience === "Call Center" || announcement.audience === "Agents") return true;
+    if (announcement.audience === "All" || announcement.audience === "All users" || announcement.audience === "Customer Care & Relationship Management (CCRM)" || announcement.audience === "Agents") return true;
     const companyId = companyIdFromName(announcement.companyName);
     if (!companyId) return user.role === "admin" || announcement.audience === "Managers";
     if (workspaceId !== "all") return companyId === workspaceId;

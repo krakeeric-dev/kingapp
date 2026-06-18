@@ -7,13 +7,14 @@ import type { SessionUser } from "@/lib/auth";
 import { getAgents, getAverageWaitSeconds, getCallLogs, getComplaints, getPaymentFollowUps, getPendingOrders, getQueueCalls } from "@/lib/call-center-data";
 import { getCompanyAgents, getCompanyClients, getCompanyComplaints, getCompanyOrders, getCompanyPayments, getCompanyQueueCalls } from "@/lib/call-center-operations";
 import { getCallRecordings, type CallRecording } from "@/lib/telephonyService";
+import { getCcrmIntelligence, groupComplaintsByProduct, groupComplaintsByRegion } from "@/lib/ccrm-data";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const secondsLabel = (seconds: number) => `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 
 export default function CallAnalyticsPage() {
   return (
-    <CallCenterShell title="Call Analytics" subtitle="Performance & Conversion">
+    <CallCenterShell title="Customer Intelligence Dashboard" subtitle="Voice of Customer, Quality Risk & Relationship Health">
       {(user) => <AnalyticsContent user={user} />}
     </CallCenterShell>
   );
@@ -40,6 +41,9 @@ function AnalyticsContent({ user }: { user: SessionUser }) {
   }, [user]);
 
   const todaysLogs = logs.filter((log) => log.date === today());
+  const intelligence = getCcrmIntelligence(user);
+  const productGroups = groupComplaintsByProduct(user);
+  const regionGroups = groupComplaintsByRegion(user);
   const metrics = useMemo(() => ({
     totalCalls: todaysLogs.length + calls.filter((call) => call.startedAt.slice(0, 10) === today()).length,
     answered: todaysLogs.filter((log) => log.outcome === "Closed").length + calls.filter((call) => call.status === "Active").length,
@@ -62,7 +66,28 @@ function AnalyticsContent({ user }: { user: SessionUser }) {
         <Metric icon={ShoppingCart} label="Orders Converted" value={metrics.orders} />
         <Metric icon={WalletCards} label="Payment Promises" value={metrics.promises} />
         <Metric icon={MessageSquareWarning} label="Complaints Logged" value={metrics.complaints} />
+        <Metric icon={BarChart3} label="Customer Health Score" value={`${intelligence.customerHealthScore}%`} />
+        <Metric icon={Headphones} label="Satisfaction Score" value={`${intelligence.satisfactionScore}%`} />
+        <Metric icon={MessageSquareWarning} label="Open Issues" value={intelligence.openIssues} />
+        <Metric icon={MessageSquareWarning} label="Escalated Issues" value={intelligence.escalatedIssues} />
       </div>
+
+      <section className="grid gap-4 xl:grid-cols-3">
+        <InsightPanel title="Complaints by Product" rows={productGroups} empty="No product complaints yet." />
+        <InsightPanel title="Complaints by Region" rows={regionGroups} empty="No regional complaints yet." />
+        <div className="rounded-lg border border-red-100 bg-white p-5 shadow-sm">
+          <h3 className="font-black text-slate-950">Executive Alert Center</h3>
+          <div className="mt-4 space-y-3">
+            {intelligence.executiveAlerts.map((alert) => (
+              <div className="rounded-lg border border-red-100 bg-red-50 p-3" key={alert.issue}>
+                <p className="font-black text-red-800">{alert.issue}</p>
+                <p className="mt-1 text-sm font-semibold text-red-700">{alert.action}</p>
+              </div>
+            ))}
+            {!intelligence.executiveAlerts.length ? <p className="rounded-lg bg-emerald-50 p-3 text-sm font-black text-emerald-700">No critical alerts.</p> : null}
+          </div>
+        </div>
+      </section>
 
       <section className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -127,4 +152,26 @@ function Metric({ icon: Icon, label, value }: { icon: typeof PhoneCall; label: s
 function Progress({ label, value }: { label: string; value: number }) {
   const clamped = Math.min(100, Math.max(0, value));
   return <div><div className="mb-1 flex justify-between text-sm font-bold"><span>{label}</span><span>{clamped.toFixed(0)}%</span></div><div className="h-3 rounded-full bg-slate-100"><div className="h-3 rounded-full bg-blue-600" style={{ width: `${clamped}%` }} /></div></div>;
+}
+
+function InsightPanel({ empty, rows, title }: { empty: string; rows: Array<{ label: string; value: number }>; title: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <h3 className="font-black text-slate-950">{title}</h3>
+      <div className="mt-4 space-y-3">
+        {rows.map((row) => (
+          <div key={row.label}>
+            <div className="mb-1 flex justify-between text-sm font-bold">
+              <span>{row.label}</span>
+              <span>{row.value}</span>
+            </div>
+            <div className="h-2 rounded-full bg-slate-100">
+              <div className="h-2 rounded-full bg-blue-600" style={{ width: `${Math.min(100, row.value * 12)}%` }} />
+            </div>
+          </div>
+        ))}
+        {!rows.length ? <p className="rounded-lg bg-slate-50 p-3 text-sm font-semibold text-slate-500">{empty}</p> : null}
+      </div>
+    </div>
+  );
 }

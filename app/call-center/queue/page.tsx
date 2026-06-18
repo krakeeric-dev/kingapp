@@ -146,7 +146,7 @@ function QueueContent({ user }: { user: SessionUser }) {
   }
 
   function missCall(call: QueueCall) {
-    markCallMissed(call.id, "Rejected or missed by call center");
+    markCallMissed(call.id, "Rejected or missed by CCRM");
     setCalls(getCompanyQueueCalls(user));
     setMissedCalls(getMissedCalls().filter((item) => !item.clientId || clients.some((client) => client.id === item.clientId)));
     setMessage("Call moved to missed calls.");
