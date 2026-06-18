@@ -105,7 +105,7 @@ import {
 } from "@/lib/messageService";
 import { filterDeliveriesForUser, getDeliveryRecords, type DeliveryRecord } from "@/lib/delivery-data";
 import { getCustomerAccounts, getCustomerDebts, getCustomerPayments } from "@/lib/customer-accounts-data";
-import { ccrmMission, getCcrmIntelligence } from "@/lib/ccrm-data";
+import { ccrmMission, getCcrmIntelligence, getCcrmTickets, type CcrmTicket } from "@/lib/ccrm-data";
 
 type ActionMode = "order" | "payment" | "complaint" | "delivery" | "callback";
 type DetailTab = "orders" | "payments" | "notes";
@@ -341,6 +341,7 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
   const displayQueueCount = queueCalls.filter((call) => call.status === "Waiting" || call.status === "Incoming").length;
   const activeCallsCount = queueCalls.filter((call) => call.status === "Active").length;
   const ccrmIntelligence = getCcrmIntelligence(user);
+  const ccrmTickets = getCcrmTickets(user);
   const mtnMatchedClient = useMemo(() => {
     const phone = normalizePhone(mtnForm.callerPhone);
     const name = mtnForm.clientName.trim().toLowerCase();
@@ -718,6 +719,16 @@ function CallCenterOffice({ onLogout, user }: { onLogout: () => void; user: Sess
                   ) : null}
                 </div>
               </div>
+            </section>
+
+            <section className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <CcrmScoreCard label="Customer Health Score" value={`${ccrmIntelligence.customerHealthScore}%`} />
+                <CcrmScoreCard label="Product Health Score" value={`${ccrmIntelligence.productHealthScore}%`} />
+                <CcrmScoreCard label="Open Tickets" value={ccrmIntelligence.openTickets.toLocaleString()} />
+                <CcrmScoreCard label="Recall Risks" danger value={ccrmIntelligence.recallRisks.toLocaleString()} />
+              </div>
+              <TicketQueuePanel tickets={ccrmTickets.slice(0, 6)} />
             </section>
 
             <div className="grid min-h-[calc(100vh-132px)] gap-4 xl:grid-cols-[360px_minmax(0,1fr)_360px]">
@@ -1370,6 +1381,60 @@ function MtnCallLogger({
         </div>
         <button className="primary-button lg:col-span-5" type="submit">Save MTN Call</button>
       </form>
+    </section>
+  );
+}
+
+function CcrmScoreCard({ danger = false, label, value }: { danger?: boolean; label: string; value: string }) {
+  return (
+    <article className={`rounded-xl border bg-white p-5 shadow-sm ${danger ? "border-red-100" : "border-slate-200"}`}>
+      <p className="text-xs font-black uppercase text-slate-500">{label}</p>
+      <p className={`mt-3 text-3xl font-black ${danger ? "text-red-600" : "text-blue-700"}`}>{value}</p>
+    </article>
+  );
+}
+
+function TicketQueuePanel({ tickets }: { tickets: CcrmTicket[] }) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase text-blue-700">Automatic Ticket Engine</p>
+          <h3 className="text-lg font-black text-slate-950">Shared Interaction Queue</h3>
+        </div>
+        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">{tickets.length} visible</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[840px] text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <tr>
+              {["Ticket", "Customer", "Channel", "Issue", "Product", "Region", "Priority", "Department", "Status"].map((heading) => (
+                <th className="px-3 py-3" key={heading}>{heading}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tickets.map((ticket) => (
+              <tr className="border-t border-slate-100" key={ticket.id}>
+                <td className="px-3 py-3 font-black text-slate-950">{ticket.id}</td>
+                <td className="px-3 py-3">{ticket.customer}</td>
+                <td className="px-3 py-3">{ticket.channel}</td>
+                <td className="px-3 py-3">{ticket.issueType}</td>
+                <td className="px-3 py-3">{ticket.product}</td>
+                <td className="px-3 py-3">{ticket.region}</td>
+                <td className="px-3 py-3">
+                  <span className={`rounded-full px-2 py-1 text-xs font-black ${ticket.priority === "Critical" || ticket.priority === "Urgent" || ticket.priority === "High" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>
+                    {ticket.priority}
+                  </span>
+                </td>
+                <td className="px-3 py-3 font-bold text-slate-700">{ticket.assignedDepartment}</td>
+                <td className="px-3 py-3">{ticket.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!tickets.length ? <EmptyDeskState text="No CCRM tickets yet." /> : null}
+      </div>
     </section>
   );
 }

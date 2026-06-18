@@ -7,7 +7,7 @@ import type { SessionUser } from "@/lib/auth";
 import { getAgents, getAverageWaitSeconds, getCallLogs, getComplaints, getPaymentFollowUps, getPendingOrders, getQueueCalls } from "@/lib/call-center-data";
 import { getCompanyAgents, getCompanyClients, getCompanyComplaints, getCompanyOrders, getCompanyPayments, getCompanyQueueCalls } from "@/lib/call-center-operations";
 import { getCallRecordings, type CallRecording } from "@/lib/telephonyService";
-import { getCcrmIntelligence, groupComplaintsByProduct, groupComplaintsByRegion } from "@/lib/ccrm-data";
+import { getCcrmIntelligence, getCcrmTickets, groupComplaintsByProduct, groupComplaintsByRegion } from "@/lib/ccrm-data";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const secondsLabel = (seconds: number) => `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
@@ -44,6 +44,7 @@ function AnalyticsContent({ user }: { user: SessionUser }) {
   const intelligence = getCcrmIntelligence(user);
   const productGroups = groupComplaintsByProduct(user);
   const regionGroups = groupComplaintsByRegion(user);
+  const tickets = getCcrmTickets(user);
   const metrics = useMemo(() => ({
     totalCalls: todaysLogs.length + calls.filter((call) => call.startedAt.slice(0, 10) === today()).length,
     answered: todaysLogs.filter((log) => log.outcome === "Closed").length + calls.filter((call) => call.status === "Active").length,
@@ -68,8 +69,11 @@ function AnalyticsContent({ user }: { user: SessionUser }) {
         <Metric icon={MessageSquareWarning} label="Complaints Logged" value={metrics.complaints} />
         <Metric icon={BarChart3} label="Customer Health Score" value={`${intelligence.customerHealthScore}%`} />
         <Metric icon={Headphones} label="Satisfaction Score" value={`${intelligence.satisfactionScore}%`} />
+        <Metric icon={BarChart3} label="Product Health Score" value={`${intelligence.productHealthScore}%`} />
         <Metric icon={MessageSquareWarning} label="Open Issues" value={intelligence.openIssues} />
         <Metric icon={MessageSquareWarning} label="Escalated Issues" value={intelligence.escalatedIssues} />
+        <Metric icon={MessageSquareWarning} label="High Risk Tickets" value={tickets.filter((ticket) => ["Critical", "Urgent", "High"].includes(ticket.priority)).length} />
+        <Metric icon={BarChart3} label="Market Opportunities" value={intelligence.marketOpportunities} />
       </div>
 
       <section className="grid gap-4 xl:grid-cols-3">
@@ -86,6 +90,31 @@ function AnalyticsContent({ user }: { user: SessionUser }) {
             ))}
             {!intelligence.executiveAlerts.length ? <p className="rounded-lg bg-emerald-50 p-3 text-sm font-black text-emerald-700">No critical alerts.</p> : null}
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-4 font-black">Structured CCRM Tickets</h3>
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead><tr><th>Ticket</th><th>Date</th><th>Customer</th><th>Channel</th><th>Issue Type</th><th>Product</th><th>Batch</th><th>Department</th><th>Status</th></tr></thead>
+            <tbody>
+              {tickets.slice(0, 12).map((ticket) => (
+                <tr key={ticket.id}>
+                  <td className="font-bold text-slate-950">{ticket.id}</td>
+                  <td>{ticket.date}</td>
+                  <td>{ticket.customer}</td>
+                  <td>{ticket.channel}</td>
+                  <td>{ticket.issueType}</td>
+                  <td>{ticket.product}</td>
+                  <td>{ticket.batchNumber}</td>
+                  <td>{ticket.assignedDepartment}</td>
+                  <td>{ticket.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!tickets.length ? <p className="px-4 py-6 text-sm font-semibold text-slate-500">No CCRM tickets yet.</p> : null}
         </div>
       </section>
 
