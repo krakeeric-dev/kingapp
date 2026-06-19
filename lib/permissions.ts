@@ -58,6 +58,15 @@ export type PermissionKey =
   | "callcenter.whatsapp.reply"
   | "callcenter.complaints.manage"
   | "callcenter.callbacks.manage"
+  | "view_issues"
+  | "create_issue"
+  | "dispatch_issue"
+  | "assign_issue"
+  | "investigate_issue"
+  | "resolve_issue"
+  | "close_issue"
+  | "view_issue_reports"
+  | "view_executive_alerts"
   | "clientorders.view"
   | "clientorders.approve"
   | "clients.manage"
@@ -188,7 +197,16 @@ export const permissionGroups: PermissionGroup[] = [
       { key: "callcenter.whatsapp.manage", label: "Manage WhatsApp Chats" },
       { key: "callcenter.whatsapp.reply", label: "Reply on WhatsApp" },
       { key: "callcenter.complaints.manage", label: "Manage Complaints" },
-      { key: "callcenter.callbacks.manage", label: "Manage Callbacks" }
+      { key: "callcenter.callbacks.manage", label: "Manage Callbacks" },
+      { key: "view_issues", label: "View Issues" },
+      { key: "create_issue", label: "Create Issue" },
+      { key: "dispatch_issue", label: "Dispatch Issue" },
+      { key: "assign_issue", label: "Assign Issue" },
+      { key: "investigate_issue", label: "Investigate Issue" },
+      { key: "resolve_issue", label: "Resolve Issue" },
+      { key: "close_issue", label: "Close Issue" },
+      { key: "view_issue_reports", label: "View Issue Reports" },
+      { key: "view_executive_alerts", label: "View Executive Alerts" }
     ]
   },
   {
@@ -253,6 +271,12 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "callcenter.view",
     "callcenter.whatsapp.view",
     "callcenter.whatsapp.manage",
+    "view_issues",
+    "dispatch_issue",
+    "assign_issue",
+    "resolve_issue",
+    "view_issue_reports",
+    "view_executive_alerts",
     "reports.view",
     "reports.export",
     "reports.print",
@@ -273,6 +297,8 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "callcenter.view",
     "callcenter.whatsapp.view",
     "callcenter.whatsapp.manage",
+    "view_issues",
+    "view_issue_reports",
     "expenses.view",
     "reports.view",
     "reports.export",
@@ -339,7 +365,10 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "callcenter.whatsapp.manage",
     "callcenter.whatsapp.reply",
     "callcenter.complaints.manage",
-    "callcenter.callbacks.manage"
+    "callcenter.callbacks.manage",
+    "view_issues",
+    "create_issue",
+    "investigate_issue"
   ],
   supplier: ["supplier.view", "supplier.orders.manage", "supplier.message"],
   client: ["dashboard.view", "clientorders.view", "clients.message", "customers.statements.view"]
@@ -367,6 +396,12 @@ export const routePermissions: Record<string, PermissionKey[]> = {
   "/call-center/complaints": ["callcenter.view", "callcenter.complaints.manage"],
   "/call-center/wallboard": ["callcenter.view"],
   "/call-center/production-checklist": ["callcenter.view"],
+  "/ccrm/issues": ["callcenter.view", "view_issues"],
+  "/ccrm/issues/new": ["callcenter.view", "create_issue"],
+  "/ccrm/issues/dispatch": ["callcenter.view", "dispatch_issue"],
+  "/ccrm/issues/investigations": ["callcenter.view", "investigate_issue"],
+  "/ccrm/issues/resolution": ["callcenter.view", "resolve_issue"],
+  "/ccrm/issues/reports": ["callcenter.view", "view_issue_reports"],
   "/client-portal": ["clientorders.view"],
   "/client-portal/messages": ["clients.message"],
   "/client-orders": ["clientorders.view"],
@@ -425,6 +460,12 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/call-center/complaints": ["admin", "callcenter"],
   "/call-center/wallboard": ["admin"],
   "/call-center/production-checklist": ["admin"],
+  "/ccrm/issues": ["admin", "manager", "supervisor", "callcenter"],
+  "/ccrm/issues/new": ["admin", "manager", "callcenter"],
+  "/ccrm/issues/dispatch": ["admin", "manager"],
+  "/ccrm/issues/investigations": ["admin", "manager", "callcenter"],
+  "/ccrm/issues/resolution": ["admin", "manager"],
+  "/ccrm/issues/reports": ["admin", "manager", "supervisor"],
   "/client-portal": ["admin", "client"],
   "/client-portal/messages": ["admin", "client"],
   "/client-orders": ["admin", "storekeeper", "accountant", "marketer", "manager", "supervisor"],
@@ -461,8 +502,16 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/admin/companies": ["admin"]
 };
 
+function resolveRouteKey(pathname: string) {
+  const normalizedRoute = pathname.split("#")[0];
+  if (normalizedRoute.startsWith("/ccrm/issues/") && !routePermissions[normalizedRoute]) {
+    return "/ccrm/issues";
+  }
+  return normalizedRoute;
+}
+
 export function getAllowedRoles(pathname: string) {
-  return pagePermissions[pathname] ?? ["admin"];
+  return pagePermissions[resolveRouteKey(pathname)] ?? ["admin"];
 }
 
 export function canAccessPage(pathname: string, role: UserRole) {
@@ -492,7 +541,7 @@ export function hasPermission(user: Pick<SessionUser, "role" | "permissions" | "
 }
 
 export function canAccessRoute(user: SessionUser, route: string) {
-  const normalizedRoute = route.split("#")[0];
+  const normalizedRoute = resolveRouteKey(route);
   const requiredPermissions = routePermissions[normalizedRoute];
 
   if (!canAccessPage(normalizedRoute, user.role)) {
