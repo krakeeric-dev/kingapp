@@ -62,7 +62,6 @@ const menuItems = [
   { label: "Tickets & Issues", href: "/call-center/complaints", icon: MessageSquareWarning, badge: "" },
   { label: "Issue Dispatch & Resolution", href: "/ccrm/issues", icon: ShieldAlert, badge: "" },
   { label: "Orders", href: "/call-center#orders", icon: ClipboardList, badge: "" },
-  { label: "Dispatch", href: "/delivery", icon: Box, badge: "" },
   { label: "Customers", href: "/customers", icon: UsersRound, badge: "" },
   { label: "Intelligence", href: "/call-center/analytics", icon: BookOpen, badge: "" },
   { label: "Softphone", href: "/call-center/softphone", icon: PhoneCall, badge: "" },
