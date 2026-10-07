@@ -223,6 +223,12 @@ const navItems: NavItem[] = [
     roles: getAllowedRoles("/production")
   },
   {
+    href: "/production/report",
+    label: "Factory Report",
+    icon: ClipboardList,
+    roles: getAllowedRoles("/production/report")
+  },
+  {
     href: "/raw-materials",
     label: "Raw Materials",
     icon: Factory,
@@ -703,7 +709,7 @@ function getNavGroupTitle(href: string) {
   if (href.startsWith("/delivery")) return "Delivery";
   if (
     href === "/inventory" ||
-    href === "/production" ||
+    href.startsWith("/production") ||
     href === "/raw-materials" ||
     href === "/admin/raw-materials" ||
     href === "/product-management" ||
