@@ -596,6 +596,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
                 className="mt-4"
                 groups={groupedMobileNav}
                 onNavigate={() => setMobileMenuOpen(false)}
+                openActiveGroup={false}
                 pathname={pathname}
               />
               {installPrompt ? (
@@ -676,7 +677,7 @@ function BrandBlock({ companyName, compact = false }: { companyName?: string; co
 }
 
 function groupNavItems(items: NavItem[]): NavGroup[] {
-  const groupOrder = ["Main", "Operations", "Clients & Suppliers", "Customer Care", "Admin & Reports"];
+  const groupOrder = ["Main", "Sales & Cash", "Stock", "Delivery", "Clients & Suppliers", "Customer Care", "Admin & Reports"];
   const groups = new Map<string, NavItem[]>();
 
   items.forEach((item) => {
@@ -692,9 +693,28 @@ function groupNavItems(items: NavItem[]): NavGroup[] {
 function getNavGroupTitle(href: string) {
   if (href === "/dashboard" || href === "/executive") return "Main";
   if (href.startsWith("/call-center")) return "Customer Care";
-  if (href === "/client-orders" || href === "/supplier-dashboard" || href === "/client-portal" || href.startsWith("/customers")) return "Clients & Suppliers";
-  if (href.startsWith("/admin") || href === "/reports" || href === "/daily-report" || href === "/sync-status") return "Admin & Reports";
-  return "Operations";
+  if (href.startsWith("/delivery")) return "Delivery";
+  if (
+    href === "/inventory" ||
+    href === "/raw-materials" ||
+    href === "/admin/raw-materials" ||
+    href === "/product-management" ||
+    href === "/price-management"
+  ) {
+    return "Stock";
+  }
+  if (
+    href === "/client-orders" ||
+    href === "/supplier-dashboard" ||
+    href.startsWith("/client-portal") ||
+    href.startsWith("/customers")
+  ) {
+    return "Clients & Suppliers";
+  }
+  if (href.startsWith("/admin") || href === "/reports" || href === "/daily-report" || href === "/sync-status") {
+    return "Admin & Reports";
+  }
+  return "Sales & Cash";
 }
 
 // Menus longer than this collapse into groups so the list stays short on a phone.
@@ -708,29 +728,32 @@ function NavMenu({
   className = "",
   groups,
   onNavigate,
+  openActiveGroup = true,
   pathname
 }: {
   className?: string;
   groups: NavGroup[];
   onNavigate?: () => void;
+  // The phone drawer starts with every group closed so all group names fit on one screen.
+  openActiveGroup?: boolean;
   pathname: string;
 }) {
   const totalItems = groups.reduce((count, group) => count + group.items.length, 0);
   const collapsible = totalItems > COLLAPSE_MENU_AFTER;
   const activeGroupTitle = findGroupTitle(groups, pathname);
   const [openGroups, setOpenGroups] = useState<string[]>(() =>
-    activeGroupTitle ? ["Main", activeGroupTitle] : ["Main"]
+    activeGroupTitle && openActiveGroup ? ["Main", activeGroupTitle] : ["Main"]
   );
 
   useEffect(() => {
-    if (!activeGroupTitle) {
+    if (!activeGroupTitle || !openActiveGroup) {
       return;
     }
 
     setOpenGroups((current) =>
       current.includes(activeGroupTitle) ? current : [...current, activeGroupTitle]
     );
-  }, [activeGroupTitle]);
+  }, [activeGroupTitle, openActiveGroup]);
 
   function toggleGroup(title: string) {
     setOpenGroups((current) =>
@@ -743,6 +766,7 @@ function NavMenu({
       {groups.map((group) => (
         <NavGroupBlock
           collapsible={collapsible && group.title !== "Main"}
+          isCurrent={group.title === activeGroupTitle}
           isOpen={!collapsible || group.title === "Main" || openGroups.includes(group.title)}
           key={group.title}
           onToggle={() => toggleGroup(group.title)}
@@ -767,12 +791,14 @@ function NavMenu({
 function NavGroupBlock({
   children,
   collapsible,
+  isCurrent,
   isOpen,
   onToggle,
   title
 }: {
   children: ReactNode;
   collapsible: boolean;
+  isCurrent: boolean;
   isOpen: boolean;
   onToggle: () => void;
   title: string;
@@ -796,7 +822,12 @@ function NavGroupBlock({
         onClick={onToggle}
         type="button"
       >
-        <span>{title}</span>
+        <span className="flex items-center gap-2">
+          {title}
+          {isCurrent && !isOpen ? (
+            <span aria-label="current section" className="h-2 w-2 rounded-full bg-emerald-300" />
+          ) : null}
+        </span>
         <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
       {isOpen ? <div className="mt-1.5 space-y-1.5">{children}</div> : null}
@@ -1052,6 +1083,10 @@ function getMobileRoleShortcuts(role: UserRole, visibleNav: NavItem[]) {
 }
 
 function shortMobileLabel(label: string) {
+  if (label === "Dashboard") {
+    return "Home";
+  }
+
   if (label === "Confirm Loading") {
     return "Confirm";
   }
