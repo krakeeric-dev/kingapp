@@ -46,10 +46,10 @@ export const historicalDeleteOptions: HistoricalDeleteOption[] = [
     localStorageKeys: ["kingapp.inventoryMovements"]
   },
   {
-    description: "Delete old factory raw material movement history.",
+    description: "Delete old factory raw material movement, production, and water and electricity history.",
     key: "raw-materials",
-    label: "Delete Raw Material History",
-    localStorageKeys: ["kingapp.rawMaterialMovements"]
+    label: "Delete Raw Material and Production History",
+    localStorageKeys: ["kingapp.rawMaterialMovements", "kingapp.productionRecords", "kingapp.utilityRecords"]
   },
   {
     description: "Delete saved marketer client sales history.",

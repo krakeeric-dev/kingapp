@@ -4,6 +4,7 @@ import { defaultCompanies } from "@/lib/companies-data";
 import {
   fetchSupabaseTable,
   isSupabaseConfigured,
+  isSupabaseTableMissing,
   upsertSupabaseRows,
   type SupabaseTable
 } from "@/lib/supabase";
@@ -96,8 +97,54 @@ const configs: LocalTableConfig<unknown>[] = [
     table: "audit_logs",
     getId: (record) => (record as { id: string }).id,
     getUpdatedAt: (record) => (record as { createdAt?: string }).createdAt
+  },
+  // Factory records. seedCloudWhenEmpty keeps records that were entered on a device
+  // before the database tables existed: the first sync uploads them instead of clearing them.
+  {
+    localKey: "kingapp.rawMaterialMaster",
+    table: "raw_material_master",
+    getId: rawMaterialMasterId,
+    seedCloudWhenEmpty: true
+  },
+  {
+    localKey: "kingapp.rawMaterialMovements",
+    table: "raw_material_movements",
+    getId: (record) => (record as { id: string }).id,
+    seedCloudWhenEmpty: true
+  },
+  {
+    localKey: "kingapp.rawMaterialMinimums",
+    table: "raw_material_minimums",
+    getId: rawMaterialMinimumId,
+    seedCloudWhenEmpty: true
+  },
+  {
+    localKey: "kingapp.productionRecords",
+    table: "production_records",
+    getId: (record) => (record as { id: string }).id,
+    getUpdatedAt: (record) => (record as { updatedAt?: string }).updatedAt,
+    seedCloudWhenEmpty: true
+  },
+  {
+    localKey: "kingapp.utilityRecords",
+    table: "utility_records",
+    getId: (record) => (record as { id: string }).id,
+    getUpdatedAt: (record) => (record as { updatedAt?: string }).updatedAt,
+    seedCloudWhenEmpty: true
   }
 ];
+
+type RawMaterialKeyParts = { id?: string; companyId?: string; materialCode?: string; materialName?: string };
+
+export function rawMaterialMasterId(record: unknown) {
+  const material = record as RawMaterialKeyParts;
+  return material.id ?? `${material.companyId ?? ""}::${material.materialCode || material.materialName || ""}`;
+}
+
+export function rawMaterialMinimumId(record: unknown) {
+  const minimum = record as RawMaterialKeyParts;
+  return `${minimum.companyId ?? ""}::${minimum.materialCode || minimum.materialName || ""}`.toLowerCase();
+}
 
 function readJson<T>(key: string, fallback: T): T {
   const rawValue = window.localStorage.getItem(key);
@@ -136,6 +183,11 @@ export async function syncSupabaseToLocalStorage() {
   await Promise.all(
     configs.map(async (config) => {
       const cloudRecords = await fetchSupabaseTable<unknown>(config.table);
+
+      if (isSupabaseTableMissing(config.table)) {
+        // The table has not been created in the database yet: keep this device's records as they are.
+        return;
+      }
 
       if (cloudRecords) {
         const normalizedCloudRecords = dedupeCloudRecords(

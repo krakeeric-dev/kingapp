@@ -22,7 +22,12 @@ export type SupabaseTable =
   | "customer_accounts"
   | "customer_debts"
   | "customer_payments"
-  | "audit_logs";
+  | "audit_logs"
+  | "raw_material_master"
+  | "raw_material_movements"
+  | "raw_material_minimums"
+  | "production_records"
+  | "utility_records";
 
 type SupabasePayloadRow<T> = {
   id: string;
@@ -36,6 +41,14 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export function isSupabaseConfigured() {
   return Boolean(supabaseUrl && supabaseAnonKey);
+}
+
+// Tables the database answered "not found" for. Records for these stay on the
+// device instead of piling up in the offline queue; the next page load tries again.
+const missingTables = new Set<SupabaseTable>();
+
+export function isSupabaseTableMissing(table: SupabaseTable) {
+  return missingTables.has(table);
 }
 
 function getRestUrl(table: SupabaseTable, query = "") {
@@ -65,10 +78,16 @@ export async function fetchSupabaseTable<T>(table: SupabaseTable) {
       }
     );
 
+    if (response.status === 404) {
+      missingTables.add(table);
+      return null;
+    }
+
     if (!response.ok) {
       throw new Error(`Unable to read ${table}`);
     }
 
+    missingTables.delete(table);
     const rows = (await response.json()) as SupabasePayloadRow<T>[];
     return rows.map((row) => row.payload);
   } catch (error) {
@@ -83,7 +102,7 @@ export async function upsertSupabaseRows<T>(
   getId: (record: T) => string,
   getUpdatedAt: (record: T) => string | undefined = () => undefined
 ) {
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || missingTables.has(table)) {
     return;
   }
 
@@ -114,6 +133,9 @@ export async function upsertSupabaseRows<T>(
     await writeRows(table, rows);
   } catch (error) {
     console.warn(error);
+    if (missingTables.has(table)) {
+      return;
+    }
     await enqueueOfflineAction({
       actionType: `upsert:${table}`,
       payload: rows,
@@ -130,6 +152,10 @@ async function writeRows<T>(table: SupabaseTable, rows: SupabasePayloadRow<T>[])
     }),
     body: JSON.stringify(rows)
   });
+
+  if (response.status === 404) {
+    missingTables.add(table);
+  }
 
   if (!response.ok) {
     throw new Error(`Unable to write ${table}`);

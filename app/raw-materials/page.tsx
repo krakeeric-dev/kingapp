@@ -9,6 +9,7 @@ import { getCompanyWorkspaceId } from "@/lib/companies-data";
 import { hasPermission } from "@/lib/permissions";
 import {
   addRawMaterialMovement,
+  formatPacks,
   getRawMaterialMinimums,
   getRawMaterialMovements,
   getRawMaterialsForCompany,
@@ -29,6 +30,8 @@ type MovementForm = {
   unit: string;
   movementType: RawMaterialMovementType;
   quantity: string;
+  // Bags or bundles, for materials that are delivered in packs.
+  packs: string;
   reference: string;
   notes: string;
 };
@@ -50,6 +53,7 @@ const emptyMovementForm: MovementForm = {
   unit: "",
   movementType: "Raw Material In",
   quantity: "",
+  packs: "",
   reference: "",
   notes: ""
 };
@@ -135,8 +139,26 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
   const canRecordMovement = hasPermission(user, "rawmaterials.update");
   const canSetMinimums = hasPermission(user, "rawmaterials.edit");
 
+  const selectedMaterial = materials.find(
+    (material) => material.materialName === movementForm.materialName
+  );
+
   function updateMovement(field: keyof MovementForm, value: string) {
-    setMovementForm((current) => ({ ...current, [field]: value }));
+    setMovementForm((current) => {
+      const next = { ...current, [field]: value };
+
+      // Typing the number of bags fills in the pieces.
+      if (field === "packs" && selectedMaterial?.piecesPerPack) {
+        const packs = Number(value);
+        next.quantity = value && Number.isFinite(packs) ? String(packs * selectedMaterial.piecesPerPack) : "";
+      }
+
+      if (field === "quantity") {
+        next.packs = "";
+      }
+
+      return next;
+    });
   }
 
   function selectMaterial(materialName: string) {
@@ -146,6 +168,8 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
       ...current,
       materialCode: row?.materialCode ?? "",
       materialName,
+      packs: "",
+      quantity: "",
       unit: row?.unit ?? current.unit
     }));
   }
@@ -175,19 +199,29 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
     setMovements(
       addRawMaterialMovement({
         date: movementForm.date,
-        companyId: workspaceCompanyId === "all" ? user.companyId : workspaceCompanyId,
+        // In the "All Companies" view the movement belongs to the company that owns the material.
+        companyId:
+          workspaceCompanyId === "all" ? selectedMaterial?.companyId ?? user.companyId : workspaceCompanyId,
         materialCode: movementForm.materialCode,
         materialName: movementForm.materialName.trim(),
         unit: movementForm.unit.trim(),
         movementType: movementForm.movementType,
         quantity,
+        packs: Number(movementForm.packs) > 0 ? Number(movementForm.packs) : undefined,
         reference: movementForm.reference.trim() || movementForm.movementType,
         user: user.displayName,
         notes: movementForm.notes.trim()
       })
     );
+    const isIn = movementForm.movementType !== "Raw Material Out" && quantity > 0;
+    const stockBefore = rows.find((row) => row.materialName === movementForm.materialName.trim())?.remainingStock ?? 0;
+    const stockAfter = movementForm.movementType === "Raw Material Out" ? stockBefore - quantity : stockBefore + quantity;
+    const packsAfter = formatPacks(stockAfter, selectedMaterial);
+
     setMovementForm({ ...emptyMovementForm, date: today() });
-    setMessage("Raw material movement saved.");
+    setMessage(
+      `Saved. ${movementForm.materialName.trim()} ${isIn ? "in" : "out"}: ${formatNumber(quantity)} ${movementForm.unit.trim()}. Stock now ${formatNumber(stockAfter)} ${movementForm.unit.trim()}${packsAfter ? ` (${packsAfter})` : ""}.`
+    );
   }
 
   function submitMinimum(event: FormEvent<HTMLFormElement>) {
@@ -288,6 +322,7 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
           {canRecordMovement ? (
             <MovementFormCard
               form={movementForm}
+              material={selectedMaterial}
               materials={rows}
               onChange={updateMovement}
               onSelectMaterial={selectMaterial}
@@ -316,7 +351,7 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
             Remaining Stock = Opening Stock + Raw Material In - Raw Material Out.
           </p>
         </div>
-        <RawMaterialsTable rows={rows} />
+        <RawMaterialsTable materials={materials} rows={rows} />
       </section>
 
       <section className="rounded-lg border border-brand-100 bg-white shadow-sm">
@@ -332,6 +367,7 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
 
 function MovementFormCard({
   form,
+  material,
   materials,
   onChange,
   onSelectMaterial,
@@ -339,12 +375,16 @@ function MovementFormCard({
   user
 }: {
   form: MovementForm;
+  material?: RawMaterialMaster;
   materials: RawMaterialRow[];
   onChange: (field: keyof MovementForm, value: string) => void;
   onSelectMaterial: (materialName: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   user: SessionUser;
 }) {
+  const packName = (material?.packName || "pack").toLowerCase();
+  const comesInPacks = Boolean(material?.piecesPerPack && material.piecesPerPack > 1);
+
   return (
     <form className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm" onSubmit={onSubmit}>
       <div className="flex items-center gap-2">
@@ -386,7 +426,20 @@ function MovementFormCard({
           </select>
         </label>
         <Input label="Unit" onChange={(value) => onChange("unit", value)} value={form.unit} />
-        <Input label="Quantity" onChange={(value) => onChange("quantity", value)} type="number" value={form.quantity} />
+        {comesInPacks ? (
+          <Input
+            label={`Number of ${packName}s (${formatNumber(material?.piecesPerPack ?? 0)} ${form.unit || "pcs"} each)`}
+            onChange={(value) => onChange("packs", value)}
+            type="number"
+            value={form.packs}
+          />
+        ) : null}
+        <Input
+          label={comesInPacks ? `Quantity in ${form.unit || "pcs"} (filled in from ${packName}s)` : "Quantity"}
+          onChange={(value) => onChange("quantity", value)}
+          type="number"
+          value={form.quantity}
+        />
         <Input label="Reference / Supplier / Batch" onChange={(value) => onChange("reference", value)} value={form.reference} />
         <label className="block md:col-span-2">
           <span className="mb-2 block text-sm font-semibold text-slate-700">Notes</span>
@@ -457,7 +510,7 @@ function MinimumFormCard({
   );
 }
 
-function RawMaterialsTable({ rows }: { rows: RawMaterialRow[] }) {
+function RawMaterialsTable({ materials, rows }: { materials: RawMaterialMaster[]; rows: RawMaterialRow[] }) {
   if (rows.length === 0) {
     return <EmptyState>No raw material records yet.</EmptyState>;
   }
@@ -488,7 +541,10 @@ function RawMaterialsTable({ rows }: { rows: RawMaterialRow[] }) {
               <td>{formatNumber(row.openingStock)}</td>
               <td>{formatNumber(row.rawMaterialIn)}</td>
               <td>{formatNumber(row.rawMaterialOut)}</td>
-              <td className="font-black text-brand-800">{formatNumber(row.remainingStock)}</td>
+              <td className="font-black text-brand-800">
+                {formatNumber(row.remainingStock)}
+                <PackCount material={materials.find((material) => material.materialCode === row.materialCode)} quantity={row.remainingStock} />
+              </td>
               <td>{formatNumber(row.minimumLevel)}</td>
               <td>{formatNumber(row.reorderLevel)}</td>
               <td><StatusBadge status={row.status} /></td>
@@ -528,8 +584,19 @@ function MovementHistory({ records }: { records: RawMaterialMovement[] }) {
                 <p className="font-bold text-slate-950">{record.materialName}</p>
                 <p className="text-xs font-semibold text-slate-500">{record.unit}</p>
               </td>
-              <td>{record.movementType}</td>
-              <td>{formatNumber(record.quantity)}</td>
+              <td>
+                {record.source === "production"
+                  ? "Used in production"
+                  : record.source === "damage"
+                    ? "Damaged in production"
+                    : record.source === "production-void"
+                      ? "Production cancelled"
+                      : record.movementType}
+              </td>
+              <td>
+                {formatNumber(record.quantity)}
+                {record.packs ? <span className="block text-xs font-semibold text-slate-500">{formatNumber(record.packs)} packs</span> : null}
+              </td>
               <td>{record.reference}</td>
               <td>{record.user}</td>
               <td>{record.notes || "None"}</td>
@@ -539,6 +606,12 @@ function MovementHistory({ records }: { records: RawMaterialMovement[] }) {
       </table>
     </div>
   );
+}
+
+function PackCount({ material, quantity }: { material?: RawMaterialMaster; quantity: number }) {
+  const packs = formatPacks(quantity, material);
+
+  return packs ? <span className="block text-xs font-semibold text-slate-500">{packs}</span> : null;
 }
 
 function SummaryCard({

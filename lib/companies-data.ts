@@ -48,6 +48,8 @@ const linkedCompanyRecordKeys = [
   "kingapp.rawMaterialMaster",
   "kingapp.rawMaterialMinimums",
   "kingapp.rawMaterialMovements",
+  "kingapp.productionRecords",
+  "kingapp.utilityRecords",
   "kingapp.loadingRecords",
   "kingapp.salesRecords",
   "kingapp.returnRecords",
@@ -154,10 +156,24 @@ export function getCompanyName(companyId?: string, fallback = defaultCompanyName
   return getCompanyById(companyId)?.name ?? fallback;
 }
 
+// The chosen company is saved as JSON text (with quotes), so it must be read back as JSON.
+// Reading the raw text returned an id wrapped in quotes that matched no company.
+function readActiveCompanyId() {
+  const rawValue = window.localStorage.getItem(ACTIVE_COMPANY_KEY);
+  if (!rawValue) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(rawValue);
+    return typeof parsed === "string" ? parsed : rawValue;
+  } catch {
+    return rawValue;
+  }
+}
+
 export function getActiveCompanyId(user?: Pick<SessionUser, "role" | "companyId"> | null) {
   if (typeof window === "undefined") return user?.companyId ?? defaultCompanyId;
   if (user?.role === "admin") {
-    return window.localStorage.getItem(ACTIVE_COMPANY_KEY) ?? user.companyId ?? "all";
+    return readActiveCompanyId() ?? user.companyId ?? "all";
   }
   return user?.companyId ?? defaultCompanyId;
 }
@@ -189,7 +205,7 @@ export function canAccessCompany(
 export function getCompanyWorkspaceId(user: Pick<SessionUser, "assignedCompanies" | "companyId" | "role">) {
   const assigned = getAssignedCompanyIds(user);
   if (typeof window === "undefined") return assigned[0] ?? user.companyId;
-  const active = window.localStorage.getItem(ACTIVE_COMPANY_KEY) ?? user.companyId;
+  const active = readActiveCompanyId() ?? user.companyId;
   if (assigned.includes("all")) return active || "all";
   if (active && assigned.includes(active)) return active;
   return assigned[0] ?? user.companyId;

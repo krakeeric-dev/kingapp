@@ -1,3 +1,5 @@
+import { mirrorRecordsToSupabase, rawMaterialMasterId, rawMaterialMinimumId } from "@/lib/live-data";
+
 export type RawMaterialMovementType =
   | "Opening Stock"
   | "Raw Material In"
@@ -16,7 +18,15 @@ export type RawMaterialMovement = {
   user: string;
   notes: string;
   companyId?: string;
+  // Why stock moved, when the app created the movement itself.
+  source?: "production" | "damage" | "production-void" | "stock-count";
+  // Number of bags or bundles received, when the material comes in packs.
+  packs?: number;
 };
+
+// How production uses a material: one per bottle (preform, cap, sticker),
+// one per carton (the carton itself), or not deducted automatically.
+export type RawMaterialUsage = "piece" | "carton" | "none";
 
 export type RawMaterialMasterStatus = "Active" | "Inactive";
 
@@ -33,6 +43,12 @@ export type RawMaterialMaster = {
   reorderLevel: number;
   status: RawMaterialMasterStatus;
   deletedAt?: string;
+  // Stock is always kept in `unit` (pieces). A pack is how the material is delivered.
+  packName?: string;
+  piecesPerPack?: number;
+  usedPer?: RawMaterialUsage;
+  // Item codes of the products that use this material. Empty means every product.
+  usedByProducts?: string[];
 };
 
 export type RawMaterialMinimum = {
@@ -274,8 +290,10 @@ export function getRawMaterialsForCompany(companyId?: string, includeInactive = 
 }
 
 export function saveRawMaterialMaster(materials: RawMaterialMaster[]) {
-  writeJson(RAW_MATERIAL_MASTER_KEY, materials.map(normalizeMaster));
-  return materials.map(normalizeMaster);
+  const normalizedMaterials = materials.map(normalizeMaster);
+  writeJson(RAW_MATERIAL_MASTER_KEY, normalizedMaterials);
+  mirrorRecordsToSupabase("raw_material_master", normalizedMaterials, rawMaterialMasterId);
+  return normalizedMaterials;
 }
 
 export function upsertRawMaterialMaster(material: RawMaterialMaster) {
@@ -335,8 +353,14 @@ export function softDeleteRawMaterialMaster(material: RawMaterialMaster) {
 }
 
 export function hardDeleteRawMaterialMaster(material: RawMaterialMaster) {
+  // Records are shared between devices by adding and updating rows, so a row that is
+  // simply dropped here would come back on the next sync. Mark it removed instead.
   return saveRawMaterialMaster(
-    getRawMaterialMaster().filter((item) => masterKey(item) !== masterKey(material))
+    getRawMaterialMaster().map((item) =>
+      masterKey(item) === masterKey(material)
+        ? { ...item, status: "Inactive", deletedAt: item.deletedAt ?? new Date().toISOString() }
+        : item
+    )
   );
 }
 
@@ -347,6 +371,34 @@ export function getRawMaterialMovements() {
 
 export function saveRawMaterialMovements(records: RawMaterialMovement[]) {
   writeJson(RAW_MATERIAL_MOVEMENTS_KEY, records);
+  mirrorRecordsToSupabase("raw_material_movements", records, (record) => record.id);
+}
+
+export function addRawMaterialMovements(movements: Array<Omit<RawMaterialMovement, "id">>) {
+  const records = movements.map(createRawMaterialMovement);
+  const updatedRecords = [...records, ...getRawMaterialMovements()];
+  saveRawMaterialMovements(updatedRecords);
+  return updatedRecords;
+}
+
+export function hasPacks(material?: Pick<RawMaterialMaster, "piecesPerPack"> | null) {
+  return Boolean(material?.piecesPerPack && material.piecesPerPack > 1);
+}
+
+// 13,200 pieces of a material that comes 4,400 to a bag reads as "3 bags".
+export function formatPacks(
+  quantity: number,
+  material?: Pick<RawMaterialMaster, "packName" | "piecesPerPack"> | null
+) {
+  if (!material || !hasPacks(material)) {
+    return "";
+  }
+
+  const packs = quantity / (material.piecesPerPack as number);
+  const rounded = Math.round(packs * 100) / 100;
+  const name = (material.packName || "pack").trim().toLowerCase();
+
+  return `${rounded.toLocaleString()} ${name}${Math.abs(rounded) === 1 ? "" : "s"}`;
 }
 
 export function addRawMaterialMovement(movement: Omit<RawMaterialMovement, "id">) {
@@ -377,6 +429,7 @@ export function saveRawMaterialMinimum(record: RawMaterialMinimum) {
   }
 
   writeJson(RAW_MATERIAL_MINIMUMS_KEY, records);
+  mirrorRecordsToSupabase("raw_material_minimums", records, rawMaterialMinimumId);
   return records;
 }
 

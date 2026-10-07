@@ -11,12 +11,15 @@ import {
   getCompanyWorkspaceId,
   type Company
 } from "@/lib/companies-data";
+import { getProductsForCompany, type ProductMaster } from "@/lib/products-data";
 import {
+  formatPacks,
   getRawMaterialsForCompany,
   hardDeleteRawMaterialMaster,
   softDeleteRawMaterialMaster,
   upsertRawMaterialMaster,
-  type RawMaterialMaster
+  type RawMaterialMaster,
+  type RawMaterialUsage
 } from "@/lib/raw-materials-data";
 
 type RawMaterialForm = {
@@ -30,6 +33,16 @@ type RawMaterialForm = {
   minimumLevel: string;
   reorderLevel: string;
   status: "Active" | "Inactive";
+  packName: string;
+  piecesPerPack: string;
+  usedPer: RawMaterialUsage;
+  usedByProducts: string[];
+};
+
+const usageLabels: Record<RawMaterialUsage, string> = {
+  none: "Not deducted automatically",
+  piece: "1 per bottle / piece produced",
+  carton: "1 per carton produced"
 };
 
 const emptyForm: RawMaterialForm = {
@@ -40,9 +53,13 @@ const emptyForm: RawMaterialForm = {
   materialName: "",
   minimumLevel: "",
   openingStock: "",
+  packName: "",
+  piecesPerPack: "",
   reorderLevel: "",
   status: "Active",
-  unit: ""
+  unit: "",
+  usedByProducts: [],
+  usedPer: "none"
 };
 
 export default function AdminRawMaterialsPage() {
@@ -57,6 +74,7 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [materials, setMaterials] = useState<RawMaterialMaster[]>([]);
+  const [products, setProducts] = useState<ProductMaster[]>([]);
   const [form, setForm] = useState<RawMaterialForm>(emptyForm);
   const [editingId, setEditingId] = useState("");
   const [message, setMessage] = useState("");
@@ -80,6 +98,7 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
       companyName: company?.name ?? ""
     }));
     setMaterials(getRawMaterialsForCompany(safeCompanyId, true));
+    setProducts(safeCompanyId ? getProductsForCompany(safeCompanyId) : []);
   }, [user]);
 
   const selectedCompany = useMemo(
@@ -89,6 +108,16 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
 
   function refreshMaterials(companyId = workspaceCompanyId) {
     setMaterials(getRawMaterialsForCompany(companyId, true));
+    setProducts(companyId ? getProductsForCompany(companyId) : []);
+  }
+
+  function toggleProduct(itemCode: string) {
+    setForm((current) => ({
+      ...current,
+      usedByProducts: current.usedByProducts.includes(itemCode)
+        ? current.usedByProducts.filter((code) => code !== itemCode)
+        : [...current.usedByProducts, itemCode]
+    }));
   }
 
   function updateCompany(companyId: string) {
@@ -103,7 +132,7 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
     refreshMaterials(companyId);
   }
 
-  function updateForm(field: keyof RawMaterialForm, value: string) {
+  function updateForm(field: Exclude<keyof RawMaterialForm, "usedByProducts">, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
@@ -127,9 +156,13 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
       materialName: material.materialName,
       minimumLevel: String(material.minimumLevel),
       openingStock: String(material.openingStock),
+      packName: material.packName ?? "",
+      piecesPerPack: material.piecesPerPack ? String(material.piecesPerPack) : "",
       reorderLevel: String(material.reorderLevel),
       status: material.status,
-      unit: material.unit
+      unit: material.unit,
+      usedByProducts: material.usedByProducts ?? [],
+      usedPer: material.usedPer ?? "none"
     });
   }
 
@@ -164,6 +197,13 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
       return;
     }
 
+    const piecesPerPack = form.piecesPerPack.trim() ? Number(form.piecesPerPack) : 0;
+
+    if (!Number.isFinite(piecesPerPack) || piecesPerPack < 0) {
+      setError("Pieces per pack must be a valid number, or left empty.");
+      return;
+    }
+
     const company = companies.find((item) => item.id === form.companyId);
     const materialPayload = {
       id: editingId || undefined,
@@ -174,9 +214,13 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
       materialName: form.materialName.trim(),
       minimumLevel,
       openingStock,
+      packName: piecesPerPack > 1 ? form.packName.trim() || "pack" : "",
+      piecesPerPack: piecesPerPack > 1 ? piecesPerPack : 0,
       reorderLevel,
       status: form.status,
-      unit: form.unit.trim()
+      unit: form.unit.trim(),
+      usedByProducts: form.usedPer === "none" ? [] : form.usedByProducts,
+      usedPer: form.usedPer
     };
     const oldMaterial = materials.find((material) => (material.id ?? material.materialCode) === editingId);
     upsertRawMaterialMaster(materialPayload);
@@ -272,7 +316,7 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
             <Input label="Raw Material Name" onChange={(value) => updateForm("materialName", value)} value={form.materialName} />
             <Input label="Raw Material Code" onChange={(value) => updateForm("materialCode", value)} value={form.materialCode} />
             <Input label="Category" onChange={(value) => updateForm("category", value)} value={form.category} />
-            <Input label="Unit of Measure" onChange={(value) => updateForm("unit", value)} value={form.unit} />
+            <Input label="Unit stock is counted in (e.g. pcs)" onChange={(value) => updateForm("unit", value)} value={form.unit} />
             <Input label="Opening Stock" onChange={(value) => updateForm("openingStock", value)} type="number" value={form.openingStock} />
             <Input label="Minimum Stock Level" onChange={(value) => updateForm("minimumLevel", value)} type="number" value={form.minimumLevel} />
             <Input label="Reorder Level" onChange={(value) => updateForm("reorderLevel", value)} type="number" value={form.reorderLevel} />
@@ -284,6 +328,57 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
               </select>
             </label>
           </div>
+
+          <h4 className="mt-6 text-sm font-black uppercase text-slate-500">How it is delivered</h4>
+          <p className="mt-1 text-sm text-slate-600">
+            Fill these in when the material arrives in bags or bundles, so stock can be received by the bag and shown both ways. Leave empty otherwise.
+          </p>
+          <div className="mt-3 grid gap-3 md:grid-cols-4">
+            <Input label="Pack name (e.g. bag, bundle)" onChange={(value) => updateForm("packName", value)} value={form.packName} />
+            <Input label={`${form.unit.trim() || "Pieces"} per pack`} onChange={(value) => updateForm("piecesPerPack", value)} type="number" value={form.piecesPerPack} />
+          </div>
+
+          <h4 className="mt-6 text-sm font-black uppercase text-slate-500">Use in production</h4>
+          <p className="mt-1 text-sm text-slate-600">
+            When production is recorded, this much is taken out of stock automatically.
+          </p>
+          <div className="mt-3 grid gap-3 md:grid-cols-4">
+            <label className="block md:col-span-2">
+              <span className="mb-2 block text-sm font-bold text-slate-700">Deducted</span>
+              <select className="form-input" onChange={(event) => updateForm("usedPer", event.target.value)} value={form.usedPer}>
+                {(Object.keys(usageLabels) as RawMaterialUsage[]).map((usage) => (
+                  <option key={usage} value={usage}>{usageLabels[usage]}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {form.usedPer !== "none" ? (
+            <fieldset className="mt-3">
+              <legend className="text-sm font-bold text-slate-700">
+                Used by which products? Leave all unticked if every product uses it.
+              </legend>
+              {products.length === 0 ? (
+                <p className="mt-2 text-sm text-slate-500">This company has no products yet.</p>
+              ) : (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {products.map((product) => (
+                    <label
+                      className="flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-800"
+                      key={product.itemCode}
+                    >
+                      <input
+                        checked={form.usedByProducts.includes(product.itemCode)}
+                        onChange={() => toggleProduct(product.itemCode)}
+                        type="checkbox"
+                      />
+                      {product.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </fieldset>
+          ) : null}
+
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <button className="primary-button" type="submit">{editingId ? "Save Changes" : "Add Raw Material"}</button>
             {editingId ? <button className="secondary-button" onClick={() => resetForm()} type="button">Cancel Edit</button> : null}
@@ -296,7 +391,7 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
           <h3 className="text-lg font-black text-slate-950">Company Raw Materials</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="data-table min-w-[1100px]">
+          <table className="data-table min-w-[1300px]">
             <thead>
               <tr>
                 <th>Company</th>
@@ -304,6 +399,8 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
                 <th>Code</th>
                 <th>Category</th>
                 <th>Unit</th>
+                <th>Pack</th>
+                <th>Use in production</th>
                 <th>Opening</th>
                 <th>Minimum</th>
                 <th>Reorder</th>
@@ -320,7 +417,30 @@ function AdminRawMaterialsContent({ user }: { user: SessionUser }) {
                   <td>{material.materialCode}</td>
                   <td>{material.category}</td>
                   <td>{material.unit}</td>
-                  <td>{formatNumber(material.openingStock)}</td>
+                  <td>
+                    {material.piecesPerPack && material.piecesPerPack > 1
+                      ? `${formatNumber(material.piecesPerPack)} per ${material.packName || "pack"}`
+                      : "-"}
+                  </td>
+                  <td>
+                    {usageLabels[material.usedPer ?? "none"]}
+                    {material.usedPer && material.usedPer !== "none" ? (
+                      <span className="block text-xs text-slate-500">
+                        {(material.usedByProducts ?? []).length === 0
+                          ? "All products"
+                          : products
+                              .filter((product) => (material.usedByProducts ?? []).includes(product.itemCode))
+                              .map((product) => product.name)
+                              .join(", ")}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td>
+                    {formatNumber(material.openingStock)}
+                    {formatPacks(material.openingStock, material) ? (
+                      <span className="block text-xs text-slate-500">{formatPacks(material.openingStock, material)}</span>
+                    ) : null}
+                  </td>
                   <td>{formatNumber(material.minimumLevel)}</td>
                   <td>{formatNumber(material.reorderLevel)}</td>
                   <td><StatusBadge status={material.deletedAt ? "Removed" : material.status} /></td>

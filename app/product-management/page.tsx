@@ -265,7 +265,7 @@ function ProductManagementContent({ user }: { user: SessionUser }) {
             <Input label="Category" onChange={(value) => updateForm("category", value)} value={form.category} />
             <Input label="Unit Price" onChange={(value) => updateForm("pricePerCarton", value)} type="number" value={form.pricePerCarton} />
             <Input label="Cost Price" onChange={(value) => updateForm("costPrice", value)} type="number" value={form.costPrice} />
-            <Input label="Carton Size" onChange={(value) => updateForm("cartonSize", value)} type="number" value={form.cartonSize} />
+            <Input label="Pieces per carton" onChange={(value) => updateForm("cartonSize", value)} type="number" value={form.cartonSize} />
             <label className="block">
               <span className="mb-2 block text-sm font-bold text-slate-700">Status</span>
               <select className="form-input" onChange={(event) => updateForm("status", event.target.value)} value={form.status}>
@@ -295,7 +295,7 @@ function ProductManagementContent({ user }: { user: SessionUser }) {
                 <th>Category</th>
                 <th>Price</th>
                 <th>Cost</th>
-                <th>Carton Size</th>
+                <th>Pieces per carton</th>
                 <th>Status</th>
                 <th>Edit</th>
                 <th>Remove</th>

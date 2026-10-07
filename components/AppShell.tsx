@@ -15,6 +15,7 @@ import {
   Download,
   Factory,
   FileText,
+  Hammer,
   Home,
   LayoutDashboard,
   LogOut,
@@ -214,6 +215,12 @@ const navItems: NavItem[] = [
     label: "Inventory",
     icon: Boxes,
     roles: getAllowedRoles("/inventory")
+  },
+  {
+    href: "/production",
+    label: "Production",
+    icon: Hammer,
+    roles: getAllowedRoles("/production")
   },
   {
     href: "/raw-materials",
@@ -696,6 +703,7 @@ function getNavGroupTitle(href: string) {
   if (href.startsWith("/delivery")) return "Delivery";
   if (
     href === "/inventory" ||
+    href === "/production" ||
     href === "/raw-materials" ||
     href === "/admin/raw-materials" ||
     href === "/product-management" ||
@@ -1050,6 +1058,7 @@ function getMobileRoleShortcuts(role: UserRole, visibleNav: NavItem[]) {
     "/loading": "Loading",
     "/inventory": "Inventory",
     "/raw-materials": "Raw Materials",
+    "/production": "Production",
     "/returns": "Returns",
     "/cash": "Cash",
     "/sales": "Sales",
@@ -1064,7 +1073,7 @@ function getMobileRoleShortcuts(role: UserRole, visibleNav: NavItem[]) {
     admin: ["/loading", "/sales", "/cash", "/inventory", "/delivery", "/client-orders"],
     manager: ["/customers/debts/approvals", "/reports", "/daily-report", "/inventory", "/delivery", "/sales"],
     supervisor: ["/customers/debts/approvals", "/loading", "/sales", "/returns", "/reports", "/cash"],
-    storekeeper: ["/loading", "/inventory", "/raw-materials", "/returns", "/delivery", "/sync-status"],
+    storekeeper: ["/loading", "/inventory", "/production", "/raw-materials", "/returns", "/delivery"],
     marketer: ["/sales", "/customers", "/delivery", "/client-portal/messages", "/customers/debts/approvals", "/sync-status"],
     accountant: ["/cash", "/customers/debts", "/customers/payments", "/customers/statements", "/expenses", "/daily-report"],
     callcenter: [],

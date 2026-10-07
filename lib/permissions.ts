@@ -17,6 +17,9 @@ export type PermissionKey =
   | "rawmaterials.update"
   | "rawmaterials.edit"
   | "rawmaterials.unlock"
+  | "production.view"
+  | "production.record"
+  | "production.cancel"
   | "sales.view"
   | "sales.create"
   | "sales.edit"
@@ -117,6 +120,14 @@ export const permissionGroups: PermissionGroup[] = [
       { key: "rawmaterials.update", label: "Update Raw Materials" },
       { key: "rawmaterials.edit", label: "Edit Raw Material Records" },
       { key: "rawmaterials.unlock", label: "Unlock Raw Material Records" }
+    ]
+  },
+  {
+    title: "Production",
+    permissions: [
+      { key: "production.view", label: "View Production" },
+      { key: "production.record", label: "Record Production and Utilities" },
+      { key: "production.cancel", label: "Cancel Production Records" }
     ]
   },
   {
@@ -256,6 +267,8 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "inventory.view",
     "product.view",
     "rawmaterials.view",
+    "production.view",
+    "production.cancel",
     "sales.view",
     "cash.view",
     "returns.view",
@@ -288,6 +301,7 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "loading.approve",
     "loading.confirm",
     "product.view",
+    "production.view",
     "sales.view",
     "returns.view",
     "cash.view",
@@ -321,6 +335,8 @@ const defaultRolePermissions: Record<UserRole, PermissionKey[]> = {
     "product.view",
     "rawmaterials.view",
     "rawmaterials.update",
+    "production.view",
+    "production.record",
     "sync.view"
   ],
   marketer: [
@@ -419,6 +435,7 @@ export const routePermissions: Record<string, PermissionKey[]> = {
   "/loading": ["loading.view"],
   "/inventory": ["inventory.view"],
   "/raw-materials": ["rawmaterials.view"],
+  "/production": ["production.view"],
   "/product-management": ["product.view"],
   "/price-management": ["inventory.price.change"],
   "/confirm-loading": ["loading.confirm"],
@@ -483,6 +500,7 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/loading": ["admin", "supervisor", "storekeeper"],
   "/inventory": ["admin", "manager", "supervisor", "storekeeper"],
   "/raw-materials": ["admin", "manager", "storekeeper", "accountant"],
+  "/production": ["admin", "manager", "supervisor", "storekeeper"],
   "/product-management": ["admin", "manager", "storekeeper", "marketer", "accountant"],
   "/price-management": ["admin"],
   "/confirm-loading": ["admin", "supervisor", "marketer"],
