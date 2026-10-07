@@ -9,6 +9,7 @@ import {
   Bell,
   Boxes,
   Building2,
+  ChevronDown,
   ClipboardCheck,
   ClipboardList,
   Download,
@@ -24,8 +25,6 @@ import {
   PhoneCall,
   Plus,
   ReceiptText,
-  RotateCcw,
-  SlidersHorizontal,
   RefreshCw,
   Search,
   ScrollText,
@@ -92,7 +91,7 @@ const navItems: NavItem[] = [
   },
   {
     href: "/call-center",
-    label: "CCRM",
+    label: "Customer Care",
     icon: PhoneCall,
     roles: getAllowedRoles("/call-center")
   },
@@ -224,7 +223,7 @@ const navItems: NavItem[] = [
   },
   {
     href: "/admin/raw-materials",
-    label: "Raw Master",
+    label: "Raw Material Setup",
     icon: Factory,
     roles: getAllowedRoles("/admin/raw-materials")
   },
@@ -242,7 +241,7 @@ const navItems: NavItem[] = [
   },
   {
     href: "/confirm-loading",
-    label: "Confirm",
+    label: "Confirm Loading",
     icon: ClipboardCheck,
     roles: getAllowedRoles("/confirm-loading")
   },
@@ -289,18 +288,6 @@ const navItems: NavItem[] = [
     roles: getAllowedRoles("/admin/call-center-numbers")
   },
   {
-    href: "/admin/reset-data",
-    label: "Historical Data",
-    icon: RotateCcw,
-    roles: getAllowedRoles("/admin/reset-data")
-  },
-  {
-    href: "/admin/dev-tools",
-    label: "Dev Tools",
-    icon: SlidersHorizontal,
-    roles: getAllowedRoles("/admin/dev-tools")
-  },
-  {
     href: "/admin/companies",
     label: "Companies",
     icon: Building2,
@@ -320,7 +307,7 @@ const navItems: NavItem[] = [
   },
   {
     href: "/sync-status",
-    label: "Sync",
+    label: "Sync Status",
     icon: RefreshCw,
     roles: getAllowedRoles("/sync-status")
   }
@@ -498,21 +485,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
     <main className="min-h-screen bg-transparent lg:grid lg:grid-cols-[300px_1fr]">
       <aside className="no-print fixed inset-y-0 left-0 z-30 hidden h-screen w-[300px] border-r border-white/10 bg-gradient-to-b from-brand-950 via-brand-900 to-brand-800 p-5 text-white shadow-executive lg:flex lg:flex-col">
         <BrandBlock companyName={workspaceName} />
-        <nav className="mt-8 min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
-          {groupedVisibleNav.map((group) => (
-            <NavGroupBlock key={group.title} title={group.title}>
-              {group.items.map((item) => (
-                <NavLink
-                  href={item.href}
-                  icon={item.icon}
-                  isActive={pathname === item.href}
-                  key={item.href}
-                  label={item.label}
-                />
-              ))}
-            </NavGroupBlock>
-          ))}
-        </nav>
+        <NavMenu className="mt-8" groups={groupedVisibleNav} pathname={pathname} />
         <UserPanel handleLogout={handleLogout} user={user} />
       </aside>
 
@@ -610,7 +583,7 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
           <div className="no-print fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm lg:hidden">
             <div className="flex h-full w-[min(88vw,340px)] flex-col bg-gradient-to-b from-brand-950 via-brand-900 to-brand-800 p-5 text-white shadow-executive">
               <div className="flex items-start justify-between gap-4">
-                <BrandBlock companyName={workspaceName} />
+                <BrandBlock companyName={workspaceName} compact />
                 <button
                   className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white transition hover:bg-white/15"
                   onClick={() => setMobileMenuOpen(false)}
@@ -619,22 +592,12 @@ export function AppShell({ allowedRoles, children }: AppShellProps) {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <nav className="mt-8 min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
-                {groupedMobileNav.map((group) => (
-                  <NavGroupBlock key={group.title} title={group.title}>
-                    {group.items.map((item) => (
-                      <NavLink
-                        href={item.href}
-                        icon={item.icon}
-                        isActive={pathname === item.href}
-                        key={item.href}
-                        label={item.label}
-                        onClick={() => setMobileMenuOpen(false)}
-                      />
-                    ))}
-                  </NavGroupBlock>
-                ))}
-              </nav>
+              <NavMenu
+                className="mt-4"
+                groups={groupedMobileNav}
+                onNavigate={() => setMobileMenuOpen(false)}
+                pathname={pathname}
+              />
               {installPrompt ? (
                 <button
                   className="mb-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-black text-brand-900"
@@ -694,13 +657,15 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function BrandBlock({ companyName }: { companyName?: string }) {
+function BrandBlock({ companyName, compact = false }: { companyName?: string; compact?: boolean }) {
   return (
     <div>
       <BrandMark />
-      <p className="mt-4 text-sm font-medium leading-6 text-emerald-100">
-        Enterprise Business Platform
-      </p>
+      {!compact ? (
+        <p className="mt-4 text-sm font-medium leading-6 text-emerald-100">
+          Enterprise Business Platform
+        </p>
+      ) : null}
       {companyName ? (
         <p className="mt-2 rounded-lg bg-white/10 px-3 py-2 text-xs font-black text-white">
           {companyName}
@@ -711,7 +676,7 @@ function BrandBlock({ companyName }: { companyName?: string }) {
 }
 
 function groupNavItems(items: NavItem[]): NavGroup[] {
-  const groupOrder = ["Main", "Operations", "Client Network", "CCRM", "Management"];
+  const groupOrder = ["Main", "Operations", "Clients & Suppliers", "Customer Care", "Admin & Reports"];
   const groups = new Map<string, NavItem[]>();
 
   items.forEach((item) => {
@@ -726,19 +691,115 @@ function groupNavItems(items: NavItem[]): NavGroup[] {
 
 function getNavGroupTitle(href: string) {
   if (href === "/dashboard" || href === "/executive") return "Main";
-  if (href.startsWith("/call-center")) return "CCRM";
-  if (href === "/client-orders" || href === "/supplier-dashboard" || href === "/client-portal" || href.startsWith("/customers")) return "Client Network";
-  if (href.startsWith("/admin") || href === "/reports" || href === "/daily-report" || href === "/sync-status") return "Management";
+  if (href.startsWith("/call-center")) return "Customer Care";
+  if (href === "/client-orders" || href === "/supplier-dashboard" || href === "/client-portal" || href.startsWith("/customers")) return "Clients & Suppliers";
+  if (href.startsWith("/admin") || href === "/reports" || href === "/daily-report" || href === "/sync-status") return "Admin & Reports";
   return "Operations";
 }
 
-function NavGroupBlock({ children, title }: { children: ReactNode; title: string }) {
+// Menus longer than this collapse into groups so the list stays short on a phone.
+const COLLAPSE_MENU_AFTER = 8;
+
+function findGroupTitle(groups: NavGroup[], pathname: string) {
+  return groups.find((group) => group.items.some((item) => item.href === pathname))?.title;
+}
+
+function NavMenu({
+  className = "",
+  groups,
+  onNavigate,
+  pathname
+}: {
+  className?: string;
+  groups: NavGroup[];
+  onNavigate?: () => void;
+  pathname: string;
+}) {
+  const totalItems = groups.reduce((count, group) => count + group.items.length, 0);
+  const collapsible = totalItems > COLLAPSE_MENU_AFTER;
+  const activeGroupTitle = findGroupTitle(groups, pathname);
+  const [openGroups, setOpenGroups] = useState<string[]>(() =>
+    activeGroupTitle ? ["Main", activeGroupTitle] : ["Main"]
+  );
+
+  useEffect(() => {
+    if (!activeGroupTitle) {
+      return;
+    }
+
+    setOpenGroups((current) =>
+      current.includes(activeGroupTitle) ? current : [...current, activeGroupTitle]
+    );
+  }, [activeGroupTitle]);
+
+  function toggleGroup(title: string) {
+    setOpenGroups((current) =>
+      current.includes(title) ? current.filter((item) => item !== title) : [...current, title]
+    );
+  }
+
+  return (
+    <nav className={`min-h-0 flex-1 overflow-y-auto pr-1 ${collapsible ? "space-y-2" : "space-y-6"} ${className}`}>
+      {groups.map((group) => (
+        <NavGroupBlock
+          collapsible={collapsible && group.title !== "Main"}
+          isOpen={!collapsible || group.title === "Main" || openGroups.includes(group.title)}
+          key={group.title}
+          onToggle={() => toggleGroup(group.title)}
+          title={group.title}
+        >
+          {group.items.map((item) => (
+            <NavLink
+              href={item.href}
+              icon={item.icon}
+              isActive={pathname === item.href}
+              key={item.href}
+              label={item.label}
+              onClick={onNavigate}
+            />
+          ))}
+        </NavGroupBlock>
+      ))}
+    </nav>
+  );
+}
+
+function NavGroupBlock({
+  children,
+  collapsible,
+  isOpen,
+  onToggle,
+  title
+}: {
+  children: ReactNode;
+  collapsible: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
+  title: string;
+}) {
+  if (!collapsible) {
+    return (
+      <div>
+        <p className="mb-3 px-3 text-[11px] font-black uppercase tracking-wide text-emerald-100/70">
+          {title}
+        </p>
+        <div className="space-y-1.5">{children}</div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <p className="mb-3 px-3 text-[11px] font-black uppercase tracking-wide text-emerald-100/70">
-        {title}
-      </p>
-      <div className="space-y-1.5">{children}</div>
+      <button
+        aria-expanded={isOpen}
+        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-xs font-black uppercase tracking-wide text-emerald-100 transition hover:bg-white/10"
+        onClick={onToggle}
+        type="button"
+      >
+        <span>{title}</span>
+        <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+      {isOpen ? <div className="mt-1.5 space-y-1.5">{children}</div> : null}
     </div>
   );
 }
@@ -808,9 +869,16 @@ function UserPanel({
   );
 }
 
+const hiddenPageTitles: Record<string, string> = {
+  "/admin/reset-data": "Historical Data",
+  "/admin/dev-tools": "Developer Tools"
+};
+
 function currentPageTitle(pathname: string) {
   return (
-    navItems.find((item) => item.href === pathname)?.label ?? "Dashboard"
+    navItems.find((item) => item.href === pathname)?.label ??
+    hiddenPageTitles[pathname] ??
+    "Dashboard"
   );
 }
 
