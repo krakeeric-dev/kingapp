@@ -970,7 +970,9 @@ function MobileRoleHome({
 }) {
   const shortcuts = getMobileRoleShortcuts(user.role, visibleNav);
 
-  if (pathname.startsWith("/call-center") || shortcuts.length === 0) {
+  // Shortcuts belong on the home screen only. On every other page they pushed
+  // the real content below the first screen, and the bottom bar already covers them.
+  if (pathname !== "/dashboard" || shortcuts.length === 0) {
     return null;
   }
 
@@ -978,7 +980,7 @@ function MobileRoleHome({
     <section className="no-print mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:hidden">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-black uppercase text-brand-700">{roleLabels[user.role]} Mobile Home</p>
+          <p className="text-xs font-black uppercase text-brand-700">{roleLabels[user.role]}</p>
           <h2 className="mt-1 text-lg font-black text-slate-950">{user.displayName}</h2>
         </div>
         <Link
@@ -1022,15 +1024,15 @@ function getMobileRoleShortcuts(role: UserRole, visibleNav: NavItem[]) {
     "/sales": "Sales",
     "/confirm-loading": "Confirm",
     "/reports": "Reports",
-    "/daily-report": "Reports",
+    "/daily-report": "Daily Report",
     "/client-portal": "Place Order",
-    "/client-orders": "My Orders",
+    "/client-orders": "Client Orders",
     "/sync-status": "Sync"
   };
   const priorityByRole: Record<UserRole, string[]> = {
-    admin: ["/dashboard", "/loading", "/sales", "/cash", "/inventory", "/delivery"],
-    manager: ["/dashboard", "/customers/debts/approvals", "/reports", "/daily-report", "/inventory", "/delivery"],
-    supervisor: ["/dashboard", "/customers/debts/approvals", "/loading", "/sales", "/returns", "/reports"],
+    admin: ["/loading", "/sales", "/cash", "/inventory", "/delivery", "/client-orders"],
+    manager: ["/customers/debts/approvals", "/reports", "/daily-report", "/inventory", "/delivery", "/sales"],
+    supervisor: ["/customers/debts/approvals", "/loading", "/sales", "/returns", "/reports", "/cash"],
     storekeeper: ["/loading", "/inventory", "/raw-materials", "/returns", "/delivery", "/sync-status"],
     marketer: ["/sales", "/customers", "/delivery", "/client-portal/messages", "/customers/debts/approvals", "/sync-status"],
     accountant: ["/cash", "/customers/debts", "/customers/payments", "/customers/statements", "/expenses", "/daily-report"],
