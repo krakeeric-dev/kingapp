@@ -453,7 +453,8 @@ export const routePermissions: Record<string, PermissionKey[]> = {
   "/admin/raw-materials": ["rawmaterials.view"],
   "/admin/reset-data": ["admin.historicalData.manage"],
   "/admin/dev-tools": ["admin.devtools.manage"],
-  "/admin/companies": ["admin.companies.manage"]
+  "/admin/companies": ["admin.companies.manage"],
+  "/admin/backup": ["admin.historicalData.manage"]
 };
 
 export const pagePermissions: Record<string, UserRole[]> = {
@@ -519,7 +520,8 @@ export const pagePermissions: Record<string, UserRole[]> = {
   "/admin/raw-materials": ["admin", "manager"],
   "/admin/reset-data": ["admin"],
   "/admin/dev-tools": ["admin"],
-  "/admin/companies": ["admin"]
+  "/admin/companies": ["admin"],
+  "/admin/backup": ["admin"]
 };
 
 function resolveRouteKey(pathname: string) {

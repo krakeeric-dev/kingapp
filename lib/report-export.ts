@@ -202,3 +202,130 @@ export async function downloadReportPicture(report: FactoryReport) {
 
   download(blob, reportFileName(report, "png"));
 }
+
+// ---------- Dispatch note picture ----------
+
+export type DispatchNotePicture = {
+  companyName: string;
+  tinNumber?: string;
+  dispatchNumber: string;
+  date: string;
+  status: string;
+  details: Array<{ label: string; value: string }>;
+  products: Array<{ product: string; cartons: number }>;
+  totalCartons: number;
+  preparedBy: string;
+};
+
+// Draws a dispatch note as a picture, so it can be sent to the client or driver on WhatsApp.
+export async function downloadDispatchPicture(note: DispatchNotePicture) {
+  const width = 900;
+  const detailRows = Math.ceil(note.details.length / 2);
+  const tableTop = 150 + detailRows * 46 + 34;
+  const tableHeight = ROW * (note.products.length + 2);
+  const signatureTop = tableTop + tableHeight + 70;
+  const height = signatureTop + 120;
+  const scale = 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("This browser cannot draw pictures.");
+  ctx.scale(scale, scale);
+  ctx.textBaseline = "middle";
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "#0f6b44";
+  ctx.fillRect(0, 0, width, 6);
+
+  // Heading: company on the left, note number and date on the right.
+  ctx.fillStyle = "#0f172a";
+  ctx.font = `800 24px ${FONT}`;
+  ctx.fillText(fitText(ctx, note.companyName, 540), PAD, 44);
+  ctx.fillStyle = "#475569";
+  ctx.font = `700 14px ${FONT}`;
+  ctx.fillText("DISPATCH NOTE", PAD, 74);
+  if (note.tinNumber) {
+    ctx.font = `500 13px ${FONT}`;
+    ctx.fillText(`TIN ${note.tinNumber}`, PAD, 96);
+  }
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#0f172a";
+  ctx.font = `800 18px ${FONT}`;
+  ctx.fillText(note.dispatchNumber, width - PAD, 44);
+  ctx.fillStyle = "#475569";
+  ctx.font = `600 14px ${FONT}`;
+  ctx.fillText(note.date, width - PAD, 70);
+  ctx.fillText(note.status, width - PAD, 94);
+  ctx.textAlign = "left";
+
+  ctx.strokeStyle = "#cbd5e1";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(PAD, 120.5);
+  ctx.lineTo(width - PAD, 120.5);
+  ctx.stroke();
+
+  // Details in two columns.
+  const columnWidth = (width - PAD * 2) / 2;
+  note.details.forEach((item, index) => {
+    const x = PAD + (index % 2) * columnWidth;
+    const y = 150 + Math.floor(index / 2) * 46;
+    ctx.fillStyle = "#64748b";
+    ctx.font = `700 11px ${FONT}`;
+    ctx.fillText(item.label.toUpperCase(), x, y);
+    ctx.fillStyle = "#0f172a";
+    ctx.font = `600 15px ${FONT}`;
+    ctx.fillText(fitText(ctx, item.value || "-", columnWidth - 24), x, y + 20);
+  });
+
+  // Products.
+  const tableWidth = width - PAD * 2;
+  let y = tableTop;
+  const drawRow = (label: string, value: string, style: "header" | "body" | "total") => {
+    ctx.fillStyle = style === "header" ? "#e2e8f0" : style === "total" ? "#ecfdf5" : "#ffffff";
+    ctx.fillRect(PAD, y, tableWidth, ROW);
+    ctx.fillStyle = style === "header" ? "#334155" : "#0f172a";
+    ctx.font = `${style === "body" ? 500 : 700} ${style === "header" ? 12 : 15}px ${FONT}`;
+    ctx.fillText(fitText(ctx, label, tableWidth - 200), PAD + CELL_PAD, y + ROW / 2);
+    ctx.textAlign = "right";
+    ctx.fillText(value, PAD + tableWidth - CELL_PAD, y + ROW / 2);
+    ctx.textAlign = "left";
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.beginPath();
+    ctx.moveTo(PAD, y + ROW + 0.5);
+    ctx.lineTo(PAD + tableWidth, y + ROW + 0.5);
+    ctx.stroke();
+    y += ROW;
+  };
+
+  drawRow("PRODUCT", "CARTONS", "header");
+  note.products.forEach((line) => drawRow(line.product, line.cartons.toLocaleString(), "body"));
+  drawRow("Total cartons", note.totalCartons.toLocaleString(), "total");
+
+  // Signature lines.
+  const signatures = [`Prepared by: ${note.preparedBy}`, "Driver", "Received by"];
+  const signatureWidth = (width - PAD * 2 - 40) / signatures.length;
+  signatures.forEach((label, index) => {
+    const x = PAD + index * (signatureWidth + 20);
+    ctx.strokeStyle = "#0f172a";
+    ctx.beginPath();
+    ctx.moveTo(x, signatureTop + 0.5);
+    ctx.lineTo(x + signatureWidth, signatureTop + 0.5);
+    ctx.stroke();
+    ctx.fillStyle = "#475569";
+    ctx.font = `600 12px ${FONT}`;
+    ctx.fillText(fitText(ctx, label, signatureWidth), x, signatureTop + 18);
+  });
+
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = `500 11px ${FONT}`;
+  ctx.fillText(`Created in KingApp on ${new Date().toLocaleString()}`, PAD, height - 24);
+
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("The picture could not be created.");
+
+  const clean = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  download(blob, `dispatch-note-${clean(note.dispatchNumber)}-${note.date}.png`);
+}

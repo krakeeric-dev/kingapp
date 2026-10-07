@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
-import { Factory, History, PackageMinus, PackagePlus, SlidersHorizontal } from "lucide-react";
+import { ClipboardCheck, Factory, History, PackageMinus, PackagePlus, SlidersHorizontal } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import type { SessionUser } from "@/lib/auth";
 import { formatDate } from "@/lib/loading-data";
@@ -82,6 +82,8 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
   const [minimumForm, setMinimumForm] = useState<MinimumForm>(emptyMinimumForm);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  // One form at a time, so the page is not three forms stacked on a phone.
+  const [activeForm, setActiveForm] = useState<"movement" | "count" | "minimum">("movement");
 
   useEffect(() => {
     setMaterials(getRawMaterialsForCompany(getCompanyWorkspaceId(user)));
@@ -224,6 +226,39 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
     );
   }
 
+  function saveStockCount(material: RawMaterialMaster, counted: number, note: string) {
+    setMessage("");
+    setError("");
+
+    const row = rows.find((item) => item.materialCode === material.materialCode);
+    const expected = row?.remainingStock ?? 0;
+    const difference = counted - expected;
+
+    if (difference === 0) {
+      setMessage(`Count matches. ${material.materialName} is ${formatNumber(counted)} ${material.unit}, as recorded. Nothing changed.`);
+      return;
+    }
+
+    setMovements(
+      addRawMaterialMovement({
+        date: today(),
+        companyId: material.companyId ?? (workspaceCompanyId === "all" ? user.companyId : workspaceCompanyId),
+        materialCode: material.materialCode,
+        materialName: material.materialName,
+        unit: material.unit,
+        movementType: "Adjustment",
+        quantity: difference,
+        reference: "Stock count",
+        user: user.displayName,
+        source: "stock-count",
+        notes: `Counted ${formatNumber(counted)}, records showed ${formatNumber(expected)}.${note ? ` ${note}` : ""}`
+      })
+    );
+    setMessage(
+      `Saved. ${material.materialName} counted at ${formatNumber(counted)} ${material.unit}. Stock corrected by ${difference > 0 ? "+" : "−"}${formatNumber(Math.abs(difference))} ${material.unit}.`
+    );
+  }
+
   function submitMinimum(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
@@ -306,20 +341,35 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
         </div>
       ) : null}
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <SummaryCard label="Raw Material In" value={totals.rawMaterialIn} />
-        <SummaryCard label="Raw Material Out" value={totals.rawMaterialOut} tone="amber" />
-        <SummaryCard label="Remaining Stock" value={totals.remainingStock} tone="green" />
-        <SummaryCard label="Minimum Stock Level" value={totalMinimumLevel} tone="blue" />
-        <SummaryCard label="Reorder Alert" value={reorderAlertCount} tone={reorderAlertCount > 0 ? "red" : "green"} />
-        <SummaryCard label="Days Remaining" value={daysRemaining >= 999 ? "Stable" : daysRemaining} tone={daysRemaining <= 3 ? "red" : daysRemaining <= 7 ? "amber" : "green"} />
-        <SummaryCard label="Daily Usage" value={dailyUsage} tone="purple" />
-        <SummaryCard label="Low Stock Alerts" value={totals.lowStockAlerts} tone={totals.lowStockAlerts > 0 ? "red" : "green"} />
-      </section>
+      {canRecordMovement && canSetMinimums ? (
+        <div className="grid gap-2 sm:grid-cols-3">
+          {(
+            [
+              ["movement", "Receive or issue stock"],
+              ["count", "Stock count"],
+              ["minimum", "Minimum levels"]
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              aria-pressed={activeForm === key}
+              className={`min-h-11 rounded-lg border px-4 text-sm font-bold transition ${
+                activeForm === key
+                  ? "border-brand-700 bg-brand-700 text-white"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-brand-200 hover:bg-brand-50"
+              }`}
+              key={key}
+              onClick={() => setActiveForm(key)}
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {(canRecordMovement || canSetMinimums) ? (
-        <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          {canRecordMovement ? (
+        <section className="grid gap-4">
+          {canRecordMovement && (activeForm === "movement" || !canSetMinimums) ? (
             <MovementFormCard
               form={movementForm}
               material={selectedMaterial}
@@ -331,7 +381,11 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
             />
           ) : null}
 
-          {canSetMinimums ? (
+          {canSetMinimums && (activeForm === "count" || !canRecordMovement) ? (
+            <StockCountCard materials={materials} onSave={saveStockCount} rows={rows} />
+          ) : null}
+
+          {canSetMinimums && activeForm === "minimum" ? (
             <MinimumFormCard
               form={minimumForm}
               materials={rows}
@@ -343,6 +397,17 @@ function RawMaterialsContent({ user }: { user: SessionUser }) {
           ) : null}
         </section>
       ) : null}
+
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-6">
+        <SummaryCard label="Raw Material In" value={totals.rawMaterialIn} />
+        <SummaryCard label="Raw Material Out" value={totals.rawMaterialOut} tone="amber" />
+        <SummaryCard label="Remaining Stock" value={totals.remainingStock} tone="green" />
+        <SummaryCard label="Minimum Stock Level" value={totalMinimumLevel} tone="blue" />
+        <SummaryCard label="Reorder Alert" value={reorderAlertCount} tone={reorderAlertCount > 0 ? "red" : "green"} />
+        <SummaryCard label="Days Remaining" value={daysRemaining >= 999 ? "Stable" : daysRemaining} tone={daysRemaining <= 3 ? "red" : daysRemaining <= 7 ? "amber" : "green"} />
+        <SummaryCard label="Daily Usage" value={dailyUsage} tone="purple" />
+        <SummaryCard label="Low Stock Alerts" value={totals.lowStockAlerts} tone={totals.lowStockAlerts > 0 ? "red" : "green"} />
+      </section>
 
       <section className="rounded-lg border border-brand-100 bg-white shadow-sm">
         <div className="border-b border-brand-100 p-5">
@@ -452,6 +517,116 @@ function MovementFormCard({
       </div>
       <button className="mt-4 rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-800">
         Save movement
+      </button>
+    </form>
+  );
+}
+
+function StockCountCard({
+  materials,
+  onSave,
+  rows
+}: {
+  materials: RawMaterialMaster[];
+  onSave: (material: RawMaterialMaster, counted: number, note: string) => void;
+  rows: RawMaterialRow[];
+}) {
+  const [materialCode, setMaterialCode] = useState("");
+  const [packs, setPacks] = useState("");
+  const [loose, setLoose] = useState("");
+  const [note, setNote] = useState("");
+  const [localError, setLocalError] = useState("");
+
+  const material = materials.find((item) => item.materialCode === materialCode);
+  const perPack = material?.piecesPerPack && material.piecesPerPack > 1 ? material.piecesPerPack : 0;
+  const packName = (material?.packName || "pack").toLowerCase();
+  const expected = rows.find((row) => row.materialCode === materialCode)?.remainingStock ?? 0;
+  const hasCount = packs !== "" || loose !== "";
+  const counted = (perPack ? (Number(packs) || 0) * perPack : 0) + (Number(loose) || 0);
+  const difference = counted - expected;
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!material) {
+      setLocalError("Choose the raw material that was counted.");
+      return;
+    }
+
+    if (!hasCount || counted < 0 || !Number.isFinite(counted)) {
+      setLocalError("Enter what was counted. Type 0 if there is none.");
+      return;
+    }
+
+    setLocalError("");
+    onSave(material, counted, note.trim());
+    setPacks("");
+    setLoose("");
+    setNote("");
+  }
+
+  return (
+    <form className="rounded-lg border border-brand-100 bg-white p-5 shadow-sm" onSubmit={submit}>
+      <div className="flex items-center gap-2">
+        <ClipboardCheck className="h-5 w-5 text-brand-700" />
+        <h3 className="font-bold text-slate-950">Stock count</h3>
+      </div>
+      <p className="mt-1 text-sm text-slate-600">
+        Count what is really in the store. If it differs from the records, the stock is corrected and the difference is kept in the history.
+      </p>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-slate-700">Raw material counted</span>
+          <select
+            className="form-input"
+            onChange={(event) => {
+              setMaterialCode(event.target.value);
+              setPacks("");
+              setLoose("");
+            }}
+            value={materialCode}
+          >
+            <option value="">Select raw material</option>
+            {materials.map((item) => (
+              <option key={item.materialCode} value={item.materialCode}>
+                {item.materialName}
+              </option>
+            ))}
+          </select>
+        </label>
+        {perPack ? (
+          <Input label={`Full ${packName}s counted`} onChange={setPacks} type="number" value={packs} />
+        ) : null}
+        <Input
+          label={perPack ? `Loose ${material?.unit || "pcs"} counted` : `Counted (${material?.unit || "pcs"})`}
+          onChange={setLoose}
+          type="number"
+          value={loose}
+        />
+      </div>
+
+      {material ? (
+        <p className="mt-3 rounded-lg bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+          Records show {formatNumber(expected)} {material.unit}
+          {formatPacks(expected, material) ? ` (${formatPacks(expected, material)})` : ""}.
+          {hasCount ? (
+            <span className={`block ${difference === 0 ? "text-emerald-700" : "text-amber-700"}`}>
+              You counted {formatNumber(counted)} {material.unit}:{" "}
+              {difference === 0
+                ? "it matches."
+                : `${formatNumber(Math.abs(difference))} ${material.unit} ${difference < 0 ? "missing" : "more than recorded"}.`}
+            </span>
+          ) : null}
+        </p>
+      ) : null}
+
+      <label className="mt-3 block">
+        <span className="mb-2 block text-sm font-semibold text-slate-700">Note (optional)</span>
+        <input className="form-input" onChange={(event) => setNote(event.target.value)} value={note} />
+      </label>
+      {localError ? <p className="mt-3 text-sm font-semibold text-red-700">{localError}</p> : null}
+      <button className="primary-button mt-4 min-h-11 w-full sm:w-auto" type="submit">
+        Save stock count
       </button>
     </form>
   );
@@ -591,7 +766,9 @@ function MovementHistory({ records }: { records: RawMaterialMovement[] }) {
                     ? "Damaged in production"
                     : record.source === "production-void"
                       ? "Production cancelled"
-                      : record.movementType}
+                      : record.source === "stock-count"
+                        ? "Stock count"
+                        : record.movementType}
               </td>
               <td>
                 {formatNumber(record.quantity)}

@@ -39,6 +39,7 @@ import {
   updateDeliveryStatus
 } from "@/lib/delivery-data";
 import { hasPermission } from "@/lib/permissions";
+import { downloadDispatchPicture } from "@/lib/report-export";
 
 type DeliveryWorkspaceMode = "dashboard" | "dispatch" | "routes" | "drivers" | "reports";
 type DispatchPassCopyMode = "driver" | "gate" | "both";
@@ -752,6 +753,7 @@ function DeliveryRecordsTable({
                       <button className="secondary-button !px-3 !py-2" onClick={() => onPrint?.(record, "gate", "print")} type="button">Gate Copy</button>
                       <button className="primary-button !px-3 !py-2" onClick={() => onPrint?.(record, "both", "print")} type="button">Print Dispatch Pass</button>
                       <button className="secondary-button !px-3 !py-2" onClick={() => onPrint?.(record, "both", "pdf")} type="button">Download PDF</button>
+                      <button className="secondary-button !px-3 !py-2" onClick={() => saveDispatchPicture(record)} type="button">Save as picture</button>
                     </div>
                   </td>
                 ) : null}
@@ -961,6 +963,34 @@ function SignatureLine({ label }: { label: string }) {
       <div className="border-t border-black pt-2 font-bold">{label}</div>
     </div>
   );
+}
+
+function saveDispatchPicture(record: DeliveryRecord) {
+  const company = getCompanyById(record.companyId);
+
+  void downloadDispatchPicture({
+    companyName: record.companyName,
+    tinNumber: company?.tinNumber,
+    dispatchNumber: record.id,
+    date: record.date,
+    status: record.status,
+    details: [
+      { label: "Client", value: record.clientName },
+      { label: "Client phone", value: record.clientPhone ?? "" },
+      { label: "Delivery location", value: record.deliveryLocation },
+      { label: "Order", value: record.orderId },
+      { label: "Truck / plate", value: record.truck },
+      { label: "Driver", value: record.driver },
+      { label: "Driver phone", value: record.driverPhone ?? "" },
+      { label: "Delivery staff", value: record.deliveryStaff }
+    ],
+    products: parseProductSummary(record.productSummary).map((row) => ({ product: row.product, cartons: row.quantity })),
+    totalCartons: record.totalCartons,
+    preparedBy: record.createdBy
+  }).catch((problem) => {
+    console.warn(problem);
+    window.alert("The picture could not be created. Try again.");
+  });
 }
 
 function parseProductSummary(summary: string) {

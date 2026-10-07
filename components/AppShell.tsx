@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   ClipboardList,
+  DatabaseBackup,
   Download,
   Factory,
   FileText,
@@ -305,6 +306,12 @@ const navItems: NavItem[] = [
     label: "Companies",
     icon: Building2,
     roles: getAllowedRoles("/admin/companies")
+  },
+  {
+    href: "/admin/backup",
+    label: "Backup",
+    icon: DatabaseBackup,
+    roles: getAllowedRoles("/admin/backup")
   },
   {
     href: "/daily-report",

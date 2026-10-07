@@ -238,6 +238,32 @@ export async function syncSupabaseToLocalStorage() {
   );
 }
 
+// How records of a saved list are told apart, for the lists that are shared through the database.
+export function getSyncedRecordId(localKey: string) {
+  return configs.find((config) => config.localKey === localKey)?.getId;
+}
+
+// Sends what this device holds to the database. Used after a backup is restored,
+// so the restored records reach the other devices instead of being replaced at the next sync.
+export async function uploadLocalRecordsToSupabase(localKeys: string[]) {
+  if (!isSupabaseConfigured()) {
+    return;
+  }
+
+  await Promise.all(
+    configs
+      .filter((config) => localKeys.includes(config.localKey))
+      .map((config) =>
+        upsertSupabaseRows(
+          config.table,
+          readJson<unknown[]>(config.localKey, []),
+          config.getId,
+          config.getUpdatedAt
+        )
+      )
+  );
+}
+
 export function mirrorRecordsToSupabase<T>(
   table: SupabaseTable,
   records: T[],
