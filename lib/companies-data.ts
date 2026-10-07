@@ -321,7 +321,7 @@ export function removeCompany(companyId: string, mode: "archive" | "permanent") 
 
   const removedKeys = removeCompanyLinkedRows(companyId);
   const companies = saveCompanies(getCompanies({ includeArchived: true }).filter((company) => company.id !== companyId));
-  if (typeof window !== "undefined" && window.localStorage.getItem(ACTIVE_COMPANY_KEY) === companyId) {
+  if (typeof window !== "undefined" && readActiveCompanyId() === companyId) {
     writeJson(ACTIVE_COMPANY_KEY, "all");
   }
 
