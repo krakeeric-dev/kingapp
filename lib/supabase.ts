@@ -1,3 +1,4 @@
+import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/supabase-config";
 import {
   enqueueOfflineAction,
   getSyncQueue,
@@ -31,12 +32,7 @@ type SupabasePayloadRow<T> = {
   updated_at?: string;
 };
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-export function isSupabaseConfigured() {
-  return Boolean(supabaseUrl && supabaseAnonKey);
-}
+export { isSupabaseConfigured };
 
 function getRestUrl(table: SupabaseTable, query = "") {
   return `${supabaseUrl}/rest/v1/${table}${query}`;
